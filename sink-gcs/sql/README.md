@@ -1,7 +1,7 @@
 # sink-gcs/sql — BigQuery schema contract + reference DDL
 
 This directory is the **schema authority** for the mio lakehouse. mio is the
-producer; consumers (e.g. `ab-spectrum/infra/loaders/bq-mio`) read the canonical
+producer; consumers (e.g. `ab-spectrum/infra/services/bq-mio`) read the canonical
 schema and DDL from here.
 
 ## Files
@@ -21,7 +21,7 @@ placeholders — render with `envsubst` before piping into `bq query`.
 ## Where the loader lives
 
 The hourly Cloud Run Job that materialises `raw_mio.messages` from GCS NDJSON
-is **not in this repo** — see [`ab-spectrum/infra/loaders/bq-mio/`](https://github.com/AB-Spectrum/infra)
+is **not in this repo** — see [`ab-spectrum/infra/services/bq-mio/`](https://github.com/AB-Spectrum/infra)
 (consumer-side concern). mio publishes the contract; the consumer builds the
 pipeline. The loader vendors `messages_schema.json` and verifies it against
 this repo's `main` in its own CI.
@@ -106,5 +106,5 @@ to camelCase without re-authoring the schema.
 ## Monitoring + alerts
 
 Loader observability and Cloud Monitoring alert policies live with the
-loader (`ab-spectrum/infra/loaders/bq-mio/README.md` + the `bigquery-loader`
+loader (`ab-spectrum/infra/services/bq-mio/README.md` + the `bigquery-loader`
 terragrunt module). Notification channel: existing `GCHAT_WEBHOOK_URL`.

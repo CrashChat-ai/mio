@@ -312,7 +312,7 @@ GCS partitioning: `gs://ab-spectrum-sensitive-prod/mio/channel_type=<slug>/date=
 
 GCS NDJSON is the lake-of-record. The `raw_mio` dataset hosts four objects
 that materialise it for analyst use, populated by an hourly Cloud Run Job
-that lives **outside** this repo, in `ab-spectrum/infra` under `loaders/bq-mio/`
+that lives **outside** this repo, in `ab-spectrum/infra` under `services/bq-mio/`
 (consumer-side concern; mio publishes the schema contract, consumers build
 the pipelines). No streaming sink, no second writer.
 
@@ -356,7 +356,7 @@ matches the existing `raw_*` dataset policy (no column-level security).
 Revisit if PII concerns escalate.
 
 **Reference:** `sink-gcs/sql/README.md` (DDL + schema contract);
-loader implementation lives in `ab-spectrum/infra/loaders/bq-mio/`.
+loader implementation lives in `ab-spectrum/infra/services/bq-mio/`.
 
 ---
 

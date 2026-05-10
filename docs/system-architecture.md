@@ -301,13 +301,59 @@ Two lifetimes, two access patterns, never shared.
 |---|---|---|---|---|
 | Operational | Postgres + pgvector | hot | per-thread, low-latency, transactional | MIU |
 | Bus | NATS JetStream | 7d (in) / 23h (out) | streaming, replayable | MIO |
-| Archive | GCS + BigQuery external tables | indefinite (lifecycle to Coldline) | analytical, batch | MIO |
+| Lake | GCS NDJSON | indefinite (lifecycle to Coldline) | append-only, batch | MIO (sink-gcs) |
+| Warehouse | BigQuery `raw_mio` | indefinite (no partition expiry yet) | analytical, deduped | MIO (bq-loader) |
 
-GCS partitioning: `gs://mio-messages/channel_type=<channel_type>/date=YYYY-MM-DD/`
-(Hive-style for BQ external table partition discovery; `channel_type` value
-is the `proto/channels.yaml` registry slug — e.g. `zoho_cliq`, `slack`).
-Lifecycle: Standard → Nearline @ 30d → Coldline @ 90d. BigQuery external
-tables read directly from GCS — no separate BQ sink, no double-write.
+GCS partitioning: `gs://ab-spectrum-sensitive-prod/mio/channel_type=<slug>/date=YYYY-MM-DD/`
+(Hive-style; `channel_type` is the `proto/channels.yaml` registry slug — e.g.
+`zoho_cliq`, `slack`). Lifecycle: Standard → Nearline @ 30d → Coldline @ 90d.
+
+### 8.1 BigQuery lakehouse (`raw_mio`)
+
+GCS NDJSON is the lake-of-record. The `raw_mio` dataset hosts four objects
+that materialise it for analyst use, populated by an hourly Cloud Run Job
+(`tools/bq-loader/`) — no streaming sink, no second writer.
+
+| Object | Type | Purpose |
+|---|---|---|
+| `messages_external` | Hive-partitioned EXTERNAL TABLE | Ad-hoc / ops queries; duplicates present by design. |
+| `messages` | Native, partitioned by `DATE(received_at)`, clustered on `(channel_type, account_id, conversation_id)` | Authoritative warehouse table. `require_partition_filter=TRUE`. |
+| `messages_dedup` | View | Analyst-facing canonical query — unique on `(account_id, source_message_id)`. **Use this.** |
+| `messages_errors` | Native, 30-day partition expiry | Quarantine for rows the loader couldn't validate. |
+
+```mermaid
+flowchart LR
+  GCS["gs://ab-spectrum-sensitive-prod/mio/<br/>channel_type=*/date=*/*.ndjson"] --> EXT["raw_mio.messages_external<br/>(EXTERNAL, autodetect off)"]
+  GCS --> JOB["bq-loader<br/>(Cloud Run Job, hourly)"]
+  JOB -- "validate.sql" --> ERR["raw_mio.messages_errors"]
+  JOB -- "merge.sql<br/>(account_id, source_message_id)" --> NATIVE["raw_mio.messages<br/>(native, partitioned)"]
+  NATIVE --> VIEW["raw_mio.messages_dedup<br/>(view)"]
+```
+
+**SLA:** rows visible in `messages` within ~10–60 min of NDJSON write
+(Cloud Scheduler `5 * * * *` + Cloud Run Job <5 min budget per window).
+
+**Dedup recipe:** `messages_dedup` keeps the most-recent row per
+`(account_id, source_message_id)` ordered by `(received_at DESC, _ingest_at DESC)`.
+At-least-once delivery from sink-gcs means duplicates exist in the lake;
+they are resolved at read time, not at write time.
+
+**Schema-evolution rule:** proto change → DDL change in the same PR.
+`tools/bq-loader/ci/check-schema-drift.sh` fails the PR if proto fields
+outpace `sink-gcs/sql/messages_schema.json`.
+
+**Wire format:** sink-gcs emits snake_case NDJSON (`UseProtoNames: true`)
+so keys match the BQ schema 1:1 — flipping back silently NULLs columns.
+
+**Retention:** no partition expiration on `messages` yet; revisit when org
+retention policy lands. `messages_errors` carries 30-day expiry.
+
+**PII:** `text` and `sender.display_name` carry user content; access today
+matches the existing `raw_*` dataset policy (no column-level security).
+Revisit if PII concerns escalate.
+
+**Reference:** `sink-gcs/sql/README.md`, `tools/bq-loader/README.md`,
+`plans/260510-1102-bq-sink-lakehouse/`.
 
 ---
 

@@ -5,6 +5,7 @@
 //
 // protojson defaults (per P6 plan §Record format):
 //   - EmitUnpopulated: false  — skip zero values; smaller NDJSON
+//   - UseProtoNames:   true   — emit snake_case field names matching .proto (BQ-load-friendly)
 //   - UseEnumNumbers:  false  — emit enum string names → SQL-friendly
 //   - AllowPartial:    false  — strict
 package encode
@@ -18,6 +19,7 @@ import (
 
 var marshaler = protojson.MarshalOptions{
 	EmitUnpopulated: false, // skip zero/unset fields — smaller NDJSON
+	UseProtoNames:   true,  // snake_case wire format — BQ schema is snake_case; camelCase silently NULLs columns on bq load
 	UseEnumNumbers:  false, // emit enum string names (e.g. "CONVERSATION_KIND_DM") — SQL-friendly
 	AllowPartial:    false, // strict — reject messages missing required fields
 }

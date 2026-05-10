@@ -152,12 +152,20 @@ func TestEncode_EmitUnpopulatedFalse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
-	// ConversationExternalId is empty → should not appear with EmitUnpopulated=false.
 	s := string(line)
-	// conversation_external_id is the protojson field name; must be absent if empty.
-	// We check the field name as protojson would emit it.
-	if contains(s, `"conversationExternalId":""`) {
-		t.Error("empty conversationExternalId should be omitted with EmitUnpopulated=false")
+	// EmitUnpopulated=false: empty fields are omitted entirely. Check by
+	// asserting the snake_case key (UseProtoNames=true) is absent.
+	if contains(s, `"conversation_external_id"`) {
+		t.Error("empty conversation_external_id should be omitted with EmitUnpopulated=false")
+	}
+	// UseProtoNames=true contract: populated fields use snake_case, never camelCase.
+	// channel_type is set above; locking the snake_case shape protects the BQ
+	// schema from a silent flip back to camelCase (which would NULL columns).
+	if !contains(s, `"channel_type":"zoho_cliq"`) {
+		t.Errorf("expected snake_case channel_type in NDJSON, got: %s", s)
+	}
+	if contains(s, `"channelType"`) {
+		t.Errorf("camelCase channelType leaked — UseProtoNames=true broken; got: %s", s)
 	}
 }
 

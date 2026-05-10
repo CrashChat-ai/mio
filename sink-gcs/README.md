@@ -64,12 +64,18 @@ go run ./cmd/sink
 
 ## BigQuery dedup
 
-JetStream pull is at-least-once; the sink does no runtime dedup. Standard view:
+JetStream pull is at-least-once; the sink does no runtime dedup. Use the
+`messages_dedup` view in the `raw_mio` dataset — keyed on
+`(account_id, source_message_id)` (the proto-locked idempotency key, not
+`id` which is a per-publish UUID v7):
 
 ```sql
-SELECT * FROM `<project>.<dataset>.messages`
-QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY received_at DESC) = 1;
+SELECT * FROM `<project>.raw_mio.messages_dedup`
+WHERE DATE(received_at) BETWEEN @from AND @to;  -- partition filter required
 ```
+
+DDL + apply order: see `sink-gcs/sql/README.md`. Loader:
+`tools/bq-loader/README.md`.
 
 ## Upgrade trigger
 

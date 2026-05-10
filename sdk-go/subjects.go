@@ -89,7 +89,7 @@ func Inbound(channelType, accountID, conversationID string) (string, error) {
 //
 //	mio.inbound_enriched.<channel_type>.<account_id>.<conversation_id>
 //
-// Emitted by attachment-downloader after attachment URLs are rewritten to
+// Emitted by media-vault after attachment URLs are rewritten to
 // stable storage URLs. Same shape as Inbound but with the "_enriched" verb.
 func InboundEnriched(channelType, accountID, conversationID string) (string, error) {
 	if err := validateChannelType(channelType); err != nil {

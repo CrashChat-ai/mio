@@ -19,7 +19,7 @@ jobs:
       sdk-py: ${{ steps.filter.outputs.sdk-py }}
       proto: ${{ steps.filter.outputs.proto }}
       helm: ${{ steps.filter.outputs.helm }}
-      attachment-downloader: ${{ steps.filter.outputs.attachment-downloader }}
+      media-vault: ${{ steps.filter.outputs.media-vault }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -45,8 +45,8 @@ jobs:
               - 'buf.gen.yaml'
             helm:
               - 'deploy/charts/**'
-            attachment-downloader:
-              - 'attachment-downloader/**'
+            media-vault:
+              - 'media-vault/**'
               - 'sdk-go/**'
               - 'proto/gen/go/**'
 
@@ -155,7 +155,7 @@ jobs:
           helm lint deploy/charts/mio-gateway
           helm lint deploy/charts/mio-sink-gcs
           helm lint deploy/charts/mio-echo-consumer
-          helm lint deploy/charts/mio-attachment-downloader
+          helm lint deploy/charts/mio-media-vault
 
       - name: helm template (render check)
         run: |
@@ -167,7 +167,7 @@ jobs:
           helm template test-sink-gcs deploy/charts/mio-sink-gcs \
             --set serviceAccount.gcpServiceAccount=mio-sink-gcs@example.iam.gserviceaccount.com
           helm template test-echo-consumer deploy/charts/mio-echo-consumer
-          helm template test-attachment-downloader deploy/charts/mio-attachment-downloader \
+          helm template test-media-vault deploy/charts/mio-media-vault \
             --set serviceAccount.gcpServiceAccount=mio-attachments@example.iam.gserviceaccount.com
 
   # ── Build + push gateway image (main push only) ────────────────────────────
@@ -254,10 +254,10 @@ jobs:
           cache-to: type=registry,ref=ghcr.io/crashchat-ai/mio/sink-gcs:cache,mode=max
           platforms: linux/amd64
 
-  # ── attachment-downloader test ────────────────────────────────────────────
-  test-attachment-downloader:
+  # ── media-vault test ────────────────────────────────────────────
+  test-media-vault:
     needs: changes
-    if: needs.changes.outputs.attachment-downloader == 'true'
+    if: needs.changes.outputs.media-vault == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -270,15 +270,15 @@ jobs:
         run: buf generate proto
 
       - name: go test
-        run: cd attachment-downloader && go test ./...
+        run: cd media-vault && go test ./...
 
-  # ── Build + push attachment-downloader image (main push only) ─────────────
-  build-attachment-downloader:
-    needs: [changes, test-attachment-downloader]
+  # ── Build + push media-vault image (main push only) ─────────────
+  build-media-vault:
+    needs: [changes, test-media-vault]
     if: |
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
-      needs.changes.outputs.attachment-downloader == 'true'
+      needs.changes.outputs.media-vault == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -300,17 +300,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push attachment-downloader
+      - name: Build and push media-vault
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: attachment-downloader/Dockerfile
+          file: media-vault/Dockerfile
           push: true
           tags: |
-            ghcr.io/crashchat-ai/mio/attachment-downloader:${{ github.sha }}
-            ghcr.io/crashchat-ai/mio/attachment-downloader:main
-          cache-from: type=registry,ref=ghcr.io/crashchat-ai/mio/attachment-downloader:cache
-          cache-to: type=registry,ref=ghcr.io/crashchat-ai/mio/attachment-downloader:cache,mode=max
+            ghcr.io/crashchat-ai/mio/media-vault:${{ github.sha }}
+            ghcr.io/crashchat-ai/mio/media-vault:main
+          cache-from: type=registry,ref=ghcr.io/crashchat-ai/mio/media-vault:cache
+          cache-to: type=registry,ref=ghcr.io/crashchat-ai/mio/media-vault:cache,mode=max
           platforms: linux/amd64
 
   # ── Build + push echo-consumer image (main push only) ─────────────────────

@@ -132,7 +132,7 @@ type NormalizedMessage struct {
 	Attributes map[string]string
 
 	// Structured attachments (raw url/mime/filename — sidecar persists bytes
-	// and rewrites url to a stable signed URL via P9 attachment-downloader).
+	// and rewrites url to a stable signed URL via P9 media-vault).
 	// Empty for text-only messages. Kept as a sibling to Attributes so
 	// downstream consumers can iterate over typed Attachment without parsing
 	// the JSON-encoded `cliq_attachment` attribute.
@@ -224,7 +224,7 @@ func Normalize(p *WebhookPayload) (*NormalizedMessage, error) {
 
 	// --- Attachment → structured + attributes (legacy JSON kept for back-compat) ---
 	if msg.File != nil {
-		// Structured form for the P9 attachment-downloader sidecar.
+		// Structured form for the P9 media-vault sidecar.
 		if msg.File.URL != "" {
 			nm.Attachments = append(nm.Attachments, NormalizedAttachment{
 				URL:      msg.File.URL,

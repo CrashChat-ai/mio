@@ -21,9 +21,9 @@ a single account from object storage.
 
 ```bash
 kubectl -n mio run cli --rm -it --restart=Never \
-  --image=ghcr.io/crashchat-ai/mio/attachment-downloader:<sha> \
-  --serviceaccount=mio-attachment-downloader \
-  --command -- /mio-attachment-cli delete \
+  --image=ghcr.io/crashchat-ai/mio/media-vault:<sha> \
+  --serviceaccount=mio-media-vault \
+  --command -- /mio-media-cli delete \
     --account_id=<UUID> \
     --prefix=mio/attachments/ \
     --dry-run
@@ -38,9 +38,9 @@ Drop `--dry-run`:
 
 ```bash
 kubectl -n mio run cli --rm -it --restart=Never \
-  --image=ghcr.io/crashchat-ai/mio/attachment-downloader:<sha> \
-  --serviceaccount=mio-attachment-downloader \
-  --command -- /mio-attachment-cli delete \
+  --image=ghcr.io/crashchat-ai/mio/media-vault:<sha> \
+  --serviceaccount=mio-media-vault \
+  --command -- /mio-media-cli delete \
     --account_id=<UUID> \
     --prefix=mio/attachments/ \
     --concurrency=16
@@ -70,7 +70,7 @@ Cluster log retention is ≥30d.
 gcloud auth application-default login
 export MIO_STORAGE_BACKEND=gcs
 export MIO_STORAGE_BUCKET=ab-spectrum-backups-prod
-go run ./cmd/mio-attachment-cli delete --account_id=<UUID> --dry-run
+go run ./cmd/mio-media-cli delete --account_id=<UUID> --dry-run
 ```
 
 ## Notes

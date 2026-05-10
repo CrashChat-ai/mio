@@ -2,7 +2,7 @@ go 1.25.10
 
 use (
 	.
-	./attachment-downloader
+	./media-vault
 	./gateway
 	./sdk-go
 	./sink-gcs

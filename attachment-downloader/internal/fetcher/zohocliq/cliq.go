@@ -19,26 +19,29 @@ import (
 
 const channelType = "zoho_cliq"
 
-// Fetcher downloads attachment bytes from Cliq using the bot oauth token.
+// Fetcher downloads attachment bytes from Cliq using a Zoho OAuth access
+// token minted on demand from a long-lived refresh token (matches the
+// gateway's auth flow).
 type Fetcher struct {
 	httpClient *http.Client
-	botToken   string
+	tokens     *tokenSource
 	maxBytes   int64
 	// allowInsecureForTest relaxes the https-only check so httptest servers
 	// (which serve http://) can drive unit tests. Never set in production.
 	allowInsecureForTest bool
 }
 
-// New constructs a Cliq fetcher. botToken is the long-lived oauth token
-// the gateway already uses; maxBytes caps a single download.
-func New(httpClient *http.Client, botToken string, maxBytes int64) *Fetcher {
+// New constructs a Cliq fetcher. tokens may be nil — in which case Fetch
+// sends no Authorization header (useful for tests with public URLs). In
+// production, tokens MUST be non-nil; main wires it up from config.
+func New(httpClient *http.Client, tokens *tokenSource, maxBytes int64) *Fetcher {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 90 * time.Second}
 	}
 	if maxBytes <= 0 {
 		maxBytes = 25 * 1024 * 1024
 	}
-	return &Fetcher{httpClient: httpClient, botToken: botToken, maxBytes: maxBytes}
+	return &Fetcher{httpClient: httpClient, tokens: tokens, maxBytes: maxBytes}
 }
 
 // ChannelType returns the slug.
@@ -58,19 +61,19 @@ func (f *Fetcher) Fetch(ctx context.Context, att *miov1.Attachment, dst io.Write
 		return fetcher.Result{}, &fetcher.Error{Code: miov1.Attachment_ERROR_CODE_NOT_FOUND, Msg: "non-https url"}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	resp, err := f.do(ctx, rawURL)
 	if err != nil {
-		return fetcher.Result{}, fmt.Errorf("zohocliq: new request: %w", err)
+		return fetcher.Result{}, err
 	}
-	if f.botToken != "" {
-		req.Header.Set("Authorization", "Zoho-oauthtoken "+f.botToken)
-	}
-	req.Header.Set("User-Agent", "mio-attachment-downloader/1.0")
-
-	resp, err := f.httpClient.Do(req)
-	if err != nil {
-		// network error — retryable
-		return fetcher.Result{}, fmt.Errorf("zohocliq: do: %w", err)
+	// Self-heal once on 401: Zoho occasionally rotates a token early. Drop
+	// the cache and retry with a freshly-minted access token.
+	if resp.StatusCode == http.StatusUnauthorized && f.tokens != nil {
+		_ = resp.Body.Close()
+		f.tokens.Invalidate()
+		resp, err = f.do(ctx, rawURL)
+		if err != nil {
+			return fetcher.Result{}, err
+		}
 	}
 	defer resp.Body.Close()
 
@@ -106,6 +109,31 @@ func (f *Fetcher) Fetch(ctx context.Context, att *miov1.Attachment, dst io.Write
 		SHA256Hex:   hex.EncodeToString(h.Sum(nil)),
 		ContentType: ct,
 	}, nil
+}
+
+// do issues a single GET against rawURL, attaching a freshly-minted Zoho
+// access token (if a tokenSource is configured). OAuth refresh failures
+// surface as a wrapped *refreshError so callers can distinguish auth-flow
+// breakage from Cliq REST errors.
+func (f *Fetcher) do(ctx context.Context, rawURL string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("zohocliq: new request: %w", err)
+	}
+	if f.tokens != nil {
+		tok, terr := f.tokens.Get(ctx)
+		if terr != nil {
+			return nil, fmt.Errorf("zohocliq: %w", terr)
+		}
+		req.Header.Set("Authorization", "Zoho-oauthtoken "+tok)
+	}
+	req.Header.Set("User-Agent", "mio-attachment-downloader/1.0")
+
+	resp, err := f.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("zohocliq: do: %w", err)
+	}
+	return resp, nil
 }
 
 // classify maps Cliq HTTP responses to typed FetchError or nil for 2xx.

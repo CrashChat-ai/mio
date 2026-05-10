@@ -98,7 +98,7 @@ func run() error {
 	}()
 
 	// Register channel fetchers.
-	zohocliq.MustRegister(cfg.CliqBotToken, cfg.DownloadMaxBytes, cfg.DownloadTimeout)
+	zohocliq.MustRegister(cfg.CliqClientID, cfg.CliqClientSecret, cfg.CliqRefreshToken, cfg.DownloadMaxBytes, cfg.DownloadTimeout)
 
 	// Provision MESSAGES_INBOUND_ENRICHED on first boot (idempotent).
 	if err := publisher.EnsureStream(ctx, js, 1); err != nil {

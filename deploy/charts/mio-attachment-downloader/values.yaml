@@ -39,10 +39,13 @@ config:
   metricsPort: "9090"
   logLevel: "info"
 
-# CLIQ_BOT_TOKEN comes from the existing mio-gateway-secrets Secret.
+# Cliq OAuth credentials come from the existing mio-gateway-secrets Secret.
+# The downloader mints fresh access tokens on demand (matches gateway).
 secrets:
   existingSecret: "mio-gateway-secrets"
-  cliqBotTokenKey: "CLIQ_BOT_TOKEN"
+  cliqClientIDKey: "CLIQ_CLIENT_ID"
+  cliqClientSecretKey: "CLIQ_CLIENT_SECRET"
+  cliqRefreshTokenKey: "CLIQ_REFRESH_TOKEN"
 
 # Lifecycle Job (post-install hook): runs the CLI to set bucket lifecycle
 # rules matching JetStream Max Age. Idempotent.

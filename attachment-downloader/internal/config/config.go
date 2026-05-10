@@ -25,9 +25,12 @@ type Config struct {
 
 	EnrichedStream string
 
-	// Cliq token (read once on startup, env-injected by chart from existing
-	// gateway secret).
-	CliqBotToken string
+	// Cliq OAuth credentials. The fetcher mints fresh access tokens on
+	// demand from the refresh token; the static 1h-TTL bot token was
+	// dropped because tokens expired before pod uptime did.
+	CliqClientID     string
+	CliqClientSecret string
+	CliqRefreshToken string
 }
 
 // FromEnv loads + validates the config. Fail-fast: required fields missing
@@ -43,7 +46,9 @@ func FromEnv() (*Config, error) {
 		DurableName:      envOr("MIO_DURABLE_NAME", "attachment-downloader"),
 		LogLevel:         envOr("MIO_LOG_LEVEL", "info"),
 		EnrichedStream:   envOr("MIO_ENRICHED_STREAM", "MESSAGES_INBOUND_ENRICHED"),
-		CliqBotToken:     os.Getenv("MIO_CLIQ_BOT_TOKEN"),
+		CliqClientID:     os.Getenv("MIO_CLIQ_CLIENT_ID"),
+		CliqClientSecret: os.Getenv("MIO_CLIQ_CLIENT_SECRET"),
+		CliqRefreshToken: os.Getenv("MIO_CLIQ_REFRESH_TOKEN"),
 	}
 
 	dlSec, err := envIntOr("MIO_DOWNLOAD_TIMEOUT_SECONDS", 60)

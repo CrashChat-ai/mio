@@ -66,11 +66,21 @@ spec:
               value: {{ .Values.config.metricsPort | quote }}
             - name: MIO_LOG_LEVEL
               value: {{ .Values.config.logLevel | quote }}
-            - name: MIO_CLIQ_BOT_TOKEN
+            - name: MIO_CLIQ_CLIENT_ID
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.existingSecret }}
-                  key: {{ .Values.secrets.cliqBotTokenKey }}
+                  key: {{ .Values.secrets.cliqClientIDKey }}
+            - name: MIO_CLIQ_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: {{ .Values.secrets.cliqClientSecretKey }}
+            - name: MIO_CLIQ_REFRESH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: {{ .Values.secrets.cliqRefreshTokenKey }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

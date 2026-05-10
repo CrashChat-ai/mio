@@ -1,0 +1,126 @@
+[
+  {
+    "name": "id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "mio UUID v7 (canonical message id)."
+  },
+  {
+    "name": "schema_version",
+    "type": "INTEGER",
+    "mode": "NULLABLE",
+    "description": "Proto schema version; SDK rejects mismatches at publish."
+  },
+  {
+    "name": "tenant_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Foundation-level tenant id."
+  },
+  {
+    "name": "account_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "mio UUID for the channel install. Half of the dedup key."
+  },
+  {
+    "name": "channel_type",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Channel slug from proto/channels.yaml (e.g. zoho_cliq, slack). Cluster key."
+  },
+  {
+    "name": "conversation_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "mio conversation UUID. Cluster key."
+  },
+  {
+    "name": "conversation_external_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Platform-side opaque conversation id."
+  },
+  {
+    "name": "conversation_kind",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "ConversationKind enum NAME (e.g. CONVERSATION_KIND_DM). Stored as string for SQL-friendliness."
+  },
+  {
+    "name": "parent_conversation_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Parent conversation for thread/forum-post. Empty when not nested."
+  },
+  {
+    "name": "source_message_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Platform message id. Half of the dedup key (account_id, source_message_id)."
+  },
+  {
+    "name": "thread_root_message_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Thread root id for Matrix-style threads. Empty otherwise."
+  },
+  {
+    "name": "sender",
+    "type": "RECORD",
+    "mode": "NULLABLE",
+    "description": "Message author identity at the platform tier. Cross-channel merge happens in MIU.",
+    "fields": [
+      { "name": "external_id",  "type": "STRING", "mode": "NULLABLE", "description": "Platform user id." },
+      { "name": "display_name", "type": "STRING", "mode": "NULLABLE", "description": "Free-form display name." },
+      { "name": "peer_kind",    "type": "STRING", "mode": "NULLABLE", "description": "PeerKind enum NAME (PEER_KIND_DIRECT | PEER_KIND_GROUP)." },
+      { "name": "is_bot",       "type": "BOOLEAN", "mode": "NULLABLE", "description": "Platform-asserted bot flag." }
+    ]
+  },
+  {
+    "name": "text",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Message body. PII; access governed per Phase 0 Q5 (default access for now)."
+  },
+  {
+    "name": "attachments",
+    "type": "RECORD",
+    "mode": "REPEATED",
+    "description": "File / image / link / media items.",
+    "fields": [
+      { "name": "kind",           "type": "STRING",  "mode": "NULLABLE", "description": "Attachment.Kind enum NAME (KIND_IMAGE, KIND_FILE, ...)." },
+      { "name": "url",            "type": "STRING",  "mode": "NULLABLE", "description": "Original platform URL (may TTL)." },
+      { "name": "mime",           "type": "STRING",  "mode": "NULLABLE", "description": "MIME type." },
+      { "name": "bytes",          "type": "INTEGER", "mode": "NULLABLE", "description": "Byte count. protojson emits int64 as JSON string; BQ load coerces to INT64." },
+      { "name": "filename",       "type": "STRING",  "mode": "NULLABLE", "description": "Filename if known." },
+      { "name": "storage_key",    "type": "STRING",  "mode": "NULLABLE", "description": "Persisted object-storage key set by media-vault sidecar." },
+      { "name": "content_sha256", "type": "STRING",  "mode": "NULLABLE", "description": "Lowercase hex SHA-256 of persisted bytes." },
+      { "name": "error_code",     "type": "STRING",  "mode": "NULLABLE", "description": "Attachment.ErrorCode enum NAME (ERROR_CODE_OK, ERROR_CODE_EXPIRED, ...)." }
+    ]
+  },
+  {
+    "name": "received_at",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE",
+    "description": "Platform-side receipt time; partition key. RFC3339 in NDJSON."
+  },
+  {
+    "name": "attributes",
+    "type": "JSON",
+    "mode": "NULLABLE",
+    "description": "Channel-specific escape-hatch map<string,string>. Promoted to typed fields when ≥2 consumers read the same key (see CONTRIBUTING.md)."
+  },
+  {
+    "name": "_ingest_at",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE",
+    "description": "Loader run timestamp (CURRENT_TIMESTAMP() at MERGE time). Set by the bq-loader, not present in NDJSON."
+  },
+  {
+    "name": "_source_object",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "GCS object path the row was loaded from (_FILE_NAME pseudo-column). Set by the bq-loader."
+  }
+]

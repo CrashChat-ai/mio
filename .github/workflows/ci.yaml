@@ -20,6 +20,7 @@ jobs:
       proto: ${{ steps.filter.outputs.proto }}
       helm: ${{ steps.filter.outputs.helm }}
       media-vault: ${{ steps.filter.outputs.media-vault }}
+      bq-loader: ${{ steps.filter.outputs.bq-loader }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -49,6 +50,10 @@ jobs:
               - 'media-vault/**'
               - 'sdk-go/**'
               - 'proto/gen/go/**'
+            bq-loader:
+              - 'tools/bq-loader/**'
+              - 'sink-gcs/sql/**'
+              - 'proto/mio/v1/**'
 
   # ── Proto lint + breaking check ────────────────────────────────────────────
   test-proto:
@@ -311,6 +316,60 @@ jobs:
             ghcr.io/crashchat-ai/mio/media-vault:main
           cache-from: type=registry,ref=ghcr.io/crashchat-ai/mio/media-vault:cache
           cache-to: type=registry,ref=ghcr.io/crashchat-ai/mio/media-vault:cache,mode=max
+          platforms: linux/amd64
+
+  # ── bq-loader: schema-drift + shell syntax ────────────────────────────────
+  test-bq-loader:
+    needs: changes
+    if: needs.changes.outputs.bq-loader == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate JSON schema syntax
+        run: jq -e 'length > 0' sink-gcs/sql/messages_schema.json
+
+      - name: Schema drift (proto vs BQ)
+        run: tools/bq-loader/ci/check-schema-drift.sh
+
+      - name: Shell syntax check
+        run: |
+          for f in tools/bq-loader/load.sh tools/bq-loader/test/run-integration.sh tools/bq-loader/ci/check-schema-drift.sh; do
+            bash -n "$f"
+          done
+
+  # ── Build + push bq-loader image (main push only) ─────────────────────────
+  build-bq-loader:
+    needs: [changes, test-bq-loader]
+    if: |
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.bq-loader == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push bq-loader
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: tools/bq-loader/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/crashchat-ai/mio/bq-loader:${{ github.sha }}
+            ghcr.io/crashchat-ai/mio/bq-loader:main
+          cache-from: type=registry,ref=ghcr.io/crashchat-ai/mio/bq-loader:cache
+          cache-to: type=registry,ref=ghcr.io/crashchat-ai/mio/bq-loader:cache,mode=max
           platforms: linux/amd64
 
   # ── Build + push echo-consumer image (main push only) ─────────────────────

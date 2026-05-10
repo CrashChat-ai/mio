@@ -30,7 +30,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -41,10 +43,11 @@ import (
 )
 
 const (
-	streamName   = "MESSAGES_INBOUND"
-	durableName  = "gcs-archiver"
-	defaultNATS  = "nats://localhost:4222"
+	streamName    = "MESSAGES_INBOUND"
+	durableName   = "gcs-archiver"
+	defaultNATS   = "nats://localhost:4222"
 	defaultBucket = "mio-messages"
+	healthAddr    = ":8080"
 )
 
 func main() {
@@ -69,6 +72,28 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
+
+	// Health endpoint — matches the Helm chart's liveness/readiness probe
+	// at :8080/healthz. Returns 200 once the archiver loop is running below
+	// (indirect signal: if this goroutine is alive, the process is up; the
+	// archiver's own NATS-handle errors propagate up via Run() and crash the
+	// process, which is what we want kubernetes to see).
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	healthSrv := &http.Server{Addr: healthAddr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	go func() {
+		if err := healthSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error("health: ListenAndServe", "err", err)
+		}
+	}()
+	defer func() {
+		shutdownCtx, c := context.WithTimeout(context.Background(), 5*time.Second)
+		defer c()
+		_ = healthSrv.Shutdown(shutdownCtx)
+	}()
 
 	// Ensure bucket exists for MinIO (local dev).
 	if writerCfg.Backend == writer.BackendMinIO {

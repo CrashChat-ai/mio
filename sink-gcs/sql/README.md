@@ -1,21 +1,30 @@
-# sink-gcs/sql — BigQuery DDL for the mio lakehouse
+# sink-gcs/sql — BigQuery schema contract + reference DDL
 
-DDL for the `raw_mio` BigQuery dataset that materialises mio chat data from
-the GCS NDJSON sink. See `plans/260510-1102-bq-sink-lakehouse/` for the full
-plan and decisions.
+This directory is the **schema authority** for the mio lakehouse. mio is the
+producer; consumers (e.g. `ab-spectrum/infra/loaders/bq-mio`) read the canonical
+schema and DDL from here.
 
 ## Files
 
-| File | Type | Applied to | Purpose |
-|---|---|---|---|
-| `messages_schema.json` | BQ JSON schema | dataset | Canonical schema (typed, snake_case). Used by `bq mk --schema=` and as the source of truth for the schema-drift CI check. |
-| `messages_native.sql` | DDL | dataset | Native partitioned + clustered table. Loader writes here. |
-| `messages_dedup_view.sql` | DDL | dataset | Analyst-facing dedup view. Use **this**, not `messages` directly. |
-| `messages_errors.sql` | DDL | dataset | Quarantine for rows the loader couldn't validate. |
-| `external_table.sql` | DDL | dataset | Hive-partitioned external view over GCS — ops/exploration only. |
+| File | Role | Notes |
+|---|---|---|
+| `messages_schema.json` | **Canonical schema** (typed, snake_case) | Source of truth. Consumers vendor a copy. The `check-proto-drift.sh` CI guard ensures this matches `proto/mio/v1/*.proto`. |
+| `messages_native.sql` | Reference DDL — partitioned + clustered native table | Apply once per environment by the operator. |
+| `messages_dedup_view.sql` | Reference DDL — analyst-facing dedup view | Use **this**, not `messages` directly. |
+| `messages_errors.sql` | Reference DDL — quarantine table (30d retention) | Loader writes here when validation fails. |
+| `external_table.sql` | Reference DDL — Hive-partitioned external view | Ops/exploration entry point; duplicates by design. |
+| `check-proto-drift.sh` | CI guard | Fails the PR if proto fields outpace `messages_schema.json`. |
 
 All DDL files use `${PROJECT_ID}`, `${DATASET}`, `${BUCKET}`, `${PREFIX}`
 placeholders — render with `envsubst` before piping into `bq query`.
+
+## Where the loader lives
+
+The hourly Cloud Run Job that materialises `raw_mio.messages` from GCS NDJSON
+is **not in this repo** — see [`ab-spectrum/infra/loaders/bq-mio/`](https://github.com/AB-Spectrum/infra)
+(consumer-side concern). mio publishes the contract; the consumer builds the
+pipeline. The loader vendors `messages_schema.json` and verifies it against
+this repo's `main` in its own CI.
 
 ## Cutover from autodetect stub (run **once**, before Apply step 1)
 
@@ -73,20 +82,20 @@ and resolved at read time.
 ## Schema-evolution rule
 
 **Proto change → DDL change in the same PR.** Adding a field in
-`proto/mio/v1/*.proto` without updating `messages_schema.json` will silently
-NULL the new column on `bq load`. The `tools/bq-loader/ci/check-schema-drift.sh`
-CI job (Phase 6) fails the PR on drift.
+`proto/mio/v1/*.proto` without updating `messages_schema.json` silently
+NULLs the new column on every consumer's `bq load`. `check-proto-drift.sh`
+fails this repo's CI on drift.
 
 To add a field:
 
 1. Add it to the `.proto` file.
 2. Add it to `messages_schema.json` (matching name, type, mode).
 3. Add it to `messages_native.sql` and `external_table.sql` columns lists.
-4. The loader inherits the change automatically — `merge.sql` uses `INSERT ROW`
-   over `*` from the staging select.
-5. For `bq load` to accept the new column on existing partitions, pass
-   `--schema_update_option=ALLOW_FIELD_ADDITION` (already wired in
-   `tools/bq-loader/load.sh`).
+4. After mio's PR merges, downstream consumers `sync-schema.sh` against
+   the new `main` and bump their loader image. Their CI verifies the
+   vendored copy matches mio.
+5. For `bq load` to accept the new column on existing partitions, the
+   consumer passes `--schema_update_option=ALLOW_FIELD_ADDITION`.
 
 ## NDJSON wire format contract
 
@@ -96,11 +105,6 @@ to camelCase without re-authoring the schema.
 
 ## Monitoring + alerts
 
-See `tools/bq-loader/README.md` for loader observability. Phase 6 wires Cloud
-Monitoring alerts on:
-
-- Cloud Run Job execution failure in last 75 min.
-- No success log entry in last 90 min (catches scheduler-not-firing).
-
-Notification channel: existing `GCHAT_WEBHOOK_URL` (Google Chat) — same channel
-the rest of the platform monitoring uses.
+Loader observability and Cloud Monitoring alert policies live with the
+loader (`ab-spectrum/infra/loaders/bq-mio/README.md` + the `bigquery-loader`
+terragrunt module). Notification channel: existing `GCHAT_WEBHOOK_URL`.

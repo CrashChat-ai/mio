@@ -312,7 +312,9 @@ GCS partitioning: `gs://ab-spectrum-sensitive-prod/mio/channel_type=<slug>/date=
 
 GCS NDJSON is the lake-of-record. The `raw_mio` dataset hosts four objects
 that materialise it for analyst use, populated by an hourly Cloud Run Job
-(`tools/bq-loader/`) — no streaming sink, no second writer.
+that lives **outside** this repo, in `ab-spectrum/infra` under `loaders/bq-mio/`
+(consumer-side concern; mio publishes the schema contract, consumers build
+the pipelines). No streaming sink, no second writer.
 
 | Object | Type | Purpose |
 |---|---|---|
@@ -339,8 +341,9 @@ At-least-once delivery from sink-gcs means duplicates exist in the lake;
 they are resolved at read time, not at write time.
 
 **Schema-evolution rule:** proto change → DDL change in the same PR.
-`tools/bq-loader/ci/check-schema-drift.sh` fails the PR if proto fields
-outpace `sink-gcs/sql/messages_schema.json`.
+`sink-gcs/sql/check-proto-drift.sh` (foundation guard, runs in mio CI)
+fails the PR if proto fields outpace `sink-gcs/sql/messages_schema.json`.
+Consumers vendor the schema and verify it against mio main in their own CI.
 
 **Wire format:** sink-gcs emits snake_case NDJSON (`UseProtoNames: true`)
 so keys match the BQ schema 1:1 — flipping back silently NULLs columns.
@@ -352,8 +355,8 @@ retention policy lands. `messages_errors` carries 30-day expiry.
 matches the existing `raw_*` dataset policy (no column-level security).
 Revisit if PII concerns escalate.
 
-**Reference:** `sink-gcs/sql/README.md`, `tools/bq-loader/README.md`,
-`plans/260510-1102-bq-sink-lakehouse/`.
+**Reference:** `sink-gcs/sql/README.md` (DDL + schema contract);
+loader implementation lives in `ab-spectrum/infra/loaders/bq-mio/`.
 
 ---
 

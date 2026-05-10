@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
-# Schema-drift CI check.
+# Foundation-contract guard: proto ↔ BQ schema must stay in lock-step.
 #
 # Compares the field set declared in proto/mio/v1/{message,attachment,sender}.proto
 # against sink-gcs/sql/messages_schema.json (recursively, including nested
 # RECORD fields). Fails the PR (exit 1) when proto fields outpace the BQ
 # schema — silent NULL columns on bq load are the failure mode this prevents.
 #
-# Whitelisted (BQ-only loader columns, never in proto):
+# This is a producer-side invariant. Every consumer that reads NDJSON via
+# the canonical schema (e.g. ab-spectrum/infra/loaders/bq-mio) depends on
+# this contract holding. The check lives next to the schema, not next to
+# any specific consumer.
+#
+# Whitelisted (loader-side conventions, never in proto):
 #   _ingest_at, _source_object
 #
 # Run:
-#   tools/bq-loader/ci/check-schema-drift.sh
+#   sink-gcs/sql/check-proto-drift.sh
 #
 # Dependencies: bash, jq, awk, sort, comm.
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCHEMA="${REPO_ROOT}/sink-gcs/sql/messages_schema.json"
 PROTO_DIR="${REPO_ROOT}/proto/mio/v1"
 

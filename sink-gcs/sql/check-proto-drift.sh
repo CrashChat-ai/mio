@@ -7,7 +7,7 @@
 # schema — silent NULL columns on bq load are the failure mode this prevents.
 #
 # This is a producer-side invariant. Every consumer that reads NDJSON via
-# the canonical schema (e.g. ab-spectrum/infra/loaders/bq-mio) depends on
+# the canonical schema (e.g. ab-spectrum/infra/services/bq-mio) depends on
 # this contract holding. The check lives next to the schema, not next to
 # any specific consumer.
 #

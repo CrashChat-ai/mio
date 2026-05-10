@@ -25,7 +25,16 @@ serviceAccount:
 
 config:
   natsUrl: "nats://mio-nats:4222"
+  # SINK_BACKEND must be "gcs" in any non-local deployment. The binary defaults
+  # to "minio" for local dev, which crashes on a real cluster (no minio at
+  # localhost:9000).
+  sinkBackend: "gcs"
+  # GCS bucket the writer flushes NDJSON to. Override per environment.
   gcsBucket: "mio-messages-poc"
+  # Optional path prepended to every object key. Empty (default) writes at
+  # bucket root; set to "mio/" to land objects under a shared bucket prefix
+  # (e.g. ab-spectrum-sensitive-prod/mio/channel_type=…/date=…/file.ndjson).
+  gcsPrefix: ""
   # Offset-based filename: <consumer-id>-<seq-start>-<seq-end>.ndjson
   # Partition: channel_type=<ct>/date=YYYY-MM-DD/
   flushIntervalSeconds: "30"

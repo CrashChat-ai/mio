@@ -19,6 +19,9 @@
 //	NATS_URL          — NATS server URL (default: nats://localhost:4222)
 //	SINK_BACKEND      — "gcs" or "minio" (default: minio)
 //	SINK_BUCKET       — GCS/MinIO bucket name (default: mio-messages)
+//	SINK_PREFIX       — optional path prepended to object keys; e.g. "mio/" so
+//	                    objects land at gs://<bucket>/mio/channel_type=…/…
+//	                    Empty (default) writes at bucket root.
 //	SINK_ENDPOINT     — MinIO endpoint (default: http://localhost:9000)
 //	SINK_ACCESS_KEY   — MinIO access key (default: minioadmin)
 //	SINK_SECRET_KEY   — MinIO secret key (default: minioadmin)

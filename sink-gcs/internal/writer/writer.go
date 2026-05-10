@@ -52,16 +52,21 @@ const (
 
 // Config holds the storage backend configuration derived from environment.
 type Config struct {
-	Backend          Backend
-	Bucket           string
-	Endpoint         string // MinIO endpoint override (e.g. "http://minio:9000")
-	AccessKey        string // MinIO access key
-	SecretKey        string // MinIO secret key
-	UseSSL           bool   // MinIO TLS
-	CredentialsFile  string // GCS: path to service-account JSON (or "" for ADC)
+	Backend         Backend
+	Bucket          string
+	// Prefix is an optional path prepended to every object key, normalized so
+	// that a non-empty value always ends in "/". Empty means write at bucket root.
+	// Example: "mio/" → objects land at gs://<bucket>/mio/channel_type=.../...
+	Prefix          string
+	Endpoint        string // MinIO endpoint override (e.g. "http://minio:9000")
+	AccessKey       string // MinIO access key
+	SecretKey       string // MinIO secret key
+	UseSSL          bool   // MinIO TLS
+	CredentialsFile string // GCS: path to service-account JSON (or "" for ADC)
 }
 
-// ConfigFromEnv reads SINK_BACKEND, SINK_BUCKET, and backend-specific vars.
+// ConfigFromEnv reads SINK_BACKEND, SINK_BUCKET, SINK_PREFIX, and
+// backend-specific vars.
 func ConfigFromEnv() (*Config, error) {
 	backend := Backend(os.Getenv("SINK_BACKEND"))
 	if backend == "" {
@@ -79,11 +84,28 @@ func ConfigFromEnv() (*Config, error) {
 	return &Config{
 		Backend:         backend,
 		Bucket:          bucket,
-		Endpoint:        os.Getenv("SINK_ENDPOINT"),    // e.g. "http://minio:9000"
-		AccessKey:       os.Getenv("SINK_ACCESS_KEY"),  // MinIO root user
-		SecretKey:       os.Getenv("SINK_SECRET_KEY"),  // MinIO root password
+		Prefix:          normalizePrefix(os.Getenv("SINK_PREFIX")),
+		Endpoint:        os.Getenv("SINK_ENDPOINT"),
+		AccessKey:       os.Getenv("SINK_ACCESS_KEY"),
+		SecretKey:       os.Getenv("SINK_SECRET_KEY"),
 		CredentialsFile: os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"),
 	}, nil
+}
+
+// normalizePrefix trims leading slashes (objects don't start with "/") and
+// ensures a single trailing slash so the caller can use simple concatenation
+// (`cfg.Prefix + objectPath`). An empty prefix stays empty.
+func normalizePrefix(p string) string {
+	for len(p) > 0 && p[0] == '/' {
+		p = p[1:]
+	}
+	if p == "" {
+		return ""
+	}
+	if p[len(p)-1] != '/' {
+		p += "/"
+	}
+	return p
 }
 
 // New constructs a Writer for the given backend configuration.

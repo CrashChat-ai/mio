@@ -279,7 +279,9 @@ func (a *Archiver) flushPartition(ctx context.Context, partPath string) error {
 	a.inflightGauge.Dec()
 	a.mu.Unlock()
 
-	objectPath := partPath + "/" + filename.Build(a.cfg.Durable, entry.seqStart, entry.seqEnd)
+	// cfg.WriterCfg.Prefix is normalised (empty or ends in "/") so simple
+	// concatenation is safe. Empty prefix → write at bucket root unchanged.
+	objectPath := a.cfg.WriterCfg.Prefix + partPath + "/" + filename.Build(a.cfg.Durable, entry.seqStart, entry.seqEnd)
 
 	if err := entry.w.Flush(ctx, objectPath); err != nil {
 		a.flushTotal.WithLabelValues("error").Inc()

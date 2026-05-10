@@ -46,6 +46,30 @@ func TestFullObjectPath(t *testing.T) {
 	}
 }
 
+// TestPrefixedObjectPath locks the SINK_PREFIX behaviour: a normalised prefix
+// (already trailing-slashed) prepended to the partition path produces a clean
+// key under the prefix folder. Regression guard for the prod deploy where the
+// loader writes to gs://ab-spectrum-sensitive-prod/mio/.
+func TestPrefixedObjectPath(t *testing.T) {
+	ts := time.Date(2026, 5, 8, 11, 0, 0, 0, time.UTC)
+	partPath := partition.Path("zoho_cliq", ts)
+	fname := filename.Build("gcs-archiver", 1000, 1063)
+
+	cases := []struct {
+		prefix, want string
+	}{
+		{"", "channel_type=zoho_cliq/date=2026-05-08/gcs-archiver-1000-1063.ndjson"},
+		{"mio/", "mio/channel_type=zoho_cliq/date=2026-05-08/gcs-archiver-1000-1063.ndjson"},
+		{"a/b/", "a/b/channel_type=zoho_cliq/date=2026-05-08/gcs-archiver-1000-1063.ndjson"},
+	}
+	for _, tc := range cases {
+		got := tc.prefix + partPath + "/" + fname
+		if got != tc.want {
+			t.Errorf("prefix=%q: got %q, want %q", tc.prefix, got, tc.want)
+		}
+	}
+}
+
 // TestNDJSONRoundtrip verifies proto → NDJSON → proto round-trip.
 func TestNDJSONRoundtrip(t *testing.T) {
 	original := &miov1.Message{

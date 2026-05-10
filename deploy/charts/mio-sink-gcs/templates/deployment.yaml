@@ -44,8 +44,12 @@ spec:
           env:
             - name: NATS_URL
               value: {{ .Values.config.natsUrl | quote }}
-            - name: GCS_BUCKET
+            - name: SINK_BACKEND
+              value: {{ .Values.config.sinkBackend | quote }}
+            - name: SINK_BUCKET
               value: {{ .Values.config.gcsBucket | quote }}
+            - name: SINK_PREFIX
+              value: {{ .Values.config.gcsPrefix | quote }}
             - name: FLUSH_INTERVAL_SECONDS
               value: {{ .Values.config.flushIntervalSeconds | quote }}
             - name: FLUSH_MAX_MESSAGES

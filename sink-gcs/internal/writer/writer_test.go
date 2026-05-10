@@ -182,3 +182,31 @@ func TestConfigFromEnv_Defaults(t *testing.T) {
 		t.Errorf("default backend = %q; want %q", cfg.Backend, writer.BackendMinIO)
 	}
 }
+
+// TestConfigFromEnv_PrefixNormalization locks the SINK_PREFIX wire contract:
+// inputs are normalised so the archiver can do `cfg.Prefix + objectPath`
+// without worrying about leading/trailing slashes.
+func TestConfigFromEnv_PrefixNormalization(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"", ""},
+		{"mio", "mio/"},
+		{"mio/", "mio/"},
+		{"/mio/", "mio/"},
+		{"//mio/", "mio/"},
+		{"a/b/c", "a/b/c/"},
+	}
+	for _, tc := range cases {
+		t.Setenv("SINK_BACKEND", "gcs")
+		t.Setenv("SINK_BUCKET", "ab-spectrum-sensitive-prod")
+		t.Setenv("SINK_PREFIX", tc.in)
+		cfg, err := writer.ConfigFromEnv()
+		if err != nil {
+			t.Fatalf("ConfigFromEnv(%q): %v", tc.in, err)
+		}
+		if cfg.Prefix != tc.want {
+			t.Errorf("Prefix(%q) = %q; want %q", tc.in, cfg.Prefix, tc.want)
+		}
+	}
+}

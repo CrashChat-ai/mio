@@ -175,7 +175,7 @@ func Handler(deps HandlerDeps) http.HandlerFunc {
 			Attributes: nm.Attributes,
 		}
 		// Convert normalized attachments to proto Attachments so the P9
-		// attachment-downloader sidecar can persist bytes and rewrite urls.
+		// media-vault sidecar can persist bytes and rewrite urls.
 		for _, a := range nm.Attachments {
 			protoMsg.Attachments = append(protoMsg.Attachments, &miov1.Attachment{
 				Kind:     attachmentKindFromMime(a.MIME),

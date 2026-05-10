@@ -1,0 +1,94 @@
+# mio-media-vault Helm values
+# Single replica for POC. Multi-replica is correctness-safe (HEAD-before-PUT
+# + IfNotExists absorbs the race), but throughput tuning is deferred.
+#
+# RUNTIME-IDENTITY NOTE (P2 of plans/260510-1112-rename-attachment-downloader-to-media-vault):
+#   Service is named media-vault, but the runtime identifiers
+#   (fullnameOverride, serviceAccount.name, config.durableName) intentionally
+#   retain "attachment-downloader"/"mio-attachment-downloader" for continuity.
+#   This avoids a JetStream replay + GCP IAM rebind on first cutover.
+#   The runtime rename is staged in P5 (chart 1.0.0).
+
+replicaCount: 1
+
+image:
+  registry: ghcr.io
+  repository: crashchat-ai/mio/media-vault
+  tag: "latest"           # overridden at deploy time --set image.tag=<sha>
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: ghcr-pull
+
+nameOverride: ""
+# Preserve legacy resource names (Pod/Deployment/Service prefixed with
+# mio-attachment-downloader-*) so the chart upgrade is image-only.
+fullnameOverride: "mio-attachment-downloader"
+
+serviceAccount:
+  create: true
+  # Preserve legacy KSA name to keep Workload Identity GSA→KSA binding.
+  name: "mio-attachment-downloader"
+  # Workload Identity binding — KSA → GSA. GSA needs roles/storage.objectAdmin
+  # on the bucket prefix and roles/iam.serviceAccountTokenCreator on itself
+  # (V4 signed-URL signing).
+  gcpServiceAccount: ""   # e.g. mio-attachments@<PROJECT>.iam.gserviceaccount.com
+
+config:
+  natsUrl: "nats://mio-nats:4222"
+  tenantId: "00000000-0000-0000-0000-000000000001"
+  accountId: "00000000-0000-0000-0000-000000000002"
+  storageBackend: "gcs"
+  storageBucket: "ab-spectrum-backups-prod"
+  storagePrefix: "mio/attachments/"
+  downloadTimeoutSeconds: "60"
+  downloadMaxBytes: "26214400"  # 25 MiB
+  signedUrlTtlSeconds: "3600"
+  durableName: "attachment-downloader"
+  enrichedStream: "MESSAGES_INBOUND_ENRICHED"
+  metricsPort: "9090"
+  logLevel: "info"
+
+# Cliq OAuth credentials come from the existing mio-gateway-secrets Secret.
+# The downloader mints fresh access tokens on demand (matches gateway).
+secrets:
+  existingSecret: "mio-gateway-secrets"
+  cliqClientIDKey: "CLIQ_CLIENT_ID"
+  cliqClientSecretKey: "CLIQ_CLIENT_SECRET"
+  cliqRefreshTokenKey: "CLIQ_REFRESH_TOKEN"
+
+# Lifecycle Job (post-install hook): runs the CLI to set bucket lifecycle
+# rules matching JetStream Max Age. Idempotent.
+lifecycle:
+  enabled: true
+  ageDays: 7
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# ServiceMonitor disabled — cluster uses GCP Managed Prometheus (matches gateway).
+serviceMonitor:
+  enabled: false
+
+terminationGracePeriodSeconds: 60
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

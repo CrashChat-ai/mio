@@ -44,7 +44,7 @@ flowchart LR
     gw["mio-gateway<br/>(Go, stateless)"]
     bus[("NATS JetStream<br/>3-replica cluster")]
     sink["mio-sink-gcs<br/>(Go consumer)"]
-    dl["mio-attachment-downloader<br/>(Go sidecar)"]
+    dl["mio-media-vault<br/>(Go sidecar)"]
     sdkgo["sdk-go"]
     sdkpy["sdk-py"]
   end
@@ -65,7 +65,7 @@ flowchart LR
   gw -- "publish<br/>MESSAGES_INBOUND" --> bus
   bus -- "consume<br/>(gcs-archiver)" --> sink
   sink --> gcs
-  bus -- "consume<br/>(attachment-downloader)" --> dl
+  bus -- "consume<br/>(media-vault)" --> dl
   dl -- "fetch bytes,<br/>persist,<br/>enrich" --> gcs
   dl -- "publish<br/>MESSAGES_INBOUND_ENRICHED" --> bus
   bus -- "consume<br/>(ai-consumer-enriched)" --> ai
@@ -122,7 +122,7 @@ sequenceDiagram
     Note over GW,Ch: ack inside channel deadline (≤3s)
   end
 
-  JS->>DL: Pull (attachment-downloader, MaxAckPending=N)
+  JS->>DL: Pull (media-vault, MaxAckPending=N)
   alt has attachments
     DL->>DL: fetch bytes from platform URL<br/>(within platform TTL)
     DL->>GCS: Put (content-addressed, deduplicated)
@@ -233,7 +233,7 @@ Why these dimensions live in the subject:
 
 | Consumer | Stream | Type | `MaxAckPending` | Notes |
 |---|---|---|---|---|
-| `attachment-downloader` | `MESSAGES_INBOUND` | Pull, durable | **N** | Fetches attachment bytes within platform TTL, persists to storage, publishes to enriched stream. Stateless; can scale horizontally. |
+| `media-vault` | `MESSAGES_INBOUND` | Pull, durable | **N** | Fetches attachment bytes within platform TTL, persists to storage, publishes to enriched stream. Stateless; can scale horizontally. |
 | `gcs-archiver` | `MESSAGES_INBOUND` | Pull, durable | 64 | Long-tail consumer; falls behind without affecting attachment or AI path. Archives raw inbound. |
 | `ai-consumer-enriched` | `MESSAGES_INBOUND_ENRICHED` | Pull, durable | **1** | Single-flight. Per-thread ordering enforced globally for now; partition by subject when throughput demands. |
 | `sender-pool` | `MESSAGES_OUTBOUND` | Pull, durable | **32** | Workqueue drain. One pool per channel adapter eventually. |
@@ -321,7 +321,7 @@ flowchart TB
     direction TB
     subgraph "ns: mio"
       gwd["mio-gateway<br/>Deployment, 2 replicas"]
-      dld["mio-attachment-downloader<br/>Deployment, 1 replica (POC)"]
+      dld["mio-media-vault<br/>Deployment, 1 replica (POC)"]
       sinkd["mio-sink-gcs<br/>Deployment, 1 replica"]
       subgraph "StatefulSet: mio-nats (3 replicas)"
         n0["nats-0<br/>zone-a · pd-balanced"]

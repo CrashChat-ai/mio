@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mio-media-vault
+description: MIO media-vault — durable archival of platform attachments to object storage with content-addressable dedup, OAuth-refresh source-side auth, and GDPR-aware retention
+type: application
+version: 0.3.0
+appVersion: "0.3.0"

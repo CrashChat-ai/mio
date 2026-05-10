@@ -65,7 +65,7 @@ by Flux. Plaintext never lives in Git.
 
 Keys: `CLIQ_WEBHOOK_SECRET`, `CLIQ_CLIENT_ID`, `CLIQ_CLIENT_SECRET`,
 `CLIQ_REFRESH_TOKEN`, `CLIQ_BOT_NAME`, `CLIQ_BOT_SCOPE`, `DATABASE_URL`.
-Gateway and attachment-downloader mint short-lived access tokens on demand
+Gateway and media-vault mint short-lived access tokens on demand
 from the refresh token (Zoho access tokens are 1h-TTL). Stored at
 `infra/fluxcd/apps/prod/mio/secrets.enc.yaml`.
 
@@ -148,8 +148,8 @@ platform URL TTLs (Cliq's are ~12 min).
 
 | Stream | Subjects | Retention | Producer | Consumer(s) |
 |---|---|---|---|---|
-| `MESSAGES_INBOUND` | `mio.inbound.>` | 7d | gateway | sink-gcs (archive), `mio-attachment-downloader` (sidecar) |
-| `MESSAGES_INBOUND_ENRICHED` | `mio.inbound_enriched.>` | 7d | `mio-attachment-downloader` | echo / AI consumers |
+| `MESSAGES_INBOUND` | `mio.inbound.>` | 7d | gateway | sink-gcs (archive), `mio-media-vault` (sidecar) |
+| `MESSAGES_INBOUND_ENRICHED` | `mio.inbound_enriched.>` | 7d | `mio-media-vault` | echo / AI consumers |
 | `MESSAGES_OUTBOUND` | `mio.outbound.>` | 24h | echo / AI consumers | gateway sender pool |
 
 The sidecar provisions `MESSAGES_INBOUND_ENRICHED` idempotently on boot.
@@ -172,7 +172,7 @@ gs://ab-spectrum-backups-prod/
 Default TTL: 1h. Re-mint from `Attachment.storage_key` via the CLI:
 
 ```bash
-mio-attachment-cli signed-url <key> --ttl=1h
+mio-media-cli signed-url <key> --ttl=1h
 ```
 
 ### GDPR delete
@@ -181,14 +181,14 @@ See [`docs/runbooks/attachment-gdpr-delete.md`](runbooks/attachment-gdpr-delete.
 
 ### IAM
 
-See [`docs/runbooks/attachment-downloader-iam.md`](runbooks/attachment-downloader-iam.md).
+See [`docs/runbooks/media-vault-iam.md`](runbooks/media-vault-iam.md).
 
 ### Operator notes
 
 - The 7d round-trip success criterion (image retrievable ≥7d later) cannot
   be verified at deploy time — re-test ≥7d after first deploy.
 - Backend swap (GCS→S3) is one new file under
-  `attachment-downloader/internal/storage/s3/` plus an env flip
+  `media-vault/internal/storage/s3/` plus an env flip
   (`MIO_STORAGE_BACKEND=s3`); zero changes to worker / consumer / sidecar core.
 - Old durable `ai-consumer` on `MESSAGES_INBOUND` should be removed after
   successful enriched-stream cutover: `nats consumer rm MESSAGES_INBOUND ai-consumer`.

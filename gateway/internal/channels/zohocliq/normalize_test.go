@@ -58,7 +58,7 @@ func TestNormalize_FileAttachment(t *testing.T) {
 		t.Error("expected cliq_attachment in attributes for file message")
 	}
 	// P9: structured Attachments must also be populated so the
-	// attachment-downloader sidecar can find the URL without parsing the
+	// media-vault sidecar can find the URL without parsing the
 	// JSON-encoded `cliq_attachment` attribute.
 	if len(nm.Attachments) != 1 {
 		t.Fatalf("expected 1 normalized attachment, got %d", len(nm.Attachments))

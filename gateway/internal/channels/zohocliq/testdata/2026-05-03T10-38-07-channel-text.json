@@ -1,0 +1,36 @@
+{
+  "body_json": {
+    "operation": "message_sent",
+    "data": {
+      "time": 1777804687085,
+      "message": {
+        "mentions": [],
+        "text": "halo",
+        "id": "1777804687057%20137127178967",
+        "type": "text",
+        "content": {"text": "halo"}
+      }
+    },
+    "user": {
+      "country": "us",
+      "zoho_user_id": "100000001",
+      "timezone": "UTC",
+      "organization_id": "999999999",
+      "admin": true,
+      "last_name": "User",
+      "language": "en",
+      "id": "100000001",
+      "first_name": "Test",
+      "email": "test@example.com"
+    },
+    "chat": {
+      "owner": "100000001",
+      "chat_type": "channel",
+      "channel_unique_name": "testdev",
+      "id": "CT_1000000000000000001_999999999",
+      "type": "channel",
+      "title": "#TestDev",
+      "channel_id": "P1000000000000000001"
+    }
+  }
+}

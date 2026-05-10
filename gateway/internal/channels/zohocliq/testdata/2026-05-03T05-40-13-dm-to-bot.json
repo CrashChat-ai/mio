@@ -1,0 +1,19 @@
+{
+  "body_json": {
+    "operation": "message",
+    "message": {
+      "id": "DM_1777803613350_137000000001",
+      "text": "end-to-end via tunnel",
+      "type": "text"
+    },
+    "user": {
+      "name": "test-user",
+      "id": "100000001"
+    },
+    "chat": {
+      "id": "CT_dm_100000001_bot",
+      "title": "#TestDev",
+      "is_dm": true
+    }
+  }
+}

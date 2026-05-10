@@ -1,0 +1,10 @@
+# Golden filename fixtures for offset-based naming scheme.
+# Format: <consumerID> <seqStart> <seqEnd> <expected>
+# Lines starting with '#' are comments. Blank lines ignored.
+
+gcs-archiver 1000 1063 gcs-archiver-1000-1063.ndjson
+gcs-archiver 1 1 gcs-archiver-1-1.ndjson
+gcs-archiver 0 0 gcs-archiver-0-0.ndjson
+gcs-archiver 9999999 10000000 gcs-archiver-9999999-10000000.ndjson
+gcs-archiver 1 64 gcs-archiver-1-64.ndjson
+my-consumer 500 563 my-consumer-500-563.ndjson

@@ -1,0 +1,34 @@
+# FluxCD HelmRelease for mio-attachment-downloader.
+#
+# This file is the source of truth that should be committed to the infra repo
+# at fluxcd/apps/prod/mio/release-attachment-downloader.yaml. It lives here
+# in the mio repo too so the chart and HelmRelease evolve together.
+#
+# Don't forget to also append `- release-attachment-downloader.yaml` to
+# fluxcd/apps/prod/mio/kustomization.yaml in the infra repo.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: mio-attachment-downloader
+  namespace: mio
+spec:
+  interval: 30m0s
+  timeout: 10m
+  dependsOn:
+    - name: mio-nats
+    - name: mio-gateway
+  chart:
+    spec:
+      chart: deploy/charts/mio-attachment-downloader
+      sourceRef:
+        kind: GitRepository
+        name: mio-charts
+        namespace: mio
+  values:
+    image:
+      tag: "main"  # bump to the merge SHA on each release
+    serviceAccount:
+      gcpServiceAccount: "mio-attachments@dp-prod-7e26.iam.gserviceaccount.com"
+    config:
+      storageBucket: "ab-spectrum-backups-prod"
+      storagePrefix: "mio/attachments/"

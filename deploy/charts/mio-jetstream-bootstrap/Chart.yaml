@@ -1,0 +1,10 @@
+apiVersion: v2
+name: mio-jetstream-bootstrap
+description: >
+  Verify-only post-install hook. Asserts that JetStream streams and consumers
+  provisioned by gateway/sink startup exist and match the locked spec.
+  Does NOT create or mutate any streams/consumers — gateway startup is the
+  single authoritative writer (P3 AddOrUpdateStream).
+type: application
+version: 0.1.0
+appVersion: "2.10.24"

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mio-gateway
+description: MIO gateway — HTTP inbound/outbound, JetStream publish, idempotent dedup
+type: application
+version: 0.2.0
+appVersion: "0.1.0"

@@ -1,0 +1,77 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write   # reserved for WIF upgrade in P10
+
+jobs:
+  deploy:
+    # Only deploy when CI succeeds on main — not on PR CI runs.
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Authenticate to GCP
+        # Static service-account JSON for POC.
+        # Workload Identity Federation deferred to P10 (ghcr.io does not support
+        # GKE WIF natively as of 2026-05; static SA JSON is the cheapest path).
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GCP_SA_JSON }}
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v3
+        with:
+          cluster_name: mio-poc
+          location: us-central1   # override per environment
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: "3.14.4"
+
+      - name: Add NATS helm repo
+        run: helm repo add nats https://nats-io.github.io/k8s/helm/charts/
+
+      - name: helm upgrade — mio-gateway
+        run: |
+          helm upgrade --install mio-gateway deploy/charts/mio-gateway \
+            --namespace mio \
+            --create-namespace \
+            --set image.tag=${{ github.event.workflow_run.head_sha }} \
+            --set image.pullPolicy=IfNotPresent \
+            --wait \
+            --timeout 5m
+
+      - name: helm upgrade — mio-sink-gcs
+        run: |
+          helm upgrade --install mio-sink-gcs deploy/charts/mio-sink-gcs \
+            --namespace mio \
+            --set image.tag=${{ github.event.workflow_run.head_sha }} \
+            --set image.pullPolicy=IfNotPresent \
+            --wait \
+            --timeout 5m
+
+      - name: Verify gateway rollout
+        run: |
+          kubectl rollout status deployment/mio-gateway -n mio --timeout=300s
+
+      - name: Post-deploy smoke — gateway healthz
+        run: |
+          # Inline healthz check via cluster-internal curl (no external LB needed in CI).
+          kubectl run smoke-probe \
+            --image=curlimages/curl:8.7.1 \
+            --restart=Never \
+            --rm \
+            --namespace mio \
+            --command -- \
+            curl -sf http://mio-gateway.mio.svc.cluster.local/healthz

@@ -1,0 +1,145 @@
+# mio-gateway Helm values
+# image.tag is overridden by CI: --set image.tag=${{ github.sha }}
+# Never use image.tag=latest in production deploys.
+
+replicaCount: 2
+
+image:
+  registry: ghcr.io
+  repository: crashchat-ai/mio/gateway
+  tag: "latest"           # overridden by deploy.yaml --set image.tag=<sha>
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: ghcr-pull      # created by deploy/gke/setup.sh from GHCR_PAT
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Rolling update: maxSurge=0, maxUnavailable=1 — sequential rollout.
+# Enforces single-writer for AddOrUpdateStream on startup until split-brain
+# risk is resolved (P3 deferred). Allows LB drain via surviving replica.
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 0
+    maxUnavailable: 1
+
+# Non-secret config passed as env vars via ConfigMap.
+config:
+  natsUrl: "nats://mio-nats:4222"
+  tenantId: "00000000-0000-0000-0000-000000000001"
+  accountId: "00000000-0000-0000-0000-000000000002"
+  schemaVersionStrict: "true"
+  migrateOnStart: "true"    # POC: gateway pods run migrations on startup (advisory-lock serialised). Separate migrate Job deferred — gateway binary has no migrate subcommand yet.
+  logLevel: "info"
+  metricsPort: "9090"
+  httpPort: "8080"
+
+# Secret references — values must be injected at deploy time.
+# For POC: create K8s Secret manually or via setup.sh.
+# For prod: use Secret Manager + External Secrets Operator.
+secrets:
+  # Name of a pre-existing K8s Secret with keys:
+  #   DATABASE_URL, CLIQ_WEBHOOK_SECRET, CLIQ_CLIENT_ID, CLIQ_CLIENT_SECRET,
+  #   CLIQ_REFRESH_TOKEN, CLIQ_BOT_SCOPE, CLIQ_BOT_NAME
+  existingSecret: "mio-gateway-secrets"
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+  metricsPort: 9090
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-production"
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: "mio.example.com"   # override per environment
+      paths:
+        - path: /webhooks/
+          pathType: Prefix
+        - path: /cliq
+          pathType: Exact
+        - path: /healthz
+          pathType: Exact
+  tls: []
+  # tls:
+  #   - secretName: mio-gateway-tls
+  #     hosts:
+  #       - mio.example.com
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 6
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  # HPA via Prometheus Adapter (cloud-agnostic; avoids Stackdriver lock-in).
+  # Metric: mio_gateway_inbound_latency_seconds rate over 1m window.
+  targetLatencyMs: 500
+
+serviceMonitor:
+  enabled: true
+  interval: "30s"
+  scrapeTimeout: "10s"
+  # Metric labels contract: {channel_type, direction, outcome} only.
+  # Do not add workspace/account_id — cardinality explosion risk.
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+migration:
+  # Migration Job image — same as gateway, runs `migrate up` before pods start.
+  image:
+    registry: ghcr.io
+    repository: crashchat-ai/mio/gateway
+    tag: "latest"   # always keep in sync with main image.tag
+    pullPolicy: IfNotPresent

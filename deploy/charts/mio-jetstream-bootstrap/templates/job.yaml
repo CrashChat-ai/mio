@@ -1,0 +1,134 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "mio-jetstream-bootstrap.fullname" . }}-verify
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mio-jetstream-bootstrap.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        {{- include "mio-jetstream-bootstrap.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "mio-jetstream-bootstrap.fullname" . }}
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      containers:
+        - name: verify
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: NATS_URL
+              value: {{ .Values.natsUrl | quote }}
+            - name: RETRY_COUNT
+              value: {{ .Values.retryCount | quote }}
+            - name: RETRY_SLEEP
+              value: {{ .Values.retrySleepSeconds | quote }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              set -e
+
+              # ---------------------------------------------------------------
+              # VERIFY-ONLY: This script never calls nats stream add/update or
+              # nats consumer add. Gateway startup (AddOrUpdateStream, P3) is
+              # the single authoritative writer. Two writers = race; we picked
+              # the gateway. This script is a post-install assertion gate only.
+              # ---------------------------------------------------------------
+
+              echo "==> Waiting for JetStream quorum (3 replicas)..."
+              ATTEMPT=0
+              while [ "$ATTEMPT" -lt "$RETRY_COUNT" ]; do
+                ATTEMPT=$((ATTEMPT + 1))
+                echo "    Attempt $ATTEMPT/$RETRY_COUNT..."
+
+                # Check MESSAGES_INBOUND cluster health
+                INBOUND_INFO=$(nats --server="$NATS_URL" stream cluster info MESSAGES_INBOUND 2>&1 || true)
+                OUTBOUND_INFO=$(nats --server="$NATS_URL" stream cluster info MESSAGES_OUTBOUND 2>&1 || true)
+
+                INBOUND_PEERS=$(echo "$INBOUND_INFO" | grep -c "current: true" || true)
+                OUTBOUND_PEERS=$(echo "$OUTBOUND_INFO" | grep -c "current: true" || true)
+
+                if [ "$INBOUND_PEERS" -ge 3 ] && [ "$OUTBOUND_PEERS" -ge 3 ]; then
+                  echo "    Quorum confirmed: INBOUND=$INBOUND_PEERS/3, OUTBOUND=$OUTBOUND_PEERS/3"
+                  break
+                fi
+
+                if [ "$ATTEMPT" -ge "$RETRY_COUNT" ]; then
+                  echo "ERROR: JetStream quorum not reached after $RETRY_COUNT attempts"
+                  echo "  MESSAGES_INBOUND peers current: $INBOUND_PEERS (need 3)"
+                  echo "  MESSAGES_OUTBOUND peers current: $OUTBOUND_PEERS (need 3)"
+                  exit 1
+                fi
+
+                echo "    Quorum not ready (INBOUND=$INBOUND_PEERS, OUTBOUND=$OUTBOUND_PEERS) — sleeping ${RETRY_SLEEP}s..."
+                sleep "$RETRY_SLEEP"
+              done
+
+              # ---------------------------------------------------------------
+              # Verify streams exist (no mutation).
+              # ---------------------------------------------------------------
+              echo "==> Verifying streams..."
+              {{- range .Values.expectedStreams }}
+              echo -n "    Checking stream {{ .name }}... "
+              if ! nats --server="$NATS_URL" stream info {{ .name }} > /dev/null 2>&1; then
+                echo "MISSING"
+                echo "ERROR: MISSING stream {{ .name }} — gateway startup did not provision it"
+                exit 1
+              fi
+              # Verify replica count.
+              REPLICAS=$(nats --server="$NATS_URL" stream info {{ .name }} --json 2>/dev/null | \
+                grep -o '"num_replicas":[0-9]*' | grep -o '[0-9]*' || echo "0")
+              if [ "$REPLICAS" != "{{ .replicas }}" ]; then
+                echo "REPLICA MISMATCH"
+                echo "ERROR: stream {{ .name }} has replicas=$REPLICAS, expected {{ .replicas }}"
+                exit 1
+              fi
+              echo "OK (replicas=$REPLICAS)"
+              {{- end }}
+
+              # ---------------------------------------------------------------
+              # Verify consumers exist (no mutation).
+              # ---------------------------------------------------------------
+              echo "==> Verifying consumers..."
+              {{- range .Values.expectedConsumers }}
+              echo -n "    Checking consumer {{ .durable }} on {{ .stream }}... "
+              if ! nats --server="$NATS_URL" consumer info {{ .stream }} {{ .durable }} > /dev/null 2>&1; then
+                echo "MISSING"
+                echo "ERROR: MISSING consumer {{ .durable }} on stream {{ .stream }} — owning service did not create it on startup"
+                exit 1
+              fi
+              echo "OK"
+              {{- end }}
+
+              echo "==> All streams and consumers verified successfully."
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
+          volumeMounts:
+            - name: spec
+              mountPath: /etc/mio-js-spec
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: spec
+          configMap:
+            name: {{ include "mio-jetstream-bootstrap.fullname" . }}-spec

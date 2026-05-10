@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package mio.v1;
+
+import "mio/v1/attachment.proto";
+
+option go_package = "github.com/crashchat-ai/mio/proto/gen/go/mio/v1;miov1";
+
+// SendCommand is the canonical outbound envelope consumed from MESSAGES_OUTBOUND.
+// The MIU AI service publishes this; the gateway's sender pool consumes it and
+// makes the platform API call.
+//
+// attributes promotion rule: same as Message — see CONTRIBUTING.md.
+// Use named constants (e.g. const AttrSlackTS = "slack_ts"), not string literals.
+message SendCommand {
+  // --- identity (also the NATS Nats-Msg-Id for dedup) ---
+  string id             = 1; // ULID
+  int32  schema_version = 2; // = 1; SDK rejects mismatch on publish
+
+  // --- four-tier scope (mirrors Message) ---
+  string tenant_id    = 3;
+  string account_id   = 4;
+  string channel_type = 5;
+
+  // --- where to send ---
+  string conversation_id          = 6;
+  string conversation_external_id = 7; // denormalized: adapter avoids a DB lookup at send time
+  string parent_conversation_id   = 8; // for "reply into thread" (platform models it as separate conv)
+  string thread_root_message_id   = 9; // for "reply in thread" (Slack-style)
+
+  // --- payload ---
+  string              text        = 10;
+  repeated Attachment attachments = 11;
+
+  // --- edit support ---
+  // Both IDs carried so the adapter doesn't need a DB lookup at send time.
+  string edit_of_message_id  = 12; // mio UUID; empty unless this is an edit
+  string edit_of_external_id = 13; // platform message id
+
+  // --- escape hatch ---
+  // Channel-specific data lives here until the promotion threshold is met.
+  // See CONTRIBUTING.md for promotion rule and naming convention.
+  map<string, string> attributes = 14;
+
+  // Reserved field numbers — do NOT reclaim without a migration plan.
+  reserved 15; // reserved for MessageRelation (P5 outbound edit / reaction linkage)
+}

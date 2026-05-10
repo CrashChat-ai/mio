@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mio-jetstream-bootstrap.fullname" . }}-spec
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mio-jetstream-bootstrap.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+data:
+  # Source of truth for expected JetStream state (audit/diff artifact).
+  # Provisioning is done by gateway startup (AddOrUpdateStream in P3).
+  # This Job only VERIFIES — it never calls nats stream add / nats consumer add.
+  expected-streams.yaml: |
+    streams:
+    {{- range .Values.expectedStreams }}
+      - name: {{ .name }}
+        subjects: {{ .subjects | toJson }}
+        replicas: {{ .replicas }}
+        retention: {{ .retention }}
+    {{- end }}
+  expected-consumers.yaml: |
+    consumers:
+    {{- range .Values.expectedConsumers }}
+      - stream: {{ .stream }}
+        durable: {{ .durable }}
+    {{- end }}

@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mio-attachment-downloader.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mio-attachment-downloader.labels" . | nindent 4 }}
+spec:
+  # Single-writer for POC. Multi-writer is correctness-safe (HEAD-before-PUT
+  # + IfNotExists race resolution), but operational rollout is post-POC.
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mio-attachment-downloader.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mio-attachment-downloader.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "mio-attachment-downloader.serviceAccountName" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: attachment-downloader
+          image: {{ include "mio-attachment-downloader.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.config.metricsPort | int }}
+              protocol: TCP
+          env:
+            - name: MIO_NATS_URLS
+              value: {{ .Values.config.natsUrl | quote }}
+            - name: MIO_TENANT_ID
+              value: {{ .Values.config.tenantId | quote }}
+            - name: MIO_ACCOUNT_ID
+              value: {{ .Values.config.accountId | quote }}
+            - name: MIO_STORAGE_BACKEND
+              value: {{ .Values.config.storageBackend | quote }}
+            - name: MIO_STORAGE_BUCKET
+              value: {{ .Values.config.storageBucket | quote }}
+            - name: MIO_STORAGE_PREFIX
+              value: {{ .Values.config.storagePrefix | quote }}
+            - name: MIO_DOWNLOAD_TIMEOUT_SECONDS
+              value: {{ .Values.config.downloadTimeoutSeconds | quote }}
+            - name: MIO_DOWNLOAD_MAX_BYTES
+              value: {{ .Values.config.downloadMaxBytes | quote }}
+            - name: MIO_SIGNED_URL_TTL_SECONDS
+              value: {{ .Values.config.signedUrlTtlSeconds | quote }}
+            - name: MIO_DURABLE_NAME
+              value: {{ .Values.config.durableName | quote }}
+            - name: MIO_ENRICHED_STREAM
+              value: {{ .Values.config.enrichedStream | quote }}
+            - name: MIO_METRICS_PORT
+              value: {{ .Values.config.metricsPort | quote }}
+            - name: MIO_LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: MIO_CLIQ_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: {{ .Values.secrets.cliqBotTokenKey }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

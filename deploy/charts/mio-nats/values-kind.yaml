@@ -1,0 +1,17 @@
+# Kind smoke-test overrides for mio-nats.
+# kind does not have pd-balanced storage class — use standard.
+nats:
+  replicaCount: 1
+  config:
+    cluster:
+      enabled: false
+      replicas: 1
+    jetstream:
+      fileStore:
+        pvc:
+          storageClassName: standard
+          size: 1Gi
+  podDisruptionBudget:
+    enabled: false
+  podTemplate:
+    topologySpreadConstraints: {}

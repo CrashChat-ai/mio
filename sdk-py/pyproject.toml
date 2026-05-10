@@ -1,0 +1,40 @@
+[project]
+name = "mio-sdk-py"
+version = "0.1.0"
+description = "MIO Python SDK — async NATS JetStream client with proto types, OTel, Prometheus"
+requires-python = ">=3.12"
+dependencies = [
+    # Pin protobuf to 7.x: the buf.build/protocolbuffers/python plugin (latest)
+    # generates code for protobuf 7.34.1+. The 4.x series ended at 4.25.x;
+    # protobuf skipped 4.27 and 6.x, going directly to 7.x.
+    # Pin to the same major as the generated stubs to avoid runtime/gencode skew.
+    "protobuf>=7.34.0,<8.0.0",
+    # nats-py: async-only NATS client with JetStream support.
+    # No sync API exists — this is a deliberate constraint (see mio/client.py).
+    "nats-py>=2.10.0,<3.0.0",
+    # Prometheus metrics — same metric names + buckets as sdk-go/metrics.go.
+    "prometheus-client>=0.20.0",
+    # OTel: W3C traceparent propagation over NATS headers.
+    "opentelemetry-api>=1.25.0",
+    "opentelemetry-sdk>=1.25.0",
+]
+
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mio*", "proto*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "integration: marks tests that require a live NATS server (deselect with -m 'not integration')",
+]

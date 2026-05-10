@@ -1,0 +1,26 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+  exclusions:
+    rules:
+      # Pre-existing internal type assertions in outbound_state.go (safe; same-package storage).
+      - path: gateway/internal/store/outbound_state\.go
+        text: "Error return value is not checked"
+      # migrate.go closes a migrator on shutdown; close-error is logged elsewhere.
+      - path: gateway/internal/store/migrate\.go
+        text: "Error return value of `m.Close` is not checked"
+      # Helpers reserved for future use (publish dedup, propagator override).
+      - path: sdk-go/publish_inbound\.go
+        text: "func isDuplicateAck is unused"
+      - path: sdk-go/tracing\.go
+        text: "func propagatorFromContext is unused"
+
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 10

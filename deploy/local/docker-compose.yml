@@ -1,0 +1,116 @@
+services:
+  nats:
+    image: nats:2.10-alpine
+    command: -js -sd=/data -m 8222
+    ports:
+      - "${NATS_PORT:-4222}:4222"
+      - "${NATS_MON_PORT:-8222}:8222"
+    volumes:
+      - ./appdata/nats:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: mio
+      POSTGRES_USER: mio_app
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./appdata/postgres:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "mio_app", "-d", "mio"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address :9001
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - ./appdata/minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ../..
+      dockerfile: gateway/Dockerfile
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    environment:
+      MIO_PORT: "8080"
+      MIO_LOG_LEVEL: "info"
+      MIO_TENANT_ID: "${MIO_TENANT_ID:-00000000-0000-0000-0000-000000000001}"
+      MIO_ACCOUNT_ID: "${MIO_ACCOUNT_ID:-00000000-0000-0000-0000-000000000002}"
+      MIO_NATS_URLS: "nats://nats:4222"
+      MIO_POSTGRES_DSN: "postgres://mio_app:dev_password@postgres:5432/mio?sslmode=disable"
+      MIO_MIGRATE_ON_START: "true"
+      MIO_PGX_MAX_CONNS: "5"
+      MIO_GRACEFUL_SHUTDOWN_SECS: "15"
+    volumes:
+      - ./secrets:/etc/mio/secrets:ro
+    depends_on:
+      nats:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  sink-gcs:
+    build:
+      context: ../..
+      dockerfile: sink-gcs/Dockerfile
+    environment:
+      NATS_URL: nats://nats:4222
+      SINK_BACKEND: minio
+      SINK_BUCKET: ${SINK_BUCKET:-mio-messages}
+      SINK_ENDPOINT: http://minio:9000
+      SINK_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      SINK_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    depends_on:
+      nats:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  echo-consumer:
+    build:
+      context: ../..
+      dockerfile: examples/echo-consumer/Dockerfile
+    environment:
+      NATS_URL: nats://nats:4222
+    depends_on:
+      nats:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+    restart: on-failure

@@ -1,0 +1,13 @@
+-- P0 bootstrap. Role + database are created by the postgres entrypoint
+-- from POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB. Do NOT add
+-- CREATE ROLE / CREATE DATABASE here — they will fail on cold boot.
+-- (Postgres has no "CREATE ROLE IF NOT EXISTS" syntax.)
+--
+-- Schema migrations are owned by gateway/migrations/ from P3.
+-- Foundation invariants (enforced by P3 migrations, not here):
+--   - tenant_id, account_id NOT NULL from row 1
+--   - idempotency address: (account_id, source_message_id)
+--
+-- If future setup needs an extension or a second role, wrap in a
+-- DO $$ BEGIN ... EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- block so re-runs against an already-initialized volume stay clean.

@@ -1,0 +1,57 @@
+# mio-nats values — overlay on nats-io/k8s upstream chart.
+# Upstream chart handles StatefulSet, headless service, routes config (auto-discovery).
+# We only override what differs from upstream defaults.
+
+nats:
+  # 3-replica JetStream cluster; one pod per zone on regional GKE.
+  replicaCount: 3
+
+  config:
+    cluster:
+      enabled: true
+      replicas: 3
+
+    jetstream:
+      enabled: true
+      fileStore:
+        enabled: true
+        pvc:
+          enabled: true
+          size: 10Gi
+          storageClassName: pd-balanced   # NOT pd-ssd; append-only writes don't benefit from SSD IOPS
+
+    merge:
+      # Expose Prometheus metrics on port 7777.
+      http_port: 8222
+      server_name: $POD_NAME
+
+  podTemplate:
+    topologySpreadConstraints:
+      mio/zone-spread:
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: nats
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2   # Protects RAFT quorum during single-node drain (zone loss / autoscaler scale-down).
+
+  promExporter:
+    enabled: true
+    port: 7777
+    image:
+      repository: natsio/prometheus-nats-exporter
+      tag: 0.15.0
+
+  service:
+    ports:
+      monitor:
+        enabled: true
+
+# Values used only in kind smoke test (override via --values values-kind.yaml).
+# On kind: no pd-balanced storage class; use standard.
+# kind:
+#   nats.config.jetstream.fileStore.pvc.storageClassName: standard

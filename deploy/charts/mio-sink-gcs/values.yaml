@@ -1,0 +1,82 @@
+# mio-sink-gcs Helm values
+# 1 replica for POC — offset-based filenames (P6) make multi-replica safe,
+# but operational rollout is deferred post-POC.
+
+replicaCount: 1
+
+image:
+  registry: ghcr.io
+  repository: crashchat-ai/mio/sink-gcs
+  tag: "latest"           # overridden by deploy.yaml --set image.tag=<sha>
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: ghcr-pull      # created by deploy/gke/setup.sh from GHCR_PAT
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: "mio-sink-gcs"
+  # Workload Identity annotation — binds KSA to GSA for GCS access (no static keys).
+  # Set project at deploy time: --set serviceAccount.gcpServiceAccount=mio-sink-gcs@<PROJECT>.iam.gserviceaccount.com
+  gcpServiceAccount: ""   # e.g. mio-sink-gcs@my-project.iam.gserviceaccount.com
+
+config:
+  natsUrl: "nats://mio-nats:4222"
+  gcsBucket: "mio-messages-poc"
+  # Offset-based filename: <consumer-id>-<seq-start>-<seq-end>.ndjson
+  # Partition: channel_type=<ct>/date=YYYY-MM-DD/
+  flushIntervalSeconds: "30"
+  flushMaxMessages: "100"
+  schemaVersionStrict: "true"
+  logLevel: "info"
+  metricsPort: "9090"
+
+serviceMonitor:
+  enabled: true
+  interval: "30s"
+  scrapeTimeout: "10s"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

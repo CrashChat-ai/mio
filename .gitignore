@@ -1,0 +1,56 @@
+# env / secrets
+.env
+.env.*
+!.env.example
+secrets.env
+*.secret
+*.key
+*.pem
+
+# Go
+bin/
+dist/
+vendor/
+*.test
+*.out
+coverage.*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node (sdk-py docs builds, generated stuff later)
+node_modules/
+
+# generated proto (we'll commit the .proto sources, not the gen output, by default)
+proto/gen/
+
+# local-only working areas (design docs, scratch, channel POCs)
+playground/
+
+# local data
+appdata/
+
+# Go workspace committed — CI relies on it for multi-module resolution.
+# Dockerfiles ignore go.work via .dockerignore.
+
+# local env overrides
+.env.local
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+.temp
+docs/journals
+
+# Local planning artifacts — not part of source tree
+plans/

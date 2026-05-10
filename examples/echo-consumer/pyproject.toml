@@ -1,0 +1,27 @@
+[project]
+name = "mio-echo-consumer"
+version = "0.1.0"
+description = "MIO reference echo consumer — POC stand-in for the AI service in MIU."
+requires-python = ">=3.12"
+dependencies = [
+    # SDK from sibling directory (local dev); swapped to PyPI when GA.
+    "mio-sdk-py",
+    # ULID for idempotency key generation on outbound SendCommand.
+    "python-ulid>=2.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv.sources]
+mio-sdk-py = { path = "../../sdk-py", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

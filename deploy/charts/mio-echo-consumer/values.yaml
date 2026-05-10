@@ -1,0 +1,54 @@
+# mio-echo-consumer Helm values
+# POC: 1 replica, no probes (consumer is JetStream-driven; readiness ≈ NATS connect).
+# Probe wiring deferred to P10 alongside metrics endpoint.
+
+replicaCount: 1
+
+image:
+  registry: ghcr.io
+  repository: crashchat-ai/mio/echo-consumer
+  tag: "latest"           # overridden by HelmRelease values.image.tag
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: ghcr-pull
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: "mio-echo-consumer"
+
+config:
+  natsUrl: "nats://mio-nats:4222"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# ServiceMonitor disabled: consumer does not yet expose /metrics (revisit P10).
+serviceMonitor:
+  enabled: false
+  interval: "30s"
+  scrapeTimeout: "10s"
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

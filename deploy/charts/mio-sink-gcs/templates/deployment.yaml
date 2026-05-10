@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mio-sink-gcs.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mio-sink-gcs.labels" . | nindent 4 }}
+spec:
+  # 1 replica for POC. Offset-based filenames (P6) make multi-replica safe,
+  # but operational rollout is deferred post-POC.
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mio-sink-gcs.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mio-sink-gcs.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "mio-sink-gcs.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: sink-gcs
+          image: {{ include "mio-sink-gcs.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.config.metricsPort | int }}
+              protocol: TCP
+            - name: health
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: NATS_URL
+              value: {{ .Values.config.natsUrl | quote }}
+            - name: GCS_BUCKET
+              value: {{ .Values.config.gcsBucket | quote }}
+            - name: FLUSH_INTERVAL_SECONDS
+              value: {{ .Values.config.flushIntervalSeconds | quote }}
+            - name: FLUSH_MAX_MESSAGES
+              value: {{ .Values.config.flushMaxMessages | quote }}
+            - name: MIO_SCHEMA_VERSION_STRICT
+              value: {{ .Values.config.schemaVersionStrict | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: METRICS_PORT
+              value: {{ .Values.config.metricsPort | quote }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

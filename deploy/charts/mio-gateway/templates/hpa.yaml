@@ -1,0 +1,27 @@
+{{- if .Values.hpa.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "mio-gateway.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mio-gateway.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "mio-gateway.fullname" . }}
+  minReplicas: {{ .Values.hpa.minReplicas }}
+  maxReplicas: {{ .Values.hpa.maxReplicas }}
+  metrics:
+    # HPA via Prometheus Adapter (cloud-agnostic; avoids Stackdriver lock-in).
+    # Requires kube-prometheus-stack + prometheus-adapter installed (deferred to P8).
+    - type: Pods
+      pods:
+        metric:
+          name: mio_gateway_inbound_latency_seconds_rate1m
+        target:
+          type: AverageValue
+          # Target 500ms average inbound latency across all pods.
+          averageValue: "0.5"
+{{- end }}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mio-attachment-downloader
+description: MIO attachment-persistence sidecar — downloads platform attachments and persists bytes to object storage with content-addressable dedup
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

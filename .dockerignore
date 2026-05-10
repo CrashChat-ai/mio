@@ -1,0 +1,41 @@
+# Version control
+.git
+
+# Go workspace file is dev-only — Dockerfiles rely on replace directives.
+go.work
+go.work.sum
+
+# Local data volumes (never in build context)
+appdata/
+
+# Generated proto output — Go bindings for Go images; Python bindings for echo-consumer.
+proto/gen/
+!proto/gen/go/
+!proto/gen/py/
+
+# Local-only areas
+playground/
+plans/
+docs/
+
+# Environment / secrets
+.env*
+!.env.example
+
+# Python artifacts
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Node
+node_modules/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+.temp

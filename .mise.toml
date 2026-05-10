@@ -1,0 +1,32 @@
+[tools]
+go = "1.25"
+python = "3.12"
+"ubi:bufbuild/buf" = "latest"
+"aqua:golangci/golangci-lint" = "2.6.0"
+"aqua:astral-sh/ruff" = "latest"
+"aqua:astral-sh/uv" = "latest"
+protoc = "27"
+
+[env]
+MIO_TENANT_ID = "tenant-dev"
+_.file = ".env.local"
+
+[tasks.up]
+run = "make up"
+description = "Start local infra (NATS + Postgres + MinIO)"
+
+[tasks.down]
+run = "make down"
+description = "Stop local infra"
+
+[tasks.proto]
+run = "make proto"
+description = "Run buf generate"
+
+[tasks.lint]
+run = "make lint"
+description = "Run buf lint + go vet"
+
+[tasks.test]
+run = "make test"
+description = "Run go test"

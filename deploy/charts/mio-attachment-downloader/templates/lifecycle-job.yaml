@@ -1,0 +1,49 @@
+{{- if .Values.lifecycle.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "mio-attachment-downloader.fullname" . }}-lifecycle
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mio-attachment-downloader.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "5"
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "mio-attachment-downloader.selectorLabels" . | nindent 8 }}
+        job-type: lifecycle-init
+    spec:
+      restartPolicy: OnFailure
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "mio-attachment-downloader.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: lifecycle-init
+          image: {{ include "mio-attachment-downloader.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          command: ["/mio-attachment-cli"]
+          args:
+            - "set-lifecycle"
+            - "--age-days={{ .Values.lifecycle.ageDays }}"
+            - "--prefix={{ .Values.config.storagePrefix }}"
+          env:
+            - name: MIO_STORAGE_BACKEND
+              value: {{ .Values.config.storageBackend | quote }}
+            - name: MIO_STORAGE_BUCKET
+              value: {{ .Values.config.storageBucket | quote }}
+          resources:
+            requests: { cpu: 25m, memory: 32Mi }
+            limits:   { cpu: 200m, memory: 128Mi }
+{{- end }}

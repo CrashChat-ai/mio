@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package mio.v1;
+
+option go_package = "github.com/crashchat-ai/mio/proto/gen/go/mio/v1;miov1";
+
+// ConversationKind classifies the structural shape of a conversation.
+// Used by adapters to route and by consumers for analytics/policy.
+// Enum zero-value is UNSPECIFIED per proto3 best practices (buf STANDARD lint).
+enum ConversationKind {
+  CONVERSATION_KIND_UNSPECIFIED = 0;
+  CONVERSATION_KIND_DM = 1;              // 1:1 direct message
+  CONVERSATION_KIND_GROUP_DM = 2;        // multi-party DM, no persistent channel
+  CONVERSATION_KIND_CHANNEL_PUBLIC = 3;
+  CONVERSATION_KIND_CHANNEL_PRIVATE = 4;
+  CONVERSATION_KIND_THREAD = 5;          // sub-conversation under another message
+  CONVERSATION_KIND_FORUM_POST = 6;      // thread-in-forum (Discord-style)
+  CONVERSATION_KIND_BROADCAST = 7;       // one-to-many (Telegram channel, news)
+}
+
+// PeerKind distinguishes direct vs. group senders.
+// Kept on the wire for fast policy routing without DB lookup.
+enum PeerKind {
+  PEER_KIND_UNSPECIFIED = 0;
+  PEER_KIND_DIRECT = 1;
+  PEER_KIND_GROUP = 2;
+}

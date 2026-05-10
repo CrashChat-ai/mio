@@ -1,0 +1,44 @@
+{
+  "body_json": {
+    "operation": "message_sent",
+    "data": {
+      "time": 1778191581949,
+      "message": {
+        "replied_message": {
+          "sender": {"name": "Test Editor", "id": "100000002"},
+          "mentions": [],
+          "time": 1778170007565,
+          "text": "Edited message content for testing purposes",
+          "id": "1778170007565%2039466508029614",
+          "type": "text"
+        },
+        "mentions": [],
+        "text": "This is a thread reply for testing",
+        "id": "1778191581949%2039500889342531",
+        "type": "text",
+        "content": {"text": "This is a thread reply for testing"}
+      }
+    },
+    "user": {
+      "country": "us",
+      "zoho_user_id": "100000003",
+      "timezone": "UTC",
+      "organization_id": "999999999",
+      "admin": false,
+      "last_name": "Replier",
+      "language": "en",
+      "id": "100000003",
+      "first_name": "Test",
+      "email": "replier@example.com"
+    },
+    "chat": {
+      "owner": "100000003",
+      "chat_type": "channel",
+      "channel_unique_name": "testchannel",
+      "id": "CT_1000000000000000002_999999999",
+      "type": "channel",
+      "title": "#TestChannel",
+      "channel_id": "P1000000000000000002"
+    }
+  }
+}

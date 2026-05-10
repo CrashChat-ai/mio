@@ -1,0 +1,82 @@
+version: 2
+updates:
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # Go modules — root (proto round-trip, tools)
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      go-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # Go modules — gateway
+  - package-ecosystem: gomod
+    directory: /gateway
+    schedule:
+      interval: weekly
+    groups:
+      go-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # Go modules — sdk-go
+  - package-ecosystem: gomod
+    directory: /sdk-go
+    schedule:
+      interval: weekly
+    groups:
+      go-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # Go modules — sink-gcs
+  - package-ecosystem: gomod
+    directory: /sink-gcs
+    schedule:
+      interval: weekly
+    groups:
+      go-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # Python — sdk-py
+  - package-ecosystem: pip
+    directory: /sdk-py
+    schedule:
+      interval: weekly
+    groups:
+      py-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # Python — echo-consumer
+  - package-ecosystem: pip
+    directory: /examples/echo-consumer
+    schedule:
+      interval: weekly
+    groups:
+      py-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # Dockerfiles
+  - package-ecosystem: docker
+    directory: /gateway
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /sink-gcs
+    schedule:
+      interval: weekly

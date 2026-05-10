@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mio-gateway.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mio-gateway.labels" . | nindent 4 }}
+data:
+  MIO_NATS_URLS: {{ .Values.config.natsUrl | quote }}
+  MIO_TENANT_ID: {{ .Values.config.tenantId | quote }}
+  MIO_ACCOUNT_ID: {{ .Values.config.accountId | quote }}
+  MIO_SCHEMA_VERSION_STRICT: {{ .Values.config.schemaVersionStrict | quote }}
+  MIO_MIGRATE_ON_START: {{ .Values.config.migrateOnStart | quote }}
+  MIO_LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  MIO_PORT: {{ .Values.config.httpPort | quote }}

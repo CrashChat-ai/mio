@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mio-sink-gcs
+description: MIO GCS archive sink — JetStream consumer writing NDJSON to GCS via Workload Identity
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,0 +1,81 @@
+# mio-attachment-downloader Helm values
+# Single replica for POC. Multi-replica is correctness-safe (HEAD-before-PUT
+# + IfNotExists absorbs the race), but throughput tuning is deferred.
+
+replicaCount: 1
+
+image:
+  registry: ghcr.io
+  repository: crashchat-ai/mio/attachment-downloader
+  tag: "latest"           # overridden at deploy time --set image.tag=<sha>
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: ghcr-pull
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: "mio-attachment-downloader"
+  # Workload Identity binding — KSA → GSA. GSA needs roles/storage.objectAdmin
+  # on the bucket prefix and roles/iam.serviceAccountTokenCreator on itself
+  # (V4 signed-URL signing).
+  gcpServiceAccount: ""   # e.g. mio-attachments@<PROJECT>.iam.gserviceaccount.com
+
+config:
+  natsUrl: "nats://mio-nats:4222"
+  tenantId: "00000000-0000-0000-0000-000000000001"
+  accountId: "00000000-0000-0000-0000-000000000002"
+  storageBackend: "gcs"
+  storageBucket: "ab-spectrum-backups-prod"
+  storagePrefix: "mio/attachments/"
+  downloadTimeoutSeconds: "60"
+  downloadMaxBytes: "26214400"  # 25 MiB
+  signedUrlTtlSeconds: "3600"
+  durableName: "attachment-downloader"
+  enrichedStream: "MESSAGES_INBOUND_ENRICHED"
+  metricsPort: "9090"
+  logLevel: "info"
+
+# CLIQ_BOT_TOKEN comes from the existing mio-gateway-secrets Secret.
+secrets:
+  existingSecret: "mio-gateway-secrets"
+  cliqBotTokenKey: "CLIQ_BOT_TOKEN"
+
+# Lifecycle Job (post-install hook): runs the CLI to set bucket lifecycle
+# rules matching JetStream Max Age. Idempotent.
+lifecycle:
+  enabled: true
+  ageDays: 7
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# ServiceMonitor disabled — cluster uses GCP Managed Prometheus (matches gateway).
+serviceMonitor:
+  enabled: false
+
+terminationGracePeriodSeconds: 60
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

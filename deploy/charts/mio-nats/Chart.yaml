@@ -1,0 +1,11 @@
+apiVersion: v2
+name: mio-nats
+description: NATS JetStream cluster for MIO — values overlay on upstream nats-io/k8s chart
+type: application
+version: 0.1.0
+appVersion: "2.10.24"
+
+dependencies:
+  - name: nats
+    version: "1.2.7"
+    repository: "https://nats-io.github.io/k8s/helm/charts/"

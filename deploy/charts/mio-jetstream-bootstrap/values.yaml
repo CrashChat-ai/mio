@@ -1,0 +1,35 @@
+# mio-jetstream-bootstrap values
+# This chart is VERIFY-ONLY. It asserts streams/consumers exist post-install.
+# It does NOT create or mutate JetStream resources.
+
+natsUrl: "nats://mio-nats:4222"
+
+# Image for the verification Job (nats CLI available).
+image:
+  repository: natsio/nats-box
+  tag: "0.14.5"
+  pullPolicy: IfNotPresent
+
+# Retry config for the quorum-wait polling loop.
+retryCount: 5
+retrySleepSeconds: 10
+
+# Expected streams (verify-only — source of truth is gateway/internal/store/jetstream.go).
+expectedStreams:
+  - name: MESSAGES_INBOUND
+    subjects: ["mio.inbound.>"]
+    replicas: 3
+    retention: limits
+  - name: MESSAGES_OUTBOUND
+    subjects: ["mio.outbound.>"]
+    replicas: 3
+    retention: workqueue
+
+# Expected consumers (created by their owning service on first start).
+expectedConsumers:
+  - stream: MESSAGES_INBOUND
+    durable: ai-consumer
+  - stream: MESSAGES_INBOUND
+    durable: gcs-archiver
+  - stream: MESSAGES_OUTBOUND
+    durable: sender-pool

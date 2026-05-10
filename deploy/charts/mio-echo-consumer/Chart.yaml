@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mio-echo-consumer
+description: MIO Echo Consumer — JetStream-driven echo reply (POC stand-in for MIU)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

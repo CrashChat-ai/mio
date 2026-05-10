@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package mio.v1;
+
+import "mio/v1/enums.proto";
+
+option go_package = "github.com/crashchat-ai/mio/proto/gen/go/mio/v1;miov1";
+
+// Sender carries the platform-side identity of the message author.
+// user_id (canonical mio user) is deliberately absent — cross-channel identity
+// merge runs in MIU after the message is consumed, not at ingest time. Keeping
+// the DB lookup off the hot path lets the gateway ack Cliq within the 5 s deadline.
+message Sender {
+  string   external_id  = 1; // platform user id (cliq sender_id, slack user id, ...)
+  string   display_name = 2;
+  PeerKind peer_kind    = 3; // direct | group — used for fast policy routing
+  bool     is_bot       = 4;
+}

@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mio-gateway.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mio-gateway.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mio-gateway.selectorLabels" . | nindent 6 }}
+  # Sequential rollout: maxSurge=0, maxUnavailable=1.
+  # Enforces single-writer for AddOrUpdateStream on startup.
+  # Allows LB drain via the surviving replica.
+  # Do NOT change to maxSurge=1 until split-brain risk in P3 is resolved.
+  strategy:
+    type: {{ .Values.strategy.type }}
+    rollingUpdate:
+      maxSurge: {{ .Values.strategy.rollingUpdate.maxSurge }}
+      maxUnavailable: {{ .Values.strategy.rollingUpdate.maxUnavailable }}
+  template:
+    metadata:
+      labels:
+        {{- include "mio-gateway.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "mio-gateway.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: gateway
+          image: {{ include "mio-gateway.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+            - name: metrics
+              containerPort: {{ .Values.service.metricsPort | int }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "mio-gateway.fullname" . }}
+          env:
+            - name: MIO_POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: DATABASE_URL
+            - name: CLIQ_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: CLIQ_WEBHOOK_SECRET
+            # OAuth refresh-token flow — gateway exchanges refresh_token
+            # for fresh access tokens via accounts.zoho.com/oauth/v2/token,
+            # caches with 5-min safety window, self-heals on stale-token 401.
+            # Replaces the old static CLIQ_BOT_TOKEN model (1h TTL bug).
+            - name: CLIQ_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: CLIQ_CLIENT_ID
+            - name: CLIQ_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: CLIQ_CLIENT_SECRET
+            - name: CLIQ_REFRESH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: CLIQ_REFRESH_TOKEN
+            - name: CLIQ_BOT_SCOPE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: CLIQ_BOT_SCOPE
+            - name: CLIQ_BOT_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: CLIQ_BOT_NAME
+          volumeMounts:
+            # Gateway reads cliq-webhook-secret from /etc/mio/secrets/cliq-webhook-secret (file mount).
+            # Projecting the Secret's CLIQ_WEBHOOK_SECRET key under that path.
+            - name: mio-secrets
+              mountPath: /etc/mio/secrets
+              readOnly: true
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: mio-secrets
+          secret:
+            secretName: {{ .Values.secrets.existingSecret }}
+            items:
+              - key: CLIQ_WEBHOOK_SECRET
+                path: cliq-webhook-secret
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

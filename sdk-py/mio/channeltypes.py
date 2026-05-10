@@ -17,5 +17,4 @@ KNOWN: set[str] = {
 }
 
 # ALIASES maps deprecated channel_type slug -> current slug.
-ALIASES: dict[str, str] = {
-}
+ALIASES: dict[str, str] = {}

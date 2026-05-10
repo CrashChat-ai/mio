@@ -34,7 +34,7 @@ var ErrTerm = errors.New("worker: terminate message")
 // Config is the runtime knobs used by Run.
 type Config struct {
 	Stream        string // e.g. MESSAGES_INBOUND
-	Durable       string // e.g. attachment-downloader (legacy default; renamed to media-vault in chart 1.0.0)
+	Durable       string // e.g. media-vault
 	FilterSubject string // e.g. mio.inbound.>
 	AckWait       time.Duration
 	MaxAckPending int

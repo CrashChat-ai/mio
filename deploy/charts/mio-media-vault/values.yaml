@@ -1,13 +1,6 @@
-# mio-media-vault Helm values
+# mio-media-vault Helm values (1.0.0 — runtime identifiers fully renamed).
 # Single replica for POC. Multi-replica is correctness-safe (HEAD-before-PUT
 # + IfNotExists absorbs the race), but throughput tuning is deferred.
-#
-# RUNTIME-IDENTITY NOTE (P2 of plans/260510-1112-rename-attachment-downloader-to-media-vault):
-#   Service is named media-vault, but the runtime identifiers
-#   (fullnameOverride, serviceAccount.name, config.durableName) intentionally
-#   retain "attachment-downloader"/"mio-attachment-downloader" for continuity.
-#   This avoids a JetStream replay + GCP IAM rebind on first cutover.
-#   The runtime rename is staged in P5 (chart 1.0.0).
 
 replicaCount: 1
 
@@ -21,14 +14,11 @@ imagePullSecrets:
   - name: ghcr-pull
 
 nameOverride: ""
-# Preserve legacy resource names (Pod/Deployment/Service prefixed with
-# mio-attachment-downloader-*) so the chart upgrade is image-only.
-fullnameOverride: "mio-attachment-downloader"
+fullnameOverride: ""
 
 serviceAccount:
   create: true
-  # Preserve legacy KSA name to keep Workload Identity GSA→KSA binding.
-  name: "mio-attachment-downloader"
+  name: "mio-media-vault"
   # Workload Identity binding — KSA → GSA. GSA needs roles/storage.objectAdmin
   # on the bucket prefix and roles/iam.serviceAccountTokenCreator on itself
   # (V4 signed-URL signing).
@@ -44,7 +34,7 @@ config:
   downloadTimeoutSeconds: "60"
   downloadMaxBytes: "26214400"  # 25 MiB
   signedUrlTtlSeconds: "3600"
-  durableName: "attachment-downloader"
+  durableName: "media-vault"
   enrichedStream: "MESSAGES_INBOUND_ENRICHED"
   metricsPort: "9090"
   logLevel: "info"

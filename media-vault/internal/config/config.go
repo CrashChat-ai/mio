@@ -43,7 +43,7 @@ func FromEnv() (*Config, error) {
 		StorageBackend:   envOr("MIO_STORAGE_BACKEND", "gcs"),
 		StorageBucket:    os.Getenv("MIO_STORAGE_BUCKET"),
 		StoragePrefix:    envOr("MIO_STORAGE_PREFIX", "mio/attachments/"),
-		DurableName:      envOr("MIO_DURABLE_NAME", "attachment-downloader"),
+		DurableName:      envOr("MIO_DURABLE_NAME", "media-vault"),
 		LogLevel:         envOr("MIO_LOG_LEVEL", "info"),
 		EnrichedStream:   envOr("MIO_ENRICHED_STREAM", "MESSAGES_INBOUND_ENRICHED"),
 		CliqClientID:     os.Getenv("MIO_CLIQ_CLIENT_ID"),

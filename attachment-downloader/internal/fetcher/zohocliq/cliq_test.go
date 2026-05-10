@@ -31,7 +31,7 @@ func TestFetchSuccess(t *testing.T) {
 	// httptest serves http://; remap to https requirement is too strict for unit
 	// tests — relax here by patching the URL parser path. We use a special
 	// constructor in tests via direct call:
-	f := New(srv.Client(), "tok", 1024)
+	f := New(srv.Client(), staticTokenSource("tok"), 1024)
 	f.allowInsecureForTest = true
 
 	var buf bytes.Buffer
@@ -60,7 +60,7 @@ func TestFetchExpired(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f := New(srv.Client(), "tok", 1024)
+	f := New(srv.Client(), staticTokenSource("tok"), 1024)
 	f.allowInsecureForTest = true
 	_, err := f.Fetch(t.Context(), &miov1.Attachment{Url: srv.URL}, &bytes.Buffer{})
 	var fe *fetcher.Error
@@ -75,7 +75,7 @@ func TestFetchForbidden(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f := New(srv.Client(), "tok", 1024)
+	f := New(srv.Client(), staticTokenSource("tok"), 1024)
 	f.allowInsecureForTest = true
 	_, err := f.Fetch(t.Context(), &miov1.Attachment{Url: srv.URL}, &bytes.Buffer{})
 	var fe *fetcher.Error
@@ -90,7 +90,7 @@ func TestFetch5xxIsRetryable(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f := New(srv.Client(), "tok", 1024)
+	f := New(srv.Client(), staticTokenSource("tok"), 1024)
 	f.allowInsecureForTest = true
 	_, err := f.Fetch(t.Context(), &miov1.Attachment{Url: srv.URL}, &bytes.Buffer{})
 	if err == nil {
@@ -110,7 +110,7 @@ func TestFetchTooLargeByContentLength(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f := New(srv.Client(), "tok", 50)
+	f := New(srv.Client(), staticTokenSource("tok"), 50)
 	f.allowInsecureForTest = true
 	_, err := f.Fetch(t.Context(), &miov1.Attachment{Url: srv.URL}, &bytes.Buffer{})
 	var fe *fetcher.Error
@@ -120,7 +120,7 @@ func TestFetchTooLargeByContentLength(t *testing.T) {
 }
 
 func TestFetchEmptyURL(t *testing.T) {
-	f := New(http.DefaultClient, "tok", 1024)
+	f := New(http.DefaultClient, staticTokenSource("tok"), 1024)
 	_, err := f.Fetch(t.Context(), &miov1.Attachment{}, &bytes.Buffer{})
 	var fe *fetcher.Error
 	if !errors.As(err, &fe) || fe.Code != miov1.Attachment_ERROR_CODE_NOT_FOUND {

@@ -63,8 +63,10 @@ by Flux. Plaintext never lives in Git.
 
 ### Gateway secrets (`mio-gateway-secrets`)
 
-Keys: `CLIQ_WEBHOOK_SECRET`, `CLIQ_BOT_TOKEN`, `CLIQ_BOT_SCOPE`,
-`DATABASE_URL`. Stored at
+Keys: `CLIQ_WEBHOOK_SECRET`, `CLIQ_CLIENT_ID`, `CLIQ_CLIENT_SECRET`,
+`CLIQ_REFRESH_TOKEN`, `CLIQ_BOT_NAME`, `CLIQ_BOT_SCOPE`, `DATABASE_URL`.
+Gateway and attachment-downloader mint short-lived access tokens on demand
+from the refresh token (Zoho access tokens are 1h-TTL). Stored at
 `infra/fluxcd/apps/prod/mio/secrets.enc.yaml`.
 
 ```bash

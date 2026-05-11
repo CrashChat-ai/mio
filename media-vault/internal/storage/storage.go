@@ -10,13 +10,22 @@ import (
 )
 
 // Object describes a stored object's metadata (returned by Stat / List).
+//
+// TenantID, AccountID, ConversationID, SourceMessageID are forward-only:
+// they are populated only on objects written after the metadata-enrichment
+// rollout. Objects written before will leave these empty, and consumers
+// (GDPR sweep predicates, forensic queries) must treat empty as "unknown",
+// not as a non-match.
 type Object struct {
-	Key         string
-	Size        int64
-	ContentType string
-	SHA256Hex   string
-	AccountID   string // recorded on Put via PutOptions.AccountID
-	ModifiedAt  time.Time
+	Key             string
+	Size            int64
+	ContentType     string
+	SHA256Hex       string
+	TenantID        string // forward-only; empty on pre-enrichment objects
+	AccountID       string // recorded on Put via PutOptions.AccountID
+	ConversationID  string // forward-only; empty on pre-enrichment objects
+	SourceMessageID string // forward-only; empty on pre-enrichment objects
+	ModifiedAt      time.Time
 }
 
 // PutOptions controls write behaviour.
@@ -26,8 +35,17 @@ type PutOptions struct {
 	// IfNotExists: when true, write only if the key does not already exist.
 	// Backend translates to GCS DoesNotExist precondition / S3 If-None-Match.
 	IfNotExists bool
+	// TenantID is recorded as object metadata for GDPR delete-by-tenant sweeps
+	// (multi-tenant deployments).
+	TenantID string
 	// AccountID is recorded as object metadata for GDPR delete-by-account sweeps.
 	AccountID string
+	// ConversationID enables narrower forensic / right-to-erasure filters
+	// (delete-by-conversation).
+	ConversationID string
+	// SourceMessageID is the platform-native message identifier — useful for
+	// joining attachment objects back to the originating message during audits.
+	SourceMessageID string
 }
 
 // SignOptions controls signed-URL issuance.

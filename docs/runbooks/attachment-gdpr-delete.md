@@ -17,6 +17,22 @@ a single account from object storage.
    attachments arrive during the sweep — otherwise dry-run vs execute can
    miss in-flight writes.
 
+## Filter modes
+
+`mio-media-cli delete` accepts **exactly one** of:
+
+| Flag | Filter on object metadata | When to use |
+|---|---|---|
+| `--account_id=<UUID>` | `account_id` | Customer offboard / single-account erasure (the legacy entry point — works on objects written at any time) |
+| `--tenant_id=<UUID>` | `tenant_id` | Tenant offboard in a multi-tenant deployment (forward-only: matches only objects written after the metadata-enrichment rollout) |
+| `--conversation_id=<UUID>` | `conversation_id` | Narrowest forensic / right-to-erasure case — purge a single thread without touching the rest of an account's data (forward-only) |
+
+> **Forward-only caveat for `--tenant_id` / `--conversation_id`:** object
+> metadata is enriched only at write time. Attachments uploaded before the
+> media-vault enrichment rollout have empty `tenant_id` / `conversation_id`
+> and will NOT be matched by these filters. For deletions that must cover
+> historical attachments, fall back to `--account_id`.
+
 ## Dry-run (always first)
 
 ```bash
@@ -28,6 +44,9 @@ kubectl -n mio run cli --rm -it --restart=Never \
     --prefix=mio/attachments/ \
     --dry-run
 ```
+
+Swap `--account_id` for `--tenant_id` or `--conversation_id` per the table
+above.
 
 Output: `listed=N matched=K deleted=0 dry_run=true`. Sanity-check K against
 expected counts.

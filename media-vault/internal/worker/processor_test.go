@@ -107,8 +107,8 @@ func newProc(t *testing.T, store storage.Storage, pub Publisher) *EnrichingProce
 	return &EnrichingProcessor{
 		Storage:       store,
 		Publisher:     pub,
+		StorageBucket: "test-bucket",
 		StoragePrefix: "mio/attachments/",
-		SignedURLTTL:  time.Hour,
 		Log:           slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})),
 	}
 }
@@ -136,8 +136,9 @@ func TestProcessRewritesAttachmentAndPublishes(t *testing.T) {
 	}
 
 	att := msg.Attachments[0]
-	if att.StorageKey == "" || !strings.HasPrefix(att.StorageKey, "mio/attachments/ch_a/") {
-		t.Fatalf("storage_key not set/shape: %q", att.StorageKey)
+	wantKeyPrefix := "gs://test-bucket/mio/attachments/ch_a/"
+	if att.StorageKey == "" || !strings.HasPrefix(att.StorageKey, wantKeyPrefix) {
+		t.Fatalf("storage_key not set/shape: %q (want prefix %q)", att.StorageKey, wantKeyPrefix)
 	}
 	if att.ContentSha256 == "" {
 		t.Fatal("content_sha256 unset")
@@ -145,8 +146,9 @@ func TestProcessRewritesAttachmentAndPublishes(t *testing.T) {
 	if att.ErrorCode != miov1.Attachment_ERROR_CODE_OK {
 		t.Fatalf("error_code = %v", att.ErrorCode)
 	}
-	if !strings.HasPrefix(att.Url, "https://signed.test/") {
-		t.Fatalf("url not rewritten to signed: %q", att.Url)
+	// url must be preserved as the original platform URL, not overwritten with a signed GCS URL.
+	if att.Url != "https://platform/x" {
+		t.Fatalf("url must be original platform url, got: %q", att.Url)
 	}
 	if len(pub.calls) != 1 {
 		t.Fatalf("publish calls = %d, want 1", len(pub.calls))

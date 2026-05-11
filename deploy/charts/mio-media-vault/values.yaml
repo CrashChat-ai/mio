@@ -33,7 +33,6 @@ config:
   storagePrefix: "mio/attachments/"
   downloadTimeoutSeconds: "60"
   downloadMaxBytes: "26214400"  # 25 MiB
-  signedUrlTtlSeconds: "3600"
   durableName: "media-vault"
   enrichedStream: "MESSAGES_INBOUND_ENRICHED"
   metricsPort: "9090"

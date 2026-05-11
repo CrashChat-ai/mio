@@ -18,7 +18,6 @@ type Config struct {
 	StoragePrefix    string
 	DownloadTimeout  time.Duration
 	DownloadMaxBytes int64
-	SignedURLTTL     time.Duration
 	DurableName      string
 	MetricsPort      int
 	LogLevel         string
@@ -62,12 +61,6 @@ func FromEnv() (*Config, error) {
 		return nil, err
 	}
 	c.DownloadMaxBytes = maxBytes
-
-	signedSec, err := envIntOr("MIO_SIGNED_URL_TTL_SECONDS", 3600)
-	if err != nil {
-		return nil, err
-	}
-	c.SignedURLTTL = time.Duration(signedSec) * time.Second
 
 	port, err := envIntOr("MIO_METRICS_PORT", 9090)
 	if err != nil {

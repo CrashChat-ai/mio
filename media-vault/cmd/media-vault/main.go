@@ -109,8 +109,8 @@ func run() error {
 	processor := &worker.EnrichingProcessor{
 		Storage:       store,
 		Publisher:     pub,
+		StorageBucket: cfg.StorageBucket,
 		StoragePrefix: cfg.StoragePrefix,
-		SignedURLTTL:  cfg.SignedURLTTL,
 		Log:           log,
 	}
 

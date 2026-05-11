@@ -40,9 +40,6 @@ appdata/
 # Go workspace committed — CI relies on it for multi-module resolution.
 # Dockerfiles ignore go.work via .dockerignore.
 
-# local env overrides
-.env.local
-
 # IDE / OS
 .idea/
 .vscode/
@@ -52,5 +49,6 @@ appdata/
 .temp
 docs/journals
 
-# Local planning artifacts — not part of source tree
+# Local planning artifacts
 plans/
+.claude/

@@ -93,14 +93,14 @@ Full design doc and phased roadmap live in `docs/system-architecture.md` (incomi
 POC. Phase tracker:
 
 - [x] **P0** — Repo scaffold (in progress)
-- [ ] **P1** — Proto v1 envelope
-- [ ] **P2** — SDKs (`sdk-go`, `sdk-py`)
-- [ ] **P3** — Gateway + Zoho Cliq inbound
-- [ ] **P4** — `examples/echo-consumer/`
-- [ ] **P5** — Outbound path → Cliq
-- [ ] **P6** — `mio-sink-gcs`
-- [ ] **P7** — Helm charts + NATS on GKE
-- [ ] **P8** — POC deploy on GKE
+- [x] **P1** — Proto v1 envelope
+- [x] **P2** — SDKs (`sdk-go`, `sdk-py`)
+- [x] **P3** — Gateway + Zoho Cliq inbound
+- [x] **P4** — `examples/echo-consumer/`
+- [x] **P5** — Outbound path → Cliq
+- [x] **P6** — `mio-sink-gcs`
+- [x] **P7** — Helm charts + NATS on GKE
+- [x] **P8** — POC deploy on GKE
 - [ ] **P9** — Second channel adapter
 
 ## License

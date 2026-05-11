@@ -1,13 +1,13 @@
 # Runbook: Cliq webhook down
 
 **Symptom:** Zoho Cliq returns 5xx (or no echo arrives) when posting to
-`https://mio.abspectrumservices.org/cliq`.
+`https://<your-mio-host>/cliq`.
 
 **Audience:** anyone on call. First-five-minute diagnosis tree only —
 deeper failure modes (jetstream-degraded, outbound-rate-limit) live in
 P10 runbooks.
 
-**Cluster:** `dp-prod-7e26` · **Namespace:** `mio`
+**Cluster:** `<your-gke-cluster>` · **Namespace:** `mio`
 
 ## 1. Are gateway pods healthy?
 
@@ -49,7 +49,7 @@ kubectl -n mio exec deploy/mio-nats -- nats stream info MESSAGES_INBOUND
 ## 4. Ingress reachable from outside?
 
 ```bash
-curl -I https://mio.abspectrumservices.org/cliq
+curl -I https://<your-mio-host>/cliq
 ```
 
 - `HTTP/2 405` → routing + TLS work; problem is Cliq-side (bot disabled,
@@ -61,11 +61,11 @@ curl -I https://mio.abspectrumservices.org/cliq
 
 ## 5. Rotate `CLIQ_WEBHOOK_SECRET`
 
-Production secret lives in `infra/fluxcd/apps/prod/mio/secrets.enc.yaml`,
-SOPS-encrypted with the age key at `infra/.secrets/age-key.txt`.
+The production secret lives in your infra repo (typical layout:
+`fluxcd/apps/prod/mio/secrets.enc.yaml`), SOPS-encrypted.
 
 ```bash
-cd ~/git/work/ab-spectrum/infra
+cd <your-infra-repo>
 SOPS_AGE_KEY_FILE=.secrets/age-key.txt sops fluxcd/apps/prod/mio/secrets.enc.yaml
 # edit CLIQ_WEBHOOK_SECRET → save → encrypted on write
 git add -A && git commit -m "chore(mio): rotate cliq webhook secret"

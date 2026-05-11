@@ -48,8 +48,8 @@ func TestFullObjectPath(t *testing.T) {
 
 // TestPrefixedObjectPath locks the SINK_PREFIX behaviour: a normalised prefix
 // (already trailing-slashed) prepended to the partition path produces a clean
-// key under the prefix folder. Regression guard for the prod deploy where the
-// loader writes to gs://ab-spectrum-sensitive-prod/mio/.
+// key under the prefix folder. Regression guard for deployments that write to
+// a shared bucket under a fixed prefix (e.g. gs://<your-bucket>/mio/).
 func TestPrefixedObjectPath(t *testing.T) {
 	ts := time.Date(2026, 5, 8, 11, 0, 0, 0, time.UTC)
 	partPath := partition.Path("zoho_cliq", ts)

@@ -53,13 +53,13 @@ is logged.
 ## Audit
 
 Cloud Logging captures every Delete call under the `mio-attachments` GSA
-identity:
+identity. Substitute your bucket name and GCP project below:
 
 ```
 resource.type="gcs_bucket"
-resource.labels.bucket_name="ab-spectrum-backups-prod"
+resource.labels.bucket_name="<your-mio-bucket>"
 protoPayload.methodName="storage.objects.delete"
-protoPayload.authenticationInfo.principalEmail="mio-attachments@dp-prod-7e26.iam.gserviceaccount.com"
+protoPayload.authenticationInfo.principalEmail="mio-attachments@<your-gcp-project>.iam.gserviceaccount.com"
 ```
 
 Cluster log retention is ≥30d.
@@ -69,7 +69,7 @@ Cluster log retention is ≥30d.
 ```bash
 gcloud auth application-default login
 export MIO_STORAGE_BACKEND=gcs
-export MIO_STORAGE_BUCKET=ab-spectrum-backups-prod
+export MIO_STORAGE_BUCKET=<your-mio-bucket>
 go run ./cmd/mio-media-cli delete --account_id=<UUID> --dry-run
 ```
 

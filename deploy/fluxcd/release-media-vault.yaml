@@ -1,11 +1,12 @@
-# FluxCD HelmRelease for mio-media-vault.
+# FluxCD HelmRelease for mio-media-vault — reference template.
 #
-# This file is the source of truth that should be committed to the infra repo
-# at fluxcd/apps/prod/mio/release-media-vault.yaml. It lives here
-# in the mio repo too so the chart and HelmRelease evolve together.
+# Copy this into your infra repo (e.g. `fluxcd/apps/prod/mio/release-media-vault.yaml`)
+# and substitute the deployment-specific values below (`gcpServiceAccount`,
+# `config.storageBucket`). It lives here in the mio repo so the chart and the
+# HelmRelease shape evolve together; the deployed copy belongs to your infra repo.
 #
-# Don't forget to also append `- release-media-vault.yaml` to
-# fluxcd/apps/prod/mio/kustomization.yaml in the infra repo.
+# Don't forget to also append `- release-media-vault.yaml` to your
+# kustomization.yaml alongside the chart's HelmRelease.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -28,7 +29,7 @@ spec:
     image:
       tag: "main"  # bump to the merge SHA on each release
     serviceAccount:
-      gcpServiceAccount: "mio-attachments@dp-prod-7e26.iam.gserviceaccount.com"
+      gcpServiceAccount: "mio-attachments@<your-gcp-project>.iam.gserviceaccount.com"
     config:
-      storageBucket: "ab-spectrum-backups-prod"
+      storageBucket: "<your-mio-attachments-bucket>"
       storagePrefix: "mio/attachments/"

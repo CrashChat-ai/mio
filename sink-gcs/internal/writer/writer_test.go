@@ -199,7 +199,7 @@ func TestConfigFromEnv_PrefixNormalization(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Setenv("SINK_BACKEND", "gcs")
-		t.Setenv("SINK_BUCKET", "ab-spectrum-sensitive-prod")
+		t.Setenv("SINK_BUCKET", "test-bucket")
 		t.Setenv("SINK_PREFIX", tc.in)
 		cfg, err := writer.ConfigFromEnv()
 		if err != nil {

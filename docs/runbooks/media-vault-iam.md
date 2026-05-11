@@ -32,16 +32,19 @@ flux reconcile helmrelease mio-media-vault -n mio
 ## Verify
 
 ```bash
+# Substitute your bucket + GSA names below (your terragrunt outputs them).
+export GSA="<your-mio-attachments-sa>@<your-gcp-project>.iam.gserviceaccount.com"
+export BUCKET="<your-mio-attachments-bucket>"
+
 # KSA carries the right WI annotation
 kubectl -n mio get sa mio-media-vault -o yaml | grep iam.gke.io
-# expected: iam.gke.io/gcp-service-account: prod-mio-attachments-sa@dp-prod-7e26.iam.gserviceaccount.com
+# expected: iam.gke.io/gcp-service-account: ${GSA}
 
 # GSA exists with self-impersonation + WI binding
-gcloud iam service-accounts get-iam-policy \
-  prod-mio-attachments-sa@dp-prod-7e26.iam.gserviceaccount.com
+gcloud iam service-accounts get-iam-policy "${GSA}"
 
 # Bucket binding (look for the prefix-scoped condition)
-gcloud storage buckets get-iam-policy gs://ab-spectrum-backups-prod \
+gcloud storage buckets get-iam-policy "gs://${BUCKET}" \
   --format=json | jq '.bindings[] | select(.members[] | contains("mio-attachments"))'
 ```
 

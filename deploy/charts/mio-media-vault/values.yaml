@@ -29,7 +29,7 @@ config:
   tenantId: "00000000-0000-0000-0000-000000000001"
   accountId: "00000000-0000-0000-0000-000000000002"
   storageBackend: "gcs"
-  storageBucket: "ab-spectrum-backups-prod"
+  storageBucket: ""   # required: set per environment (e.g. "<your-mio-attachments-bucket>")
   storagePrefix: "mio/attachments/"
   downloadTimeoutSeconds: "60"
   downloadMaxBytes: "26214400"  # 25 MiB

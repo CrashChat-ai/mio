@@ -1,10 +1,8 @@
-# Mio deployment topology (POC, prod GKE)
+# Mio deployment topology (POC, GKE reference)
 
-POC ships onto the **existing** `dp-prod-7e26` GKE cluster
-(`us-central1-a`) into the `mio` namespace, reconciled by FluxCD from the
-infra repo at `~/git/work/ab-spectrum/infra`. No new cluster, no new
-ingress controller, no new prometheus stack — P8 reuses what the cluster
-already runs.
+This document describes the **reference POC deployment** onto a GKE cluster,
+reconciled by FluxCD from a deployer-owned infra repo. The shape is intended as
+a template: substitute your own project, host, bucket, and SA names below.
 
 ## Cluster shape
 
@@ -12,7 +10,7 @@ already runs.
 ingress-nginx (cluster-scoped, pre-existing)
         │  TLS (letsencrypt-production)
         ▼
-host:  mio.abspectrumservices.org
+host:  <your-mio-host>           (e.g. mio.example.com)
 path:  /cliq  →  Service mio-gateway:80  →  gateway pods :8080
                                               │
                                               ▼
@@ -22,7 +20,7 @@ path:  /cliq  →  Service mio-gateway:80  →  gateway pods :8080
                      mio-echo-consumer  ─────►  outbound dispatcher  ──►  Cliq REST
                                               │
                                               ▼
-                                    sink-gcs  →  gs://ab-spectrum-backups-prod/mio/
+                                    sink-gcs  →  gs://<your-mio-bucket>/mio/
 ```
 
 Components in namespace `mio`:
@@ -32,17 +30,17 @@ Components in namespace `mio`:
 | `mio-gateway` | HelmRelease (this repo's chart) | 2 replicas, ingress entry, talks to CNPG + NATS |
 | `mio-nats` | HelmRelease (upstream nats chart) | **1 replica, emptyDir** (POC; data loss on pod loss — Risk #1) |
 | `mio-echo-consumer` | HelmRelease (this repo's chart) | 1 replica, JetStream pull subscription |
-| `mio-sink-gcs` | HelmRelease (this repo's chart) | 1 replica, Workload Identity to `mio-sink-gcs@dp-prod-7e26` |
+| `mio-sink-gcs` | HelmRelease (this repo's chart) | 1 replica, Workload Identity to `mio-sink-gcs@<your-gcp-project>` |
 | `mio-postgres` | CNPG `Cluster` (databases/prod/mio) | 1 instance, 10Gi premium-rwo, PG 17.2 |
-| Secrets | SOPS-encrypted in infra repo | `mio-gateway-secrets`, `mio-app-credentials`, `ghcr-pull` |
+| Secrets | SOPS-encrypted in your infra repo | `mio-gateway-secrets`, `mio-app-credentials`, `ghcr-pull` |
 
 External infra reused:
 
 - `ingress-nginx` (class `nginx`)
 - `cert-manager` ClusterIssuer `letsencrypt-production` (HTTP-01 via NGINX)
-- CNPG operator + backup SA `prod-cnpg-backup-sa@dp-prod-7e26`
-- Cloud DNS managed zone for `abspectrumservices.org` (manual A record)
-- GCS bucket `gs://ab-spectrum-backups-prod` with prefix `mio/`
+- CNPG operator + your backup SA (e.g. `prod-cnpg-backup-sa@<your-gcp-project>`)
+- Cloud DNS managed zone for your host's apex domain (manual A record)
+- GCS bucket `gs://<your-mio-bucket>` with prefix `mio/`
 
 ## Image tag policy
 
@@ -70,7 +68,7 @@ from the refresh token (Zoho access tokens are 1h-TTL). Stored at
 `infra/fluxcd/apps/prod/mio/secrets.enc.yaml`.
 
 ```bash
-cd ~/git/work/ab-spectrum/infra
+cd <your-infra-repo>
 SOPS_AGE_KEY_FILE=.secrets/age-key.txt sops fluxcd/apps/prod/mio/secrets.enc.yaml
 # edit → save → re-encrypted on write
 git commit -am "chore(mio): rotate <key>" && git push
@@ -157,7 +155,7 @@ The sidecar provisions `MESSAGES_INBOUND_ENRICHED` idempotently on boot.
 ### Object storage layout
 
 ```
-gs://ab-spectrum-backups-prod/
+gs://<your-mio-attachments-bucket>/
 └── mio/attachments/
     └── {channel_type}/yyyy=YYYY/mm=MM/dd=DD/{sha256[:2]}/{sha256}{ext}
 ```

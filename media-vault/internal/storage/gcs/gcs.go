@@ -268,12 +268,12 @@ func attrsToObject(key string, attrs *gcs.ObjectAttrs) *storage.Object {
 		ContentType: attrs.ContentType,
 		ModifiedAt:  attrs.Updated,
 	}
-	if attrs.Metadata != nil {
-		o.SHA256Hex = attrs.Metadata["sha256"]
-		o.TenantID = attrs.Metadata["tenant_id"]
-		o.AccountID = attrs.Metadata["account_id"]
-		o.ConversationID = attrs.Metadata["conversation_id"]
-		o.SourceMessageID = attrs.Metadata["source_message_id"]
+	if m := attrs.Metadata; m != nil {
+		o.SHA256Hex = m["sha256"]
+		o.TenantID = m["tenant_id"]
+		o.AccountID = m["account_id"]
+		o.ConversationID = m["conversation_id"]
+		o.SourceMessageID = m["source_message_id"]
 	}
 	return o
 }

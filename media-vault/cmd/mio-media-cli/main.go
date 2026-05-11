@@ -93,7 +93,6 @@ func runList(ctx context.Context, s storage.Storage, args []string, log *slog.Lo
 	_ = fs.Parse(args)
 
 	// Columns: key, size, sha256, tenant_id, account_id, conversation_id, source_message_id.
-	// New columns will be empty for pre-enrichment objects (forward-only metadata).
 	out, errCh := s.List(ctx, *prefix)
 	for o := range out {
 		fmt.Printf("%s\t%d\t%s\t%s\t%s\t%s\t%s\n",

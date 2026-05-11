@@ -156,11 +156,6 @@ func TestProcessRewritesAttachmentAndPublishes(t *testing.T) {
 	}
 }
 
-// TestProcessStampsOwnerIdentifiersOnPutOptions locks in the metadata
-// enrichment contract: every PutOptions handed to the storage backend must
-// carry tenant_id, account_id, conversation_id, source_message_id from the
-// originating Message. Regression guard against a future refactor silently
-// dropping any of these fields and breaking GDPR / forensic filters.
 func TestProcessStampsOwnerIdentifiersOnPutOptions(t *testing.T) {
 	registerStub(t, "ch_meta", []byte("payload-meta"))
 	mem := newMem()

@@ -11,30 +11,22 @@ import (
 
 // Object describes a stored object's metadata (returned by Stat / List).
 //
-// TenantID, AccountID, ConversationID, SourceMessageID are forward-only:
-// they are populated only on objects written after the metadata-enrichment
-// rollout. Objects written before will leave these empty, and consumers
-// (GDPR sweep predicates, forensic queries) must treat empty as "unknown",
-// not as a non-match.
-//
-// Dedup-collision caveat: media-vault keys objects by content SHA-256 and
-// writes with IfNotExists=true. When two messages with different owner
-// identifiers (different tenant_id / account_id / conversation_id) carry
-// the same content bytes, only the FIRST writer's identifiers land on the
-// shared object — the second writer's PutOptions are silently discarded
-// by the dedup short-circuit. Tenant- or conversation-scoped GDPR sweeps
-// over the second writer's identifiers will therefore miss the object.
-// See docs/runbooks/attachment-gdpr-delete.md ("Dedup-collision caveat")
-// for operator guidance.
+// TenantID / ConversationID / SourceMessageID are forward-only — they are
+// populated only on objects written after the metadata-enrichment rollout,
+// so an empty value means "unknown", not "non-match", to GDPR filters.
+// Dedup hazard: media-vault writes with IfNotExists=true on a content-hash
+// key, so if two messages with different owner identifiers carry the same
+// bytes, only the first writer's identifiers are stamped — see
+// docs/runbooks/attachment-gdpr-delete.md for operator guidance.
 type Object struct {
 	Key             string
 	Size            int64
 	ContentType     string
 	SHA256Hex       string
-	TenantID        string // forward-only; empty on pre-enrichment objects
-	AccountID       string // recorded on Put via PutOptions.AccountID
-	ConversationID  string // forward-only; empty on pre-enrichment objects
-	SourceMessageID string // forward-only; empty on pre-enrichment objects
+	TenantID        string
+	AccountID       string
+	ConversationID  string
+	SourceMessageID string
 	ModifiedAt      time.Time
 }
 
@@ -42,19 +34,11 @@ type Object struct {
 type PutOptions struct {
 	ContentType string
 	SHA256Hex   string
-	// IfNotExists: when true, write only if the key does not already exist.
-	// Backend translates to GCS DoesNotExist precondition / S3 If-None-Match.
-	IfNotExists bool
-	// TenantID is recorded as object metadata for GDPR delete-by-tenant sweeps
-	// (multi-tenant deployments).
-	TenantID string
-	// AccountID is recorded as object metadata for GDPR delete-by-account sweeps.
-	AccountID string
-	// ConversationID enables narrower forensic / right-to-erasure filters
-	// (delete-by-conversation).
-	ConversationID string
-	// SourceMessageID is the platform-native message identifier — useful for
-	// joining attachment objects back to the originating message during audits.
+	// IfNotExists: GCS DoesNotExist precondition / S3 If-None-Match.
+	IfNotExists     bool
+	TenantID        string
+	AccountID       string
+	ConversationID  string
 	SourceMessageID string
 }
 

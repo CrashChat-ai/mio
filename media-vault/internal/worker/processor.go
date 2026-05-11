@@ -64,9 +64,6 @@ func (p *EnrichingProcessor) Process(ctx context.Context, msg *miov1.Message) er
 	return nil
 }
 
-// attachmentOwner carries the message-level identifiers stamped into each
-// stored object's metadata. Bundled into a struct so adding another field
-// (e.g. workspace_id) doesn't keep widening processAttachment's signature.
 type attachmentOwner struct {
 	TenantID        string
 	AccountID       string

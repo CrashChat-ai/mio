@@ -193,10 +193,6 @@ func TestDeleteByConversationRequiresID(t *testing.T) {
 	}
 }
 
-// TestDeleteByTenantSkipsPreEnrichmentObjects locks in the forward-only
-// contract: objects written before the enrichment rollout have empty
-// tenant_id, and a tenant filter must NOT match them (would silently delete
-// legacy data belonging to a different tenant).
 func TestDeleteByTenantSkipsPreEnrichmentObjects(t *testing.T) {
 	f := newFake()
 	// Pre-enrichment object: account_id only, no tenant_id.

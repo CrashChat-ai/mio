@@ -139,7 +139,7 @@ func TestProcessRewritesAttachmentAndPublishes(t *testing.T) {
 	}
 
 	att := msg.Attachments[0]
-	wantKeyPrefix := "gs://test-bucket/mio/attachments/ch_a/"
+	wantKeyPrefix := "gs://test-bucket/mio/attachments/channel_type=ch_a/"
 	if att.StorageKey == "" || !strings.HasPrefix(att.StorageKey, wantKeyPrefix) {
 		t.Fatalf("storage_key not set/shape: %q (want prefix %q)", att.StorageKey, wantKeyPrefix)
 	}

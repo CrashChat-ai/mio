@@ -10,7 +10,7 @@ func TestBuildShape(t *testing.T) {
 	at := time.Date(2026, 5, 9, 12, 0, 0, 0, time.UTC)
 	sha := "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
 	got := Build("mio/attachments/", "zoho_cliq", sha, "image/png", "x.png", at)
-	want := "mio/attachments/zoho_cliq/yyyy=2026/mm=05/dd=09/ab/" + sha + ".png"
+	want := "mio/attachments/channel_type=zoho_cliq/date=2026-05-09/ab/" + sha + ".png"
 	if got != want {
 		t.Errorf("\n got: %s\nwant: %s", got, want)
 	}

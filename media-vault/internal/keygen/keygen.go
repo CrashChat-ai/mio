@@ -1,10 +1,16 @@
 // Package keygen builds the canonical content-addressable object key for
 // persisted attachments.
 //
-//	{prefix}{channel_type}/yyyy=YYYY/mm=MM/dd=DD/{sha256[:2]}/{sha256}{ext}
+//	{prefix}channel_type={X}/date=YYYY-MM-DD/{sha256[:2]}/{sha256}{ext}
 //
-// Date partitioning uses the inbound message's received_at, not "now" — so
-// the prefix-delete used by retention sweeps is chronologically meaningful.
+// The hive form (channel_type=, date=) matches sink-gcs/internal/partition so
+// a single hive-partitioned BigLake table can cover both messages and
+// attachments. Date partitioning uses the inbound message's received_at, not
+// "now", so prefix-scoped retention sweeps are chronologically meaningful.
+//
+// Legacy form (pre-2026-05): {prefix}{channel_type}/yyyy=YYYY/mm=MM/dd=DD/...
+// Existing objects keep their legacy keys; the writer only emits the new
+// form going forward.
 package keygen
 
 import (
@@ -34,10 +40,8 @@ func Build(prefix, channelType, sha256hex, contentType, filename string, receive
 	}
 	ext := pickExt(contentType, filename)
 	return prefix +
-		channelType + "/" +
-		"yyyy=" + receivedAt.Format("2006") + "/" +
-		"mm=" + receivedAt.Format("01") + "/" +
-		"dd=" + receivedAt.Format("02") + "/" +
+		"channel_type=" + channelType + "/" +
+		"date=" + receivedAt.Format("2006-01-02") + "/" +
 		shortSha + "/" +
 		sha256hex + ext
 }

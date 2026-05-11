@@ -98,18 +98,18 @@ The hot path on receive. Every step has a clear owner.
 ```mermaid
 sequenceDiagram
   autonumber
-  participant Ch as Channel<br/>(e.g. Zoho Cliq)
+  participant Ch as Channel (e.g. Zoho Cliq)
   participant GW as mio-gateway
-  participant DB as Postgres<br/>(idempotency)
-  participant JS as JetStream<br/>MESSAGES_INBOUND
-  participant DL as mio-attachment-<br/>downloader
-  participant GCS as GCS<br/>(attachments)
-  participant JSE as JetStream<br/>MESSAGES_INBOUND_ENRICHED
-  participant AI as MIU AI service<br/>(ai-consumer-enriched)
+  participant DB as Postgres (idempotency)
+  participant JS as JetStream MESSAGES_INBOUND
+  participant DL as mio-attachment-downloader
+  participant GCS as GCS (attachments)
+  participant JSE as JetStream MESSAGES_INBOUND_ENRICHED
+  participant AI as AI service (ai-consumer-enriched)
 
   Ch->>GW: POST /webhooks/{channel} (signed)
   GW->>GW: verify HMAC signature
-  GW->>GW: normalize → mio.v1.Message
+  GW->>GW: normalize to mio.v1.Message
   GW->>DB: INSERT (account_id, source_message_id) ON CONFLICT DO NOTHING
   alt duplicate
     DB-->>GW: 0 rows
@@ -119,26 +119,26 @@ sequenceDiagram
     GW->>JS: Publish(subject, payload, Nats-Msg-Id)
     JS-->>GW: PubAck (seq#)
     GW-->>Ch: 200 OK
-    Note over GW,Ch: ack inside channel deadline (≤3s)
+    Note over GW,Ch: ack inside channel deadline (<=3s)
   end
 
   JS->>DL: Pull (media-vault, MaxAckPending=N)
   alt has attachments
-    DL->>DL: fetch bytes from platform URL<br/>(within platform TTL)
+    DL->>DL: fetch bytes from platform URL within TTL
     DL->>GCS: Put (content-addressed, deduplicated)
-    DL->>DL: enrich: add storage_key,<br/>content_sha256
+    DL->>DL: enrich with storage_key and content_sha256
   else no attachments
     DL->>DL: pass through unchanged
   end
-  DL->>JSE: Publish enriched Message<br/>to MESSAGES_INBOUND_ENRICHED
+  DL->>JSE: Publish enriched Message to MESSAGES_INBOUND_ENRICHED
   DL->>JS: Ack
-  Note over DL: idempotent; republish<br/>safe on error redo
+  Note over DL: idempotent; republish safe on error redo
 
   JSE->>AI: Pull (ai-consumer-enriched, MaxAckPending=1)
-  AI->>AI: LangGraph run (2–30s)
-  AI->>AI: fetch attachment bytes from<br/>storage_key (no platform TTL risk)
+  AI->>AI: LangGraph run (2-30s)
+  AI->>AI: fetch attachment bytes from storage_key (no platform TTL risk)
   AI->>JSE: Ack
-  Note over AI: AI may publish "thinking..."<br/>SendCommand immediately,<br/>then edit when done
+  Note over AI: AI may publish "thinking..." SendCommand first, then edit when done
 ```
 
 Latency budget on the gateway path: **target p99 < 500ms**, hard ceiling
@@ -155,10 +155,10 @@ channel and reports back.
 ```mermaid
 sequenceDiagram
   autonumber
-  participant AI as MIU AI service
-  participant JS as JetStream<br/>MESSAGES_OUTBOUND
-  participant GW as mio-gateway<br/>(sender-pool)
-  participant RL as Per-workspace<br/>rate limiter
+  participant AI as AI service
+  participant JS as JetStream MESSAGES_OUTBOUND
+  participant GW as mio-gateway (sender-pool)
+  participant RL as Per-workspace rate limiter
   participant Ch as Channel API
 
   AI->>JS: Publish SendCommand (workqueue)

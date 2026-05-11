@@ -127,10 +127,16 @@ func deleteByFilter(
 		tokens   = make(chan struct{}, concurrency)
 	)
 
-	// needsStat reports whether the List-returned Object is missing the fields
-	// our matcher cares about. For GCS, List already populates all metadata
-	// fields, so this typically returns false (fast path); other backends may
-	// need an extra Stat round-trip.
+	// needsStat triggers an extra Stat round-trip only for objects with NO
+	// owner metadata at all (List returned an Object with every owner field
+	// empty). For GCS, List already populates all metadata that the object
+	// carries, so:
+	//   - post-enrichment objects: all four fields set      → returns false
+	//   - pre-enrichment objects:  account_id only          → returns false
+	//   - malformed / pathological objects: zero fields set → returns true
+	// In other words: returns false whenever ANY owner field is set, which
+	// covers every realistic GCS object. Other backends that don't surface
+	// metadata via List may need the Stat fallback.
 	needsStat := func(o storage.Object) bool {
 		return o.TenantID == "" && o.AccountID == "" && o.ConversationID == "" && o.SourceMessageID == ""
 	}

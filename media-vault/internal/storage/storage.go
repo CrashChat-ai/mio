@@ -16,6 +16,16 @@ import (
 // rollout. Objects written before will leave these empty, and consumers
 // (GDPR sweep predicates, forensic queries) must treat empty as "unknown",
 // not as a non-match.
+//
+// Dedup-collision caveat: media-vault keys objects by content SHA-256 and
+// writes with IfNotExists=true. When two messages with different owner
+// identifiers (different tenant_id / account_id / conversation_id) carry
+// the same content bytes, only the FIRST writer's identifiers land on the
+// shared object — the second writer's PutOptions are silently discarded
+// by the dedup short-circuit. Tenant- or conversation-scoped GDPR sweeps
+// over the second writer's identifiers will therefore miss the object.
+// See docs/runbooks/attachment-gdpr-delete.md ("Dedup-collision caveat")
+// for operator guidance.
 type Object struct {
 	Key             string
 	Size            int64

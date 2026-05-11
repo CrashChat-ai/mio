@@ -33,6 +33,25 @@ a single account from object storage.
 > and will NOT be matched by these filters. For deletions that must cover
 > historical attachments, fall back to `--account_id`.
 
+> **Dedup-collision caveat (all filter modes):** media-vault keys objects
+> by content SHA-256 and writes with `IfNotExists=true`. If tenant A
+> uploads a file and tenant B later uploads the same bytes, only A's
+> metadata is stamped on the single shared object — B's `tenant_id` /
+> `conversation_id` / `source_message_id` are silently dropped by the
+> dedup short-circuit, and `account_id` keeps A's value. Consequences:
+>
+> - `--tenant_id=B` / `--conversation_id=<B's-conv>` will **not** find
+>   the shared blob; the bytes survive a B-scoped erasure even though
+>   B has a copy referenced.
+> - `--account_id=A` deletes the blob and removes B's logical access too.
+>
+> This is the same cross-tenant dedup hazard called out in the Notes
+> section for `--account_id`, but applies more sharply to the narrower
+> filters. A reference-count side-table is tracked as a P10 enhancement.
+> For now: when running tenant- or conversation-scoped erasure, escalate
+> to an `--account_id` sweep if dedup-collision risk matters for the
+> request.
+
 ## Dry-run (always first)
 
 ```bash

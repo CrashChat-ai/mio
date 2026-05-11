@@ -38,7 +38,7 @@ message Attachment {
   string filename = 5;
 
   // --- storage rewrite (set by attachment-downloader sidecar) ---
-  // Stable object-storage key (e.g. "mio/attachments/zoho_cliq/yyyy=2026/.../{sha256}.png").
+  // Stable object-storage key (e.g. "mio/attachments/channel_type=zoho_cliq/date=2026-05-09/{sha256[:2]}/{sha256}.png").
   // Empty until the sidecar persists bytes. Independent of `url` so consumers
   // that hold long-lived references can re-mint signed URLs from the key.
   string    storage_key    = 6;

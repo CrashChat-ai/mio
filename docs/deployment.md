@@ -157,7 +157,7 @@ The sidecar provisions `MESSAGES_INBOUND_ENRICHED` idempotently on boot.
 ```
 gs://<your-mio-attachments-bucket>/
 └── mio/attachments/
-    └── {channel_type}/yyyy=YYYY/mm=MM/dd=DD/{sha256[:2]}/{sha256}{ext}
+    └── channel_type=<slug>/date=YYYY-MM-DD/{sha256[:2]}/{sha256}{ext}
 ```
 
 - Content-addressable: same image = single object.

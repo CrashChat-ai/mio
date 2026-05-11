@@ -41,7 +41,7 @@ config:
   gcsBucket: "mio-messages-poc"
   # Optional path prepended to every object key. Empty (default) writes at
   # bucket root; set to "mio/" to land objects under a shared bucket prefix
-  # (e.g. ab-spectrum-sensitive-prod/mio/channel_type=…/date=…/file.ndjson).
+  # (e.g. <your-mio-bucket>/mio/channel_type=…/date=…/file.ndjson).
   gcsPrefix: ""
   # Offset-based filename: <consumer-id>-<seq-start>-<seq-end>.ndjson
   # Partition: channel_type=<ct>/date=YYYY-MM-DD/

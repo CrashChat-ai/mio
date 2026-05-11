@@ -1,8 +1,9 @@
 # sink-gcs/sql — BigQuery schema contract + reference DDL
 
 This directory is the **schema authority** for the mio lakehouse. mio is the
-producer; consumers (e.g. `ab-spectrum/infra/services/bq-mio`) read the canonical
-schema and DDL from here.
+producer; downstream loaders (typically maintained in the deployer's own infra
+repo, e.g. a Cloud Run / Airflow `bq-mio` loader) read the canonical schema and
+DDL from here.
 
 ## Files
 
@@ -20,11 +21,11 @@ placeholders — render with `envsubst` before piping into `bq query`.
 
 ## Where the loader lives
 
-The hourly Cloud Run Job that materialises `raw_mio.messages` from GCS NDJSON
-is **not in this repo** — see [`ab-spectrum/infra/services/bq-mio/`](https://github.com/AB-Spectrum/infra)
-(consumer-side concern). mio publishes the contract; the consumer builds the
-pipeline. The loader vendors `messages_schema.json` and verifies it against
-this repo's `main` in its own CI.
+The job that materialises `raw_mio.messages` from GCS NDJSON is **not in this
+repo** — it lives in the deployer's own infra (e.g. a Cloud Run Job, an
+Airflow DAG, or any other ETL runner). mio publishes the contract; the
+consumer builds the pipeline. The loader vendors `messages_schema.json` and
+verifies it against this repo's `main` in its own CI.
 
 ## Cutover from autodetect stub (run **once**, before Apply step 1)
 
@@ -48,9 +49,9 @@ Skip this entirely on a fresh dataset.
 ## Apply order (per environment)
 
 ```bash
-export PROJECT_ID=dp-prod-7e26   # or dp-dev's project id
+export PROJECT_ID=<your-gcp-project>   # or your dev project id
 export DATASET=raw_mio
-export BUCKET=ab-spectrum-sensitive-prod
+export BUCKET=<your-mio-ndjson-bucket>
 export PREFIX=mio/
 
 # 1. native table (loader target)
@@ -106,5 +107,6 @@ to camelCase without re-authoring the schema.
 ## Monitoring + alerts
 
 Loader observability and Cloud Monitoring alert policies live with the
-loader (`ab-spectrum/infra/services/bq-mio/README.md` + the `bigquery-loader`
-terragrunt module). Notification channel: existing `GCHAT_WEBHOOK_URL`.
+loader in the deployer's own infra repo (typically a `bigquery-loader`
+terragrunt module or equivalent). Notification channel: deployer's choice
+(`GCHAT_WEBHOOK_URL`, Slack incoming webhook, PagerDuty, etc.).

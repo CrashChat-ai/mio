@@ -304,17 +304,17 @@ Two lifetimes, two access patterns, never shared.
 | Lake | GCS NDJSON | indefinite (lifecycle to Coldline) | append-only, batch | MIO (sink-gcs) |
 | Warehouse | BigQuery `raw_mio` | indefinite (no partition expiry yet) | analytical, deduped | MIO (bq-loader) |
 
-GCS partitioning: `gs://ab-spectrum-sensitive-prod/mio/channel_type=<slug>/date=YYYY-MM-DD/`
+GCS partitioning: `gs://<your-mio-ndjson-bucket>/mio/channel_type=<slug>/date=YYYY-MM-DD/`
 (Hive-style; `channel_type` is the `proto/channels.yaml` registry slug — e.g.
 `zoho_cliq`, `slack`). Lifecycle: Standard → Nearline @ 30d → Coldline @ 90d.
 
 ### 8.1 BigQuery lakehouse (`raw_mio`)
 
 GCS NDJSON is the lake-of-record. The `raw_mio` dataset hosts four objects
-that materialise it for analyst use, populated by an hourly Cloud Run Job
-that lives **outside** this repo, in `ab-spectrum/infra` under `services/bq-mio/`
-(consumer-side concern; mio publishes the schema contract, consumers build
-the pipelines). No streaming sink, no second writer.
+that materialise it for analyst use, populated by a job that lives **outside**
+this repo (consumer-side concern; mio publishes the schema contract, downstream
+deployers build the pipelines — a Cloud Run Job, Airflow DAG, or equivalent).
+No streaming sink, no second writer.
 
 | Object | Type | Purpose |
 |---|---|---|
@@ -325,7 +325,7 @@ the pipelines). No streaming sink, no second writer.
 
 ```mermaid
 flowchart LR
-  GCS["gs://ab-spectrum-sensitive-prod/mio/<br/>channel_type=*/date=*/*.ndjson"] --> EXT["raw_mio.messages_external<br/>(EXTERNAL, autodetect off)"]
+  GCS["gs://<your-mio-ndjson-bucket>/mio/<br/>channel_type=*/date=*/*.ndjson"] --> EXT["raw_mio.messages_external<br/>(EXTERNAL, autodetect off)"]
   GCS --> JOB["bq-loader<br/>(Cloud Run Job, hourly)"]
   JOB -- "validate.sql" --> ERR["raw_mio.messages_errors"]
   JOB -- "merge.sql<br/>(account_id, source_message_id)" --> NATIVE["raw_mio.messages<br/>(native, partitioned)"]
@@ -356,7 +356,7 @@ matches the existing `raw_*` dataset policy (no column-level security).
 Revisit if PII concerns escalate.
 
 **Reference:** `sink-gcs/sql/README.md` (DDL + schema contract);
-loader implementation lives in `ab-spectrum/infra/services/bq-mio/`.
+loader implementation lives in the deployer's own infra repo.
 
 ---
 

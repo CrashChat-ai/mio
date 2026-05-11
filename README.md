@@ -1,9 +1,9 @@
-# MIO — Messaging I/O for MIU
+# MIO — Messaging I/O for AI Agents
 
-MIO is the messaging I/O platform for [MIU](https://github.com/vanducng/miu).
-It connects MIU's AI agents to the chat channels customers actually live in
-(Zoho Cliq first, then Slack, Telegram, Discord, …) and gives them a
-clean, channel-agnostic envelope to receive messages and respond back.
+MIO is a messaging I/O platform that connects AI agents to the chat channels
+customers actually live in (Zoho Cliq first, then Slack, Telegram, Discord, …)
+and gives them a clean, channel-agnostic envelope to receive messages and
+respond back.
 
 > Channels are messy. Agents shouldn't care.
 
@@ -34,7 +34,8 @@ the receiver.
 | `sdk-go/` | Go | Thin NATS wrapper. Idempotency, OTel, Prometheus, schema-version checks. |
 | `sdk-py/` | Python | Same, for the AI side. |
 | `sink-gcs/` | Go | Consumer that writes raw payloads to GCS. Cold storage + analytics substrate. |
-| `examples/echo-consumer/` | Python | Tiny stub proving the loop. The real agents live in MIU. |
+| `media-vault/` | Go | Attachment ingestion and storage service backed by GCS. |
+| `examples/echo-consumer/` | Python | Tiny stub proving the loop. |
 | `deploy/local/` | — | `docker-compose.yml` + Postgres init + dev secrets for local dev. |
 | `deploy/charts/` | — | Helm charts for GKE; `fluxcd/`, `gke/` for prod GitOps. |
 
@@ -42,15 +43,14 @@ the receiver.
 
 - **Bus**: NATS JetStream (3-replica on GKE; cloud-agnostic)
 - **Schema**: Protobuf via `buf`
-- **Storage**: Postgres + pgvector (operational, in MIU); GCS (raw + analytics)
-- **Workflow**: Hatchet wraps LangGraph
+- **Storage**: Postgres + pgvector (operational); GCS (raw + analytics)
 - **Platform**: GKE for POC; only K8s primitives, no managed lock-in
 - **Local dev**: `docker compose` brings up NATS + Postgres + MinIO
 
 ## Quickstart
 
 ```bash
-git clone https://github.com/crashchat-ai/mio.git
+git clone https://github.com/vanducng/mio.git
 cd mio
 mise install            # pins Go 1.23, Python 3.12, buf, protoc
 make up                 # NATS + Postgres + MinIO (all three healthy)
@@ -81,18 +81,17 @@ See `.env.example` for the full list of overridable variables.
 5. **Per-thread ordering** via single-replica AI consumer with `MaxAckPending=1`.
 6. **Two-step UX for slow LLM calls.** Send "thinking…" immediately, edit-in-place when answered.
 
-Full design doc and phased roadmap live in `docs/system-architecture.md` (incoming).
+Full design doc and phased roadmap live in `docs/system-architecture.md`.
 
 ## Working docs
 
-- `docs/` — authoritative specs (system architecture, deployment, runbooks). What MIO **is**.
-- `plans/` — agent working memory: per-feature plan dirs (`{YYMMDD-HHMM}-{slug}/`) and a flat `plans/reports/` of cook + research outputs. These are decision history, **not specs** — code and `docs/` are the source of truth. Plans for shipped phases stay in place as a paper trail; if `plans/` grows past ~10 active dirs, move shipped ones under `plans/archive/`.
+`docs/` — authoritative specs (system architecture, deployment, runbooks). What MIO **is**.
 
 ## Status
 
 POC. Phase tracker:
 
-- [x] **P0** — Repo scaffold (in progress)
+- [x] **P0** — Repo scaffold
 - [x] **P1** — Proto v1 envelope
 - [x] **P2** — SDKs (`sdk-go`, `sdk-py`)
 - [x] **P3** — Gateway + Zoho Cliq inbound

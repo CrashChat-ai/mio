@@ -43,11 +43,13 @@ func (s *stubFetcher) Fetch(_ context.Context, _ *miov1.Attachment, dst io.Write
 }
 
 // memStorage is a tiny in-memory backend that records writes (used to assert
-// dedup behaviour). Not a faithful GCS — just enough surface for the processor.
+// dedup behaviour and that PutOptions metadata is wired correctly). Not a
+// faithful GCS — just enough surface for the processor.
 type memStorage struct {
-	mu      sync.Mutex
-	objects map[string][]byte
-	puts    int
+	mu       sync.Mutex
+	objects  map[string][]byte
+	lastOpts storage.PutOptions
+	puts     int
 }
 
 func newMem() *memStorage { return &memStorage{objects: map[string][]byte{}} }
@@ -63,6 +65,7 @@ func (m *memStorage) Put(_ context.Context, key string, body io.Reader, _ int64,
 	}
 	b, _ := io.ReadAll(body)
 	m.objects[key] = b
+	m.lastOpts = opts
 	m.puts++
 	return nil
 }
@@ -152,6 +155,44 @@ func TestProcessRewritesAttachmentAndPublishes(t *testing.T) {
 	}
 	if len(pub.calls) != 1 {
 		t.Fatalf("publish calls = %d, want 1", len(pub.calls))
+	}
+}
+
+func TestProcessStampsOwnerIdentifiersOnPutOptions(t *testing.T) {
+	registerStub(t, "ch_meta", []byte("payload-meta"))
+	mem := newMem()
+	pub := &recPub{}
+	p := newProc(t, mem, pub)
+
+	msg := &miov1.Message{
+		Id:              "m-meta",
+		ChannelType:     "ch_meta",
+		TenantId:        "tenant-T",
+		AccountId:       "account-A",
+		ConversationId:  "conversation-C",
+		SourceMessageId: "src-msg-S",
+		ReceivedAt:      timestamppb.New(time.Date(2026, 5, 9, 0, 0, 0, 0, time.UTC)),
+		Attachments:     []*miov1.Attachment{{Url: "https://platform/x"}},
+	}
+	if err := p.Process(t.Context(), msg); err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+
+	opts := mem.lastOpts
+	if opts.TenantID != "tenant-T" {
+		t.Errorf("PutOptions.TenantID = %q; want tenant-T", opts.TenantID)
+	}
+	if opts.AccountID != "account-A" {
+		t.Errorf("PutOptions.AccountID = %q; want account-A", opts.AccountID)
+	}
+	if opts.ConversationID != "conversation-C" {
+		t.Errorf("PutOptions.ConversationID = %q; want conversation-C", opts.ConversationID)
+	}
+	if opts.SourceMessageID != "src-msg-S" {
+		t.Errorf("PutOptions.SourceMessageID = %q; want src-msg-S", opts.SourceMessageID)
+	}
+	if !opts.IfNotExists {
+		t.Error("PutOptions.IfNotExists should remain true (dedup contract)")
 	}
 }
 

@@ -48,7 +48,12 @@ func (p *EnrichingProcessor) Process(ctx context.Context, msg *miov1.Message) er
 		if att.GetStorageKey() != "" {
 			continue
 		}
-		p.processAttachment(ctx, channelType, receivedAt, msg.GetAccountId(), att)
+		p.processAttachment(ctx, channelType, receivedAt, attachmentOwner{
+			TenantID:        msg.GetTenantId(),
+			AccountID:       msg.GetAccountId(),
+			ConversationID:  msg.GetConversationId(),
+			SourceMessageID: msg.GetSourceMessageId(),
+		}, att)
 	}
 
 	if err := p.Publisher.Publish(ctx, msg); err != nil {
@@ -59,11 +64,18 @@ func (p *EnrichingProcessor) Process(ctx context.Context, msg *miov1.Message) er
 	return nil
 }
 
+type attachmentOwner struct {
+	TenantID        string
+	AccountID       string
+	ConversationID  string
+	SourceMessageID string
+}
+
 func (p *EnrichingProcessor) processAttachment(
 	ctx context.Context,
 	channelType string,
 	receivedAt time.Time,
-	accountID string,
+	owner attachmentOwner,
 	att *miov1.Attachment,
 ) {
 	start := time.Now()
@@ -109,10 +121,13 @@ func (p *EnrichingProcessor) processAttachment(
 	storeStart := time.Now()
 	dr, err := dedup.PersistIfAbsent(ctx, p.Storage, key, func() error {
 		return p.Storage.Put(ctx, key, bytes.NewReader(buf.Bytes()), res.Bytes, storage.PutOptions{
-			ContentType: res.ContentType,
-			SHA256Hex:   res.SHA256Hex,
-			AccountID:   accountID,
-			IfNotExists: true,
+			ContentType:     res.ContentType,
+			SHA256Hex:       res.SHA256Hex,
+			TenantID:        owner.TenantID,
+			AccountID:       owner.AccountID,
+			ConversationID:  owner.ConversationID,
+			SourceMessageID: owner.SourceMessageID,
+			IfNotExists:     true,
 		})
 	})
 	metrics.StorageDuration.WithLabelValues(p.Storage.Backend(), "put").Observe(time.Since(storeStart).Seconds())

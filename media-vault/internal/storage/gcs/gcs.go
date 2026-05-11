@@ -58,8 +58,17 @@ func (b *Backend) Put(ctx context.Context, key string, body io.Reader, size int6
 	if opts.SHA256Hex != "" {
 		meta["sha256"] = opts.SHA256Hex
 	}
+	if opts.TenantID != "" {
+		meta["tenant_id"] = opts.TenantID
+	}
 	if opts.AccountID != "" {
 		meta["account_id"] = opts.AccountID
+	}
+	if opts.ConversationID != "" {
+		meta["conversation_id"] = opts.ConversationID
+	}
+	if opts.SourceMessageID != "" {
+		meta["source_message_id"] = opts.SourceMessageID
 	}
 	if len(meta) > 0 {
 		w.Metadata = meta
@@ -259,9 +268,12 @@ func attrsToObject(key string, attrs *gcs.ObjectAttrs) *storage.Object {
 		ContentType: attrs.ContentType,
 		ModifiedAt:  attrs.Updated,
 	}
-	if attrs.Metadata != nil {
-		o.SHA256Hex = attrs.Metadata["sha256"]
-		o.AccountID = attrs.Metadata["account_id"]
+	if m := attrs.Metadata; m != nil {
+		o.SHA256Hex = m["sha256"]
+		o.TenantID = m["tenant_id"]
+		o.AccountID = m["account_id"]
+		o.ConversationID = m["conversation_id"]
+		o.SourceMessageID = m["source_message_id"]
 	}
 	return o
 }

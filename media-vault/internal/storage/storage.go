@@ -10,24 +10,36 @@ import (
 )
 
 // Object describes a stored object's metadata (returned by Stat / List).
+//
+// TenantID / ConversationID / SourceMessageID are forward-only — they are
+// populated only on objects written after the metadata-enrichment rollout,
+// so an empty value means "unknown", not "non-match", to GDPR filters.
+// Dedup hazard: media-vault writes with IfNotExists=true on a content-hash
+// key, so if two messages with different owner identifiers carry the same
+// bytes, only the first writer's identifiers are stamped — see
+// docs/runbooks/attachment-gdpr-delete.md for operator guidance.
 type Object struct {
-	Key         string
-	Size        int64
-	ContentType string
-	SHA256Hex   string
-	AccountID   string // recorded on Put via PutOptions.AccountID
-	ModifiedAt  time.Time
+	Key             string
+	Size            int64
+	ContentType     string
+	SHA256Hex       string
+	TenantID        string
+	AccountID       string
+	ConversationID  string
+	SourceMessageID string
+	ModifiedAt      time.Time
 }
 
 // PutOptions controls write behaviour.
 type PutOptions struct {
 	ContentType string
 	SHA256Hex   string
-	// IfNotExists: when true, write only if the key does not already exist.
-	// Backend translates to GCS DoesNotExist precondition / S3 If-None-Match.
-	IfNotExists bool
-	// AccountID is recorded as object metadata for GDPR delete-by-account sweeps.
-	AccountID string
+	// IfNotExists: GCS DoesNotExist precondition / S3 If-None-Match.
+	IfNotExists     bool
+	TenantID        string
+	AccountID       string
+	ConversationID  string
+	SourceMessageID string
 }
 
 // SignOptions controls signed-URL issuance.

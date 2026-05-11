@@ -6,7 +6,8 @@
 //
 //	list           --prefix=mio/attachments/zoho_cliq/
 //	stat           <key>
-//	delete         --account_id=<uuid> [--dry-run] [--concurrency=10] [--prefix=...]
+//	delete         (--account_id | --tenant_id | --conversation_id)=<uuid>
+//	                  [--dry-run] [--concurrency=10] [--prefix=...]
 //	signed-url     <key> [--ttl=1h]
 //	set-lifecycle  [--age-days=7] [--prefix=mio/attachments/]
 //
@@ -76,7 +77,8 @@ func printUsage() {
 Commands:
   list           --prefix=...
   stat           <key>
-  delete         --account_id=<uuid> [--dry-run] [--concurrency=10] [--prefix=...]
+  delete         (--account_id | --tenant_id | --conversation_id)=<uuid>
+                    [--dry-run] [--concurrency=10] [--prefix=...]
   signed-url     <key> [--ttl=1h]
   set-lifecycle  [--age-days=7] [--prefix=mio/attachments/]
 
@@ -90,9 +92,12 @@ func runList(ctx context.Context, s storage.Storage, args []string, log *slog.Lo
 	prefix := fs.String("prefix", "mio/attachments/", "key prefix")
 	_ = fs.Parse(args)
 
+	// Columns: key, size, sha256, tenant_id, account_id, conversation_id, source_message_id.
 	out, errCh := s.List(ctx, *prefix)
 	for o := range out {
-		fmt.Printf("%s\t%d\t%s\t%s\n", o.Key, o.Size, o.SHA256Hex, o.AccountID)
+		fmt.Printf("%s\t%d\t%s\t%s\t%s\t%s\t%s\n",
+			o.Key, o.Size, o.SHA256Hex,
+			o.TenantID, o.AccountID, o.ConversationID, o.SourceMessageID)
 	}
 	if err := <-errCh; err != nil {
 		log.Error("list failed", "err", err)
@@ -111,24 +116,62 @@ func runStat(ctx context.Context, s storage.Storage, args []string, log *slog.Lo
 		log.Error("stat failed", "err", err)
 		return 1
 	}
-	fmt.Printf("Key:         %s\nSize:        %d\nContentType: %s\nSHA256:      %s\nAccountID:   %s\nModified:    %s\n",
-		o.Key, o.Size, o.ContentType, o.SHA256Hex, o.AccountID, o.ModifiedAt.Format(time.RFC3339))
+	fmt.Printf(
+		"Key:             %s\n"+
+			"Size:            %d\n"+
+			"ContentType:     %s\n"+
+			"SHA256:          %s\n"+
+			"TenantID:        %s\n"+
+			"AccountID:       %s\n"+
+			"ConversationID:  %s\n"+
+			"SourceMessageID: %s\n"+
+			"Modified:        %s\n",
+		o.Key, o.Size, o.ContentType, o.SHA256Hex,
+		o.TenantID, o.AccountID, o.ConversationID, o.SourceMessageID,
+		o.ModifiedAt.Format(time.RFC3339))
 	return 0
 }
 
 func runDelete(ctx context.Context, s storage.Storage, args []string, log *slog.Logger) int {
 	fs := flag.NewFlagSet("delete", flag.ExitOnError)
-	accountID := fs.String("account_id", "", "account UUID (required)")
+	accountID := fs.String("account_id", "", "account UUID (mutually exclusive with --tenant_id / --conversation_id)")
+	tenantID := fs.String("tenant_id", "", "tenant UUID (mutually exclusive with --account_id / --conversation_id)")
+	conversationID := fs.String("conversation_id", "", "conversation UUID (mutually exclusive with --account_id / --tenant_id)")
 	prefix := fs.String("prefix", "mio/attachments/", "key prefix")
 	dryRun := fs.Bool("dry-run", false, "report counts without deleting")
 	concurrency := fs.Int("concurrency", 8, "max in-flight Stat+Delete operations")
 	_ = fs.Parse(args)
-	if strings.TrimSpace(*accountID) == "" {
-		fmt.Fprintln(os.Stderr, "error: --account_id is required")
+
+	acct := strings.TrimSpace(*accountID)
+	tnt := strings.TrimSpace(*tenantID)
+	conv := strings.TrimSpace(*conversationID)
+	set := 0
+	if acct != "" {
+		set++
+	}
+	if tnt != "" {
+		set++
+	}
+	if conv != "" {
+		set++
+	}
+	if set != 1 {
+		fmt.Fprintln(os.Stderr, "error: exactly one of --account_id / --tenant_id / --conversation_id is required")
 		return 2
 	}
 
-	stats, err := gdpr.DeleteByAccount(ctx, s, *prefix, *accountID, *dryRun, *concurrency, log)
+	var (
+		stats gdpr.Stats
+		err   error
+	)
+	switch {
+	case acct != "":
+		stats, err = gdpr.DeleteByAccount(ctx, s, *prefix, acct, *dryRun, *concurrency, log)
+	case tnt != "":
+		stats, err = gdpr.DeleteByTenant(ctx, s, *prefix, tnt, *dryRun, *concurrency, log)
+	case conv != "":
+		stats, err = gdpr.DeleteByConversation(ctx, s, *prefix, conv, *dryRun, *concurrency, log)
+	}
 	fmt.Printf("listed=%d matched=%d deleted=%d dry_run=%v\n",
 		stats.Listed, stats.Matched, stats.Deleted, *dryRun)
 	if err != nil {

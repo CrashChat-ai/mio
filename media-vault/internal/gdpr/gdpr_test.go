@@ -23,7 +23,14 @@ func (f *fakeStore) Put(ctx context.Context, key string, body io.Reader, _ int64
 	b, _ := io.ReadAll(body)
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.objects[key] = storage.Object{Key: key, Size: int64(len(b)), AccountID: opts.AccountID}
+	f.objects[key] = storage.Object{
+		Key:             key,
+		Size:            int64(len(b)),
+		TenantID:        opts.TenantID,
+		AccountID:       opts.AccountID,
+		ConversationID:  opts.ConversationID,
+		SourceMessageID: opts.SourceMessageID,
+	}
 	return nil
 }
 func (f *fakeStore) Get(_ context.Context, _ string) (io.ReadCloser, *storage.Object, error) {
@@ -111,6 +118,97 @@ func TestDeleteByAccountRequiresID(t *testing.T) {
 	f := newFake()
 	if _, err := DeleteByAccount(t.Context(), f, "p/", "", false, 1, nil); err == nil {
 		t.Fatal("expected error on empty account_id")
+	}
+}
+
+func TestDeleteByTenantFiltersOnTenantID(t *testing.T) {
+	f := newFake()
+	for i := 0; i < 4; i++ {
+		_ = f.Put(t.Context(), "p/t1/"+itoa(i), strings.NewReader("x"), 1, storage.PutOptions{TenantID: "tenant-1", AccountID: "acc-x"})
+		_ = f.Put(t.Context(), "p/t2/"+itoa(i), strings.NewReader("x"), 1, storage.PutOptions{TenantID: "tenant-2", AccountID: "acc-x"})
+	}
+	stats, err := DeleteByTenant(t.Context(), f, "p/", "tenant-1", false, 4, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.Listed != 8 || stats.Matched != 4 || stats.Deleted != 4 {
+		t.Fatalf("stats = %+v", stats)
+	}
+	// Confirm tenant-2 survived.
+	for i := 0; i < 4; i++ {
+		if _, ok := f.objects["p/t2/"+itoa(i)]; !ok {
+			t.Fatalf("tenant-2 object p/t2/%d was deleted", i)
+		}
+	}
+}
+
+func TestDeleteByTenantRequiresID(t *testing.T) {
+	f := newFake()
+	if _, err := DeleteByTenant(t.Context(), f, "p/", "", false, 1, nil); err == nil {
+		t.Fatal("expected error on empty tenant_id")
+	}
+}
+
+func TestDeleteByConversationFiltersOnConversationID(t *testing.T) {
+	f := newFake()
+	// Two conversations, three objects each, all under one account.
+	for i := 0; i < 3; i++ {
+		_ = f.Put(t.Context(), "p/c1/"+itoa(i), strings.NewReader("x"), 1, storage.PutOptions{AccountID: "acc-1", ConversationID: "conv-1"})
+		_ = f.Put(t.Context(), "p/c2/"+itoa(i), strings.NewReader("x"), 1, storage.PutOptions{AccountID: "acc-1", ConversationID: "conv-2"})
+	}
+	stats, err := DeleteByConversation(t.Context(), f, "p/", "conv-1", false, 4, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.Listed != 6 || stats.Matched != 3 || stats.Deleted != 3 {
+		t.Fatalf("stats = %+v", stats)
+	}
+	// Confirm conv-2 survived intact.
+	for i := 0; i < 3; i++ {
+		if _, ok := f.objects["p/c2/"+itoa(i)]; !ok {
+			t.Fatalf("conv-2 object p/c2/%d was deleted", i)
+		}
+	}
+}
+
+func TestDeleteByConversationDryRunDoesNotDelete(t *testing.T) {
+	f := newFake()
+	_ = f.Put(t.Context(), "p/c/x", strings.NewReader("x"), 1, storage.PutOptions{ConversationID: "conv-x"})
+	stats, err := DeleteByConversation(t.Context(), f, "p/", "conv-x", true, 1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.Matched != 1 || stats.Deleted != 0 {
+		t.Fatalf("dry-run stats = %+v", stats)
+	}
+	if len(f.deletes) != 0 {
+		t.Fatalf("dry-run leaked Deletes: %v", f.deletes)
+	}
+}
+
+func TestDeleteByConversationRequiresID(t *testing.T) {
+	f := newFake()
+	if _, err := DeleteByConversation(t.Context(), f, "p/", "", false, 1, nil); err == nil {
+		t.Fatal("expected error on empty conversation_id")
+	}
+}
+
+func TestDeleteByTenantSkipsPreEnrichmentObjects(t *testing.T) {
+	f := newFake()
+	// Pre-enrichment object: account_id only, no tenant_id.
+	_ = f.Put(t.Context(), "p/legacy", strings.NewReader("x"), 1, storage.PutOptions{AccountID: "acc-1"})
+	// New object: full metadata.
+	_ = f.Put(t.Context(), "p/new", strings.NewReader("x"), 1, storage.PutOptions{TenantID: "tenant-1", AccountID: "acc-1"})
+
+	stats, err := DeleteByTenant(t.Context(), f, "p/", "tenant-1", false, 1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.Matched != 1 || stats.Deleted != 1 {
+		t.Fatalf("expected only the enriched object to match, got %+v", stats)
+	}
+	if _, ok := f.objects["p/legacy"]; !ok {
+		t.Fatal("legacy object (no tenant_id) was wrongly deleted on a tenant filter")
 	}
 }
 

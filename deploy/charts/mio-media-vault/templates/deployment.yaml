@@ -56,8 +56,6 @@ spec:
               value: {{ .Values.config.downloadTimeoutSeconds | quote }}
             - name: MIO_DOWNLOAD_MAX_BYTES
               value: {{ .Values.config.downloadMaxBytes | quote }}
-            - name: MIO_SIGNED_URL_TTL_SECONDS
-              value: {{ .Values.config.signedUrlTtlSeconds | quote }}
             - name: MIO_DURABLE_NAME
               value: {{ .Values.config.durableName | quote }}
             - name: MIO_ENRICHED_STREAM

@@ -21,11 +21,11 @@ import (
 // attachment, persist to storage with dedup, rewrite Attachment fields, and
 // publish the enriched Message via the supplied publisher.
 type EnrichingProcessor struct {
-	Storage      storage.Storage
-	Publisher    Publisher
+	Storage       storage.Storage
+	Publisher     Publisher
+	StorageBucket string
 	StoragePrefix string
-	SignedURLTTL time.Duration
-	Log          *slog.Logger
+	Log           *slog.Logger
 }
 
 // Publisher decouples the worker from the publisher package (avoids an import
@@ -128,17 +128,16 @@ func (p *EnrichingProcessor) processAttachment(
 		metrics.BytesTotal.WithLabelValues(channelType).Add(float64(res.Bytes))
 	}
 
-	signStart := time.Now()
-	signed, err := p.Storage.SignedURL(ctx, key, storage.SignOptions{TTL: p.SignedURLTTL})
-	metrics.StorageDuration.WithLabelValues(p.Storage.Backend(), "signed_url").Observe(time.Since(signStart).Seconds())
-	if err != nil {
-		p.Log.Warn("processor: signed url", "err", err, "key", key)
-		// non-fatal — consumers can re-mint via storage_key; leave att.Url alone
-	} else if signed != "" {
-		att.Url = signed
+	// storage_key is the full gs:// URI so downstream consumers have a
+	// self-contained reference without needing the bucket name from elsewhere.
+	// att.Url is left untouched to preserve the original platform URL (Cliq,
+	// etc.). Signed GCS URLs expire in ~1 h and are useless in long-lived
+	// storage like BigQuery — callers can sign on demand from storage_key.
+	storageKey := key
+	if p.StorageBucket != "" {
+		storageKey = "gs://" + p.StorageBucket + "/" + key
 	}
-
-	att.StorageKey = key
+	att.StorageKey = storageKey
 	att.ContentSha256 = res.SHA256Hex
 	att.Bytes = res.Bytes
 	if res.ContentType != "" {

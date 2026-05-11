@@ -38,7 +38,9 @@ func EnsureStream(ctx context.Context, js jetstream.JetStream, replicas int) err
 		MaxAge:      7 * 24 * time.Hour,
 		Storage:     jetstream.FileStorage,
 		Replicas:    replicas,
-		Duplicates:  2 * time.Minute,
+		// 24h covers redeploy / durable-recreate replays; DeliverAllPolicy on
+		// MESSAGES_INBOUND replays from seq 1 and re-publishes "enr:<id>".
+		Duplicates:  24 * time.Hour,
 		Description: "Inbound messages with attachment URLs rewritten to stable storage URLs",
 	}
 	_, err := js.CreateOrUpdateStream(ctx, cfg)
@@ -54,8 +56,7 @@ func Subject(channelType, accountID, conversationID string) string {
 }
 
 // Publish marshals and publishes msg under its enriched subject.
-// Sets Nats-Msg-Id = "enr:<msg.id>" so JetStream's DuplicateWindow drops
-// re-deliveries within 2m.
+// Sets Nats-Msg-Id = "enr:<msg.id>" for JetStream dedup.
 func (p *Publisher) Publish(ctx context.Context, msg *miov1.Message) error {
 	data, err := proto.Marshal(msg)
 	if err != nil {

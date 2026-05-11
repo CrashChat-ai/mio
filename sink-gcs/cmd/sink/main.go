@@ -16,15 +16,21 @@
 //
 // Environment variables:
 //
-//	NATS_URL          — NATS server URL (default: nats://localhost:4222)
-//	SINK_BACKEND      — "gcs" or "minio" (default: minio)
-//	SINK_BUCKET       — GCS/MinIO bucket name (default: mio-messages)
-//	SINK_PREFIX       — optional path prepended to object keys; e.g. "mio/" so
-//	                    objects land at gs://<bucket>/mio/channel_type=…/…
-//	                    Empty (default) writes at bucket root.
-//	SINK_ENDPOINT     — MinIO endpoint (default: http://localhost:9000)
-//	SINK_ACCESS_KEY   — MinIO access key (default: minioadmin)
-//	SINK_SECRET_KEY   — MinIO secret key (default: minioadmin)
+//	NATS_URL              — NATS server URL (default: nats://localhost:4222)
+//	SINK_STREAM           — JetStream stream name to consume from
+//	                        (default: MESSAGES_INBOUND)
+//	SINK_SUBJECT          — NATS subject filter for the consumer
+//	                        (default: mio.inbound.>)
+//	SINK_DURABLE          — JetStream durable consumer name
+//	                        (default: gcs-archiver)
+//	SINK_BACKEND          — "gcs" or "minio" (default: minio)
+//	SINK_BUCKET           — GCS/MinIO bucket name (default: mio-messages)
+//	SINK_PREFIX           — optional path prepended to object keys; e.g. "mio/" so
+//	                        objects land at gs://<bucket>/mio/channel_type=…/…
+//	                        Empty (default) writes at bucket root.
+//	SINK_ENDPOINT         — MinIO endpoint (default: http://localhost:9000)
+//	SINK_ACCESS_KEY       — MinIO access key (default: minioadmin)
+//	SINK_SECRET_KEY       — MinIO secret key (default: minioadmin)
 //	GOOGLE_APPLICATION_CREDENTIALS — GCS service-account JSON path (empty → ADC)
 package main
 
@@ -43,11 +49,12 @@ import (
 )
 
 const (
-	streamName    = "MESSAGES_INBOUND"
-	durableName   = "gcs-archiver"
-	defaultNATS   = "nats://localhost:4222"
-	defaultBucket = "mio-messages"
-	healthAddr    = ":8080"
+	defaultStream  = "MESSAGES_INBOUND"
+	defaultSubject = "mio.inbound.>"
+	defaultDurable = "gcs-archiver"
+	defaultNATS    = "nats://localhost:4222"
+	defaultBucket  = "mio-messages"
+	healthAddr     = ":8080"
 )
 
 func main() {
@@ -55,6 +62,9 @@ func main() {
 	slog.SetDefault(log)
 
 	natsURL := envOr("NATS_URL", defaultNATS)
+	streamName := envOr("SINK_STREAM", defaultStream)
+	subjectFilter := envOr("SINK_SUBJECT", defaultSubject)
+	durableName := envOr("SINK_DURABLE", defaultDurable)
 
 	// Writer config from environment.
 	if os.Getenv("SINK_BUCKET") == "" {
@@ -105,22 +115,23 @@ func main() {
 	}
 
 	arc, err := archiver.New(archiver.Config{
-		NatsURL:     natsURL,
-		Stream:      streamName,
-		Durable:     durableName,
-		WriterCfg:   writerCfg,
-		FlushSize:   16 * 1024 * 1024, // 16 MB
-		FlushAge:    time.Minute,
-		MaxInflight: 64,
-		Logger:      log,
+		NatsURL:       natsURL,
+		Stream:        streamName,
+		Subject:       subjectFilter,
+		Durable:       durableName,
+		WriterCfg:     writerCfg,
+		FlushSize:     16 * 1024 * 1024, // 16 MB
+		FlushAge:      time.Minute,
+		MaxInflight:   64,
+		Logger:        log,
 	})
 	if err != nil {
 		log.Error("archiver: init", "err", err)
 		os.Exit(1)
 	}
 
-	log.Info("sink-gcs: starting", "stream", streamName, "durable", durableName,
-		"backend", writerCfg.Backend, "bucket", writerCfg.Bucket)
+	log.Info("sink-gcs: starting", "stream", streamName, "subject", subjectFilter,
+		"durable", durableName, "backend", writerCfg.Backend, "bucket", writerCfg.Bucket)
 
 	if err := arc.Run(ctx); err != nil {
 		log.Error("archiver: run", "err", err)

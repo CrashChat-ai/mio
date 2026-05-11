@@ -25,6 +25,14 @@ serviceAccount:
 
 config:
   natsUrl: "nats://mio-nats:4222"
+  # JetStream stream to consume from. Override to point at the enriched stream
+  # (e.g. MESSAGES_INBOUND_ENRICHED) so that storage_key is populated.
+  sinkStream: "MESSAGES_INBOUND"
+  # NATS subject filter applied to the consumer.
+  sinkSubject: "mio.inbound.>"
+  # Durable consumer name. Use a distinct name when switching streams to avoid
+  # replaying old offsets from the raw-stream consumer.
+  sinkDurable: "gcs-archiver"
   # SINK_BACKEND must be "gcs" in any non-local deployment. The binary defaults
   # to "minio" for local dev, which crashes on a real cluster (no minio at
   # localhost:9000).

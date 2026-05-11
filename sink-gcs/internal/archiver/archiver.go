@@ -38,6 +38,7 @@ import (
 type Config struct {
 	NatsURL     string
 	Stream      string
+	Subject     string        // JetStream consumer filter subject (default: "mio.inbound.>")
 	Durable     string
 	WriterCfg   *writer.Config
 	FlushSize   int           // bytes; flush when buffer reaches this size
@@ -86,6 +87,9 @@ func New(cfg Config) (*Archiver, error) {
 	}
 	if cfg.MaxInflight == 0 {
 		cfg.MaxInflight = 64
+	}
+	if cfg.Subject == "" {
+		cfg.Subject = "mio.inbound.>"
 	}
 
 	nc, err := nats.Connect(cfg.NatsURL, nats.Name("mio-sink-gcs"))
@@ -176,7 +180,7 @@ func (a *Archiver) Run(ctx context.Context) error {
 }
 
 // ensureConsumer attaches to (or creates) the durable pull consumer.
-// MESSAGES_INBOUND stream is provisioned by gateway (P3); sink only creates its consumer.
+// The target stream is provisioned externally; sink only creates its consumer.
 func (a *Archiver) ensureConsumer(ctx context.Context) (jetstream.Consumer, error) {
 	stream, err := a.js.Stream(ctx, a.cfg.Stream)
 	if err != nil {
@@ -184,14 +188,14 @@ func (a *Archiver) ensureConsumer(ctx context.Context) (jetstream.Consumer, erro
 	}
 
 	cons, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
-		Durable:        a.cfg.Durable,
-		DeliverPolicy:  jetstream.DeliverAllPolicy,
-		AckPolicy:      jetstream.AckExplicitPolicy,
-		AckWait:        60 * time.Second,
-		MaxAckPending:  a.cfg.MaxInflight,
-		MaxDeliver:     -1,           // never give up; archival never drops
-		ReplayPolicy:   jetstream.ReplayInstantPolicy,
-		FilterSubject:  "mio.inbound.>",
+		Durable:       a.cfg.Durable,
+		DeliverPolicy: jetstream.DeliverAllPolicy,
+		AckPolicy:     jetstream.AckExplicitPolicy,
+		AckWait:       60 * time.Second,
+		MaxAckPending: a.cfg.MaxInflight,
+		MaxDeliver:    -1,          // never give up; archival never drops
+		ReplayPolicy:  jetstream.ReplayInstantPolicy,
+		FilterSubject: a.cfg.Subject,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("archiver: ensure consumer %q: %w", a.cfg.Durable, err)

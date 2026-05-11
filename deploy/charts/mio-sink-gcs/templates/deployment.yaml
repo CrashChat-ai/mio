@@ -44,6 +44,12 @@ spec:
           env:
             - name: NATS_URL
               value: {{ .Values.config.natsUrl | quote }}
+            - name: SINK_STREAM
+              value: {{ .Values.config.sinkStream | quote }}
+            - name: SINK_SUBJECT
+              value: {{ .Values.config.sinkSubject | quote }}
+            - name: SINK_DURABLE
+              value: {{ .Values.config.sinkDurable | quote }}
             - name: SINK_BACKEND
               value: {{ .Values.config.sinkBackend | quote }}
             - name: SINK_BUCKET

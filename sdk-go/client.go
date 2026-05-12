@@ -140,3 +140,14 @@ func New(url string, opts ...Option) (*Client, error) {
 func (c *Client) Close() {
 	_ = c.nc.Drain()
 }
+
+// JetStream is the jetstream.JetStream handle held by a Client. Re-exported
+// so callers that need to provision streams or consumers (gateway boot,
+// integration tests) can do so against the same connection. Production
+// callers should prefer the higher-level Publish/Consume methods.
+type JetStream = jetstream.JetStream
+
+// JetStream returns the underlying JetStream handle. Intended for stream
+// provisioning at boot and integration-test bootstrapping; everyday
+// publish/consume should go through the typed wrappers on Client.
+func (c *Client) JetStream() JetStream { return c.js }

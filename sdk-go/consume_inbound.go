@@ -107,6 +107,63 @@ func (c *Client) ConsumeInbound(ctx context.Context, stream, durable string) (<-
 	return ch, nil
 }
 
+// ConsumeInboundEphemeral attaches to an ephemeral ordered consumer and
+// returns a channel of Delivery — no durable name is needed, and the
+// consumer self-destructs when ctx is cancelled. Use this for live-tail
+// flows (admin TailMessages, debug observers) where each caller wants its
+// own short-lived stream from "now".
+//
+// Delivery semantics are best-effort: ordered, but messages start at
+// DeliverNew so consumers only see traffic after they connect — this is
+// the right default for tail UIs.
+//
+// Cancel ctx to stop consumption; the returned channel is closed on stop
+// and the ephemeral consumer is removed.
+func (c *Client) ConsumeInboundEphemeral(ctx context.Context, stream string) (<-chan Delivery, error) {
+	cons, err := c.js.OrderedConsumer(ctx, stream, jetstream.OrderedConsumerConfig{
+		DeliverPolicy: jetstream.DeliverNewPolicy,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("sdk: consume_inbound_ephemeral: create ordered consumer on %q: %w", stream, err)
+	}
+
+	ch := make(chan Delivery, c.maxAckPending)
+
+	cc, err := cons.Consume(func(raw jetstream.Msg) {
+		start := time.Now()
+
+		var msg miov1.Message
+		if err := proto.Unmarshal(raw.Data(), &msg); err != nil {
+			_ = raw.Term()
+			c.metrics.incConsume(unknownChannelType(raw), "inbound", OutcomeError)
+			return
+		}
+		_, span := extractTrace(ctx, c.tp, raw.Subject(), raw.Headers())
+		elapsed := time.Since(start).Seconds()
+		c.metrics.incConsume(msg.ChannelType, "inbound", OutcomeSuccess)
+		c.metrics.observeConsume(msg.ChannelType, "inbound", elapsed)
+
+		select {
+		case ch <- Delivery{msg: &msg, raw: raw, span: span}:
+		case <-ctx.Done():
+			span.End()
+			_ = raw.Nak()
+		}
+	})
+	if err != nil {
+		close(ch)
+		return nil, fmt.Errorf("sdk: consume_inbound_ephemeral: start consume: %w", err)
+	}
+
+	go func() {
+		<-ctx.Done()
+		cc.Stop()
+		close(ch)
+	}()
+
+	return ch, nil
+}
+
 // unknownChannelType extracts channel_type from the NATS subject for metrics
 // when proto decode fails (subject token 3 = channel_type).
 func unknownChannelType(raw jetstream.Msg) string {

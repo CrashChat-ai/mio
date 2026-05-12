@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package mio.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/crashchat-ai/mio/proto/gen/go/mio/v1;miov1";
+
+// Presence is a separate envelope from Message; it never lives on the
+// MESSAGES_INBOUND stream. A future PRESENCE stream / subject is the planned
+// home so AI consumers can subscribe selectively without filtering Messages.
+//
+// observed_at is the platform's timestamp, not the gateway's receive time —
+// presence is rate-limited at the source so clock drift matters less than for
+// Messages but downstream consumers should still treat the field as advisory.
+message Presence {
+  // State classifies the user's current availability.
+  // TYPING is a transient signal (renders an indicator); the others are
+  // longer-lived availability flags.
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_ONLINE      = 1;
+    STATE_AWAY        = 2;
+    STATE_OFFLINE     = 3;
+    STATE_TYPING      = 4;
+  }
+
+  string                    tenant_id        = 1;
+  string                    account_id       = 2;
+  string                    conversation_id  = 3; // empty for global presence
+  string                    external_user_id = 4; // platform-side user id
+  State                     state            = 5;
+  google.protobuf.Timestamp observed_at      = 6;
+}

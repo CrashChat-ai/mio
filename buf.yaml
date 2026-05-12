@@ -10,3 +10,13 @@ lint:
 breaking:
   use:
     - WIRE_JSON
+  # One-time exception: message.proto field 17 (relation) and send_command.proto
+  # field 15 (relation) were `reserved` placeholders pre-promotion. Populating
+  # a reserved slot with its planned field is wire-safe (old consumers ignore
+  # unknown fields) but buf flags it as RESERVED_MESSAGE_NO_DELETE. Once these
+  # fields are committed, no further deletion of reserved ranges occurs in
+  # these files, so the ignore stays scoped to exactly two files.
+  ignore_only:
+    RESERVED_MESSAGE_NO_DELETE:
+      - proto/mio/v1/message.proto
+      - proto/mio/v1/send_command.proto

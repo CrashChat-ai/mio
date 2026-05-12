@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package mio.v1;
+
+option go_package = "github.com/crashchat-ai/mio/proto/gen/go/mio/v1;miov1";
+
+// MessageRelation links one message to another: reply, edit, delete, reaction,
+// or pin. Carried on Message (field 17) and SendCommand (field 15).
+//
+// target_message_id is the mio UUID; target_external_id is the platform's id.
+// Both are populated when known; consumers should prefer target_message_id
+// when present (mio's identity is stable across renames/migrations).
+message MessageRelation {
+  // Kind classifies the relation.
+  // UNSPECIFIED is the zero value — proto3 best practice and buf STANDARD lint.
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_REPLY       = 1; // threaded reply / quote
+    KIND_EDIT        = 2; // in-place edit of the target message
+    KIND_DELETE      = 3; // soft-delete tombstone
+    KIND_REACTION    = 4; // emoji reaction (use reaction_emoji)
+    KIND_PIN         = 5; // pinned to conversation
+  }
+
+  Kind   kind                = 1;
+  string target_message_id   = 2; // mio UUID of the target
+  string target_external_id  = 3; // platform-side opaque id
+  string reaction_emoji      = 4; // populated when kind = KIND_REACTION
+}

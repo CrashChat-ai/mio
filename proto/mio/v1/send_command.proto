@@ -3,6 +3,7 @@ syntax = "proto3";
 package mio.v1;
 
 import "mio/v1/attachment.proto";
+import "mio/v1/relation.proto";
 
 option go_package = "github.com/crashchat-ai/mio/proto/gen/go/mio/v1;miov1";
 
@@ -42,6 +43,7 @@ message SendCommand {
   // See CONTRIBUTING.md for promotion rule and naming convention.
   map<string, string> attributes = 14;
 
-  // Reserved field numbers — do NOT reclaim without a migration plan.
-  reserved 15; // reserved for MessageRelation (P5 outbound edit / reaction linkage)
+  // MessageRelation drives outbound edit / reaction / delete / pin operations.
+  // Empty for plain Send; populated for linked outbound commands.
+  MessageRelation relation = 15;
 }

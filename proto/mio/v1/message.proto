@@ -5,6 +5,7 @@ package mio.v1;
 import "google/protobuf/timestamp.proto";
 import "mio/v1/attachment.proto";
 import "mio/v1/enums.proto";
+import "mio/v1/relation.proto";
 import "mio/v1/sender.proto";
 
 option go_package = "github.com/crashchat-ai/mio/proto/gen/go/mio/v1;miov1";
@@ -57,7 +58,10 @@ message Message {
   // Always use named constants, never string literals. See CONTRIBUTING.md.
   map<string, string> attributes = 16;
 
+  // MessageRelation links this message to another (reply/edit/delete/reaction/pin).
+  // Empty for plain messages; populated for linked envelopes.
+  MessageRelation relation = 17;
+
   // Reserved field numbers — do NOT reclaim without a migration plan.
-  reserved 17; // reserved for MessageRelation (P5 outbound edit / reaction linkage)
   reserved 18; // reserved for is_summary (compaction flag, future)
 }

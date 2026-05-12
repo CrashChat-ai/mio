@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package mio.v1;
+
+import "mio/v1/attachment.proto";
+
+option go_package = "github.com/crashchat-ai/mio/proto/gen/go/mio/v1;miov1";
+
+// ChannelCapabilities advertises what a single channel adapter can do, so the
+// admin API (and UI/TUI) can render install flows and feature toggles without
+// hardcoding per-channel knowledge. Returned by Adapter.Capabilities().
+//
+// Hard-coded in each adapter package (Cliq's lives in zohocliq/sender.go).
+// A regression test asserts the struct matches expectation verbatim — stale
+// capability advertisement is caught loudly instead of drifting silently.
+message ChannelCapabilities {
+  // --- feature flags ---
+  bool supports_edit      = 1;
+  bool supports_delete    = 2;
+  bool supports_reactions = 3;
+  bool supports_threads   = 4;
+  bool supports_typing    = 5;
+  bool supports_presence  = 6;
+
+  // --- attachment policy ---
+  // Empty allowed_attachments means the adapter does not handle attachments;
+  // include explicit kinds (IMAGE, FILE, AUDIO, VIDEO, LINK) when supported.
+  repeated Attachment.Kind allowed_attachments = 7;
+
+  // --- limits ---
+  // max_text_bytes is the platform's hard limit; admin UI surfaces this as
+  // a hint before send.
+  int32 max_text_bytes        = 8;
+  // rate_limit_per_second is a per-bucket cap; bucket key is given by
+  // rate_limit_scope (one of "account", "account:conversation").
+  int32  rate_limit_per_second = 9;
+  string rate_limit_scope      = 10;
+
+  // --- auth flavor ---
+  // auth_kind names the credential model: "oauth2_refresh" (Cliq, Slack),
+  // "bot_token" (Telegram), "hmac_webhook" (inbound-only signed webhooks).
+  // CredentialAdapter implementations branch on this.
+  string auth_kind = 11;
+
+  // --- edit / delete windows ---
+  // edit_window_seconds is how long after Send a message may be edited;
+  // 0 = no platform-enforced limit. delete_window_seconds is analogous.
+  int32 edit_window_seconds   = 12;
+  int32 delete_window_seconds = 13;
+}

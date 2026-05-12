@@ -15,6 +15,9 @@ const secretsDir = "/etc/mio/secrets"
 // Config holds all gateway configuration. Non-secret values come from env
 // vars; secrets are read from file mounts (never env vars).
 type Config struct {
+	// Deploy environment
+	Env string // MIO_ENV, one of {dev, staging, prod}; default dev
+
 	// HTTP server
 	Port                int    // MIO_PORT, default 8080
 	LogLevel            string // MIO_LOG_LEVEL, default "info"
@@ -39,10 +42,24 @@ type Config struct {
 	CliqWebhookSecret string // /etc/mio/secrets/cliq-webhook-secret
 }
 
+// validEnvs is the allowlist for MIO_ENV. Unknown values are rejected loud
+// and early so a typo in a deploy manifest (`MIO_ENV=production`) doesn't
+// silently fall through to dev-mode defaults like NoopCipher acceptance.
+var validEnvs = map[string]bool{
+	"dev":     true,
+	"staging": true,
+	"prod":    true,
+}
+
 // Load reads config from environment and file-mounted secrets.
 // Returns an error if any required field is missing.
 func Load() (*Config, error) {
+	env := envStr("MIO_ENV", "dev")
+	if !validEnvs[env] {
+		return nil, fmt.Errorf("config: MIO_ENV=%q invalid; must be one of dev|staging|prod", env)
+	}
 	cfg := &Config{
+		Env:                 env,
 		Port:                envInt("MIO_PORT", 8080),
 		LogLevel:            envStr("MIO_LOG_LEVEL", "info"),
 		GracefulShutdownSec: envInt("MIO_GRACEFUL_SHUTDOWN_SECS", 15),

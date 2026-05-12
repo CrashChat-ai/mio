@@ -1,25 +1,15 @@
 package main
 
 import (
-	"embed"
-	"io/fs"
-
 	"github.com/crashchat-ai/mio/gateway/internal/store"
+	"github.com/crashchat-ai/mio/gateway/internal/store/migrations"
 )
 
-// migrationsRaw embeds all SQL migration files from migrations/ (adjacent to
-// this file in cmd/gateway/migrations/). The embed path is relative to
-// cmd/gateway/ with no .. traversal, satisfying Go embed rules.
-//
-//go:embed migrations/*.sql
-var migrationsRaw embed.FS
-
+// init wires the shared migration FS into the store package. Both
+// cmd/gateway and cmd/admin import the same migrations/ package so the
+// embed.FS is built exactly once; cmd/gateway alone calls MigrateUp,
+// while cmd/admin only checks that the schema is present (avoids
+// golang-migrate lock contention from two binaries racing on boot).
 func init() {
-	// Strip the "migrations" prefix so golang-migrate's iofs driver
-	// sees files directly at "./<version>_name.{up,down}.sql".
-	sub, err := fs.Sub(migrationsRaw, "migrations")
-	if err != nil {
-		panic("embed: sub migrations: " + err.Error())
-	}
-	store.MigrationsFS = sub
+	store.MigrationsFS = migrations.FS
 }

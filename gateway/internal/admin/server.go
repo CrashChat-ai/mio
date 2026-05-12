@@ -404,8 +404,9 @@ func (s *AdminServer) TailMessages(
 		return connect.NewError(connect.CodeUnimplemented, errors.New("SDK client not configured"))
 	}
 
-	// Ephemeral consumer: empty durable name.
-	deliveries, err := s.SDK.ConsumeInbound(ctx, store.StreamInbound, "")
+	// Ephemeral ordered consumer — self-destructs on ctx cancel; each
+	// TailMessages caller gets its own live-tail slice of MESSAGES_INBOUND.
+	deliveries, err := s.SDK.ConsumeInboundEphemeral(ctx, store.StreamInbound)
 	if err != nil {
 		return connect.NewError(connect.CodeInternal, fmt.Errorf("consume inbound: %w", err))
 	}

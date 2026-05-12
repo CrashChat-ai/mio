@@ -38,4 +38,26 @@ type Adapter interface {
 	// Slack-style adapters return "account_id:conversation_external_id" for
 	// per-conversation fairness — no wire-format change required.
 	RateLimitKey(cmd *miov1.SendCommand) string
+
+	// Capabilities returns the hard-coded ChannelCapabilities for this
+	// adapter. The admin API serves this as-is via ListChannelTypes; UI and
+	// TUI render install flows based on it. Must be a stable pointer (struct
+	// is treated as read-only by callers).
+	//
+	// Capability values are NOT discovered at runtime: each adapter owns its
+	// own truth. A regression test (zohocliq capability_test.go) catches
+	// drift loudly.
+	Capabilities() *miov1.ChannelCapabilities
+
+	// Inbound returns the webhook handler concerns (signature verify,
+	// normalize, handshake) for this adapter. Returns a non-nil InboundAdapter
+	// for any adapter that accepts inbound webhooks; outbound-only adapters
+	// may return nil — the HTTP layer skips mounting their inbound route.
+	Inbound() InboundAdapter
+
+	// Credentials returns the credential lifecycle handler (OAuth dance +
+	// refresh). All adapters MUST return a non-nil CredentialAdapter; an
+	// hmac_webhook adapter (no OAuth) returns one whose AuthorizeURL is "" and
+	// whose ExchangeCode returns an explanatory error.
+	Credentials() CredentialAdapter
 }

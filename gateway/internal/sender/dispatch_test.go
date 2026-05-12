@@ -20,6 +20,9 @@ func (s *stubAdapter) Edit(_ context.Context, _ *miov1.SendCommand) error { retu
 func (s *stubAdapter) ChannelType() string                                 { return s.slug }
 func (s *stubAdapter) MaxDeliver() int                                     { return 5 }
 func (s *stubAdapter) RateLimitKey(_ *miov1.SendCommand) string            { return "" }
+func (s *stubAdapter) Capabilities() *miov1.ChannelCapabilities             { return &miov1.ChannelCapabilities{} }
+func (s *stubAdapter) Inbound() sender.InboundAdapter                       { return nil }
+func (s *stubAdapter) Credentials() sender.CredentialAdapter                { return nil }
 
 func TestDispatcher_ForCommand_Found(t *testing.T) {
 	a := &stubAdapter{slug: "test_channel"}

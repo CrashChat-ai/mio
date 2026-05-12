@@ -38,6 +38,9 @@ func (m *mockAdapter) Edit(ctx context.Context, cmd *miov1.SendCommand) error {
 func (m *mockAdapter) ChannelType() string                      { return m.slug }
 func (m *mockAdapter) MaxDeliver() int                           { return 5 }
 func (m *mockAdapter) RateLimitKey(_ *miov1.SendCommand) string { return m.rateLimitKey }
+func (m *mockAdapter) Capabilities() *miov1.ChannelCapabilities  { return &miov1.ChannelCapabilities{} }
+func (m *mockAdapter) Inbound() sender.InboundAdapter            { return nil }
+func (m *mockAdapter) Credentials() sender.CredentialAdapter     { return nil }
 
 // ── mock delivery error ───────────────────────────────────────────────────────
 

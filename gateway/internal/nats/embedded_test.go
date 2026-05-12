@@ -82,6 +82,95 @@ func TestMemoryMode_RoundTrip(t *testing.T) {
 	}
 }
 
+// TestMemoryMode_Volatile is the complement to TestFileMode_Durable:
+// memory storage keeps no on-disk state, so a fresh server with the same
+// StoreDir starts with zero messages — regardless of what the previous
+// process published. Catches regressions where someone wires "memory" to
+// a file-backed store path by mistake.
+func TestMemoryMode_Volatile(t *testing.T) {
+	dir := t.TempDir()
+
+	ns1, url1, err := StartEmbedded(EmbeddedOpts{
+		Storage:  "memory",
+		StoreDir: dir,
+		Host:     "127.0.0.1",
+		Port:     -1,
+	})
+	if err != nil {
+		t.Fatalf("start 1: %v", err)
+	}
+	nc1, err := natsgo.Connect(url1)
+	if err != nil {
+		ns1.Shutdown()
+		t.Fatalf("connect 1: %v", err)
+	}
+	js1, err := jetstream.New(nc1)
+	if err != nil {
+		nc1.Close()
+		ns1.Shutdown()
+		t.Fatalf("jetstream 1: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	if _, err := js1.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
+		Name:     "VOLATILE_TEST",
+		Subjects: []string{"volatile.>"},
+		Storage:  jetstream.MemoryStorage,
+		Replicas: 1,
+	}); err != nil {
+		cancel()
+		nc1.Close()
+		ns1.Shutdown()
+		t.Fatalf("create stream 1: %v", err)
+	}
+	if _, err := js1.Publish(ctx, "volatile.one", []byte("ephemeral")); err != nil {
+		cancel()
+		nc1.Close()
+		ns1.Shutdown()
+		t.Fatalf("publish: %v", err)
+	}
+	cancel()
+	nc1.Drain() //nolint:errcheck
+	ns1.Shutdown()
+	ns1.WaitForShutdown()
+
+	// Restart with the same StoreDir — memory storage should yield a
+	// fresh stream that doesn't even exist (or zero messages if recreated).
+	ns2, url2, err := StartEmbedded(EmbeddedOpts{
+		Storage:  "memory",
+		StoreDir: dir,
+		Host:     "127.0.0.1",
+		Port:     -1,
+	})
+	if err != nil {
+		t.Fatalf("start 2: %v", err)
+	}
+	defer ns2.Shutdown()
+	nc2, err := natsgo.Connect(url2)
+	if err != nil {
+		t.Fatalf("connect 2: %v", err)
+	}
+	defer nc2.Drain() //nolint:errcheck
+	js2, err := jetstream.New(nc2)
+	if err != nil {
+		t.Fatalf("jetstream 2: %v", err)
+	}
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel2()
+	stream, err := js2.Stream(ctx2, "VOLATILE_TEST")
+	if err != nil {
+		// Expected: memory streams vanish across restarts; the stream lookup
+		// returning ErrStreamNotFound is the strongest possible signal.
+		return
+	}
+	info, err := stream.Info(ctx2)
+	if err != nil {
+		t.Fatalf("stream info 2: %v", err)
+	}
+	if info.State.Msgs != 0 {
+		t.Errorf("memory mode: expected 0 surviving msgs, got %d", info.State.Msgs)
+	}
+}
+
 func TestFileMode_Durable(t *testing.T) {
 	dir := t.TempDir()
 

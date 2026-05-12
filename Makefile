@@ -71,6 +71,30 @@ gateway-dispatch-lint: ## CI guard: dispatch.go must have zero channel-specific 
 		echo "dispatch.go: clean (no adapter-specific branches)" || \
 		(echo "ERROR: adapter-specific branch found in dispatch.go — P9 litmus FAIL"; exit 1)
 
+admin-build: ## Build the admin connect-go server binary
+	cd gateway && go build -o ../bin/mio-admin ./cmd/admin
+
+admin-run: ## Run the admin server locally (loopback:9090)
+	cd gateway && go run ./cmd/admin
+
+admin-test: ## Run admin unit tests
+	cd gateway && go test ./internal/admin/... -v -count=1
+
+run-laptop: ## Run mio-all-in-one with embedded NATS (memory storage)
+	cd gateway && go run ./cmd/all-in-one --storage memory
+
+run-laptop-persist: ## Run mio-all-in-one with embedded NATS (file storage, ./var/jetstream)
+	cd gateway && go run ./cmd/all-in-one --storage file --store-dir ./var/jetstream
+
+tui-build: ## Build the mio-tui binary
+	cd tui && go build -o ../bin/mio-tui ./cmd/mio-tui
+
+tui-run: ## Run the TUI against ADMIN_URL (default http://127.0.0.1:9090)
+	cd tui && go run ./cmd/mio-tui
+
+tui-test: ## Run TUI unit tests
+	cd tui && go test ./... -v -count=1
+
 sink-gcs-test: ## Run sink-gcs unit tests (no live NATS/MinIO needed)
 	cd sink-gcs && go test ./internal/... -v
 

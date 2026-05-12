@@ -6,4 +6,5 @@ use (
 	./gateway
 	./sdk-go
 	./sink-gcs
+	./tui
 )

@@ -35,15 +35,12 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
-	env := os.Getenv("MIO_ENV")
-	if env == "" {
-		env = "dev"
-	}
-	if env == "prod" && *storage == "memory" {
-		logger.Error("all-in-one: memory storage forbidden in prod — use --storage file or external NATS")
+	decision, err := nats.CheckProdStorage(os.Getenv("MIO_ENV"), *storage)
+	if err != nil {
+		logger.Error("all-in-one: " + err.Error())
 		os.Exit(2)
 	}
-	if env == "prod" && *storage == "file" {
+	if decision.WarnSingleNode {
 		logger.Warn("running all-in-one in prod — single-node durability only; use external NATS for multi-replica deploys")
 	}
 

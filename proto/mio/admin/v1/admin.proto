@@ -1,0 +1,126 @@
+syntax = "proto3";
+
+package mio.admin.v1;
+
+import "google/protobuf/timestamp.proto";
+import "mio/v1/capabilities.proto";
+
+option go_package = "github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1;adminv1";
+
+// AdminService is the control-plane API: tenants, channel installs, message
+// inspection. Internal-only by default — the admin binary binds 127.0.0.1
+// and the auth middleware allowlists loopback + MIO_ADMIN_ALLOW_CIDRS.
+//
+// Wire stability: the surrounding buf module has WIRE_JSON breaking checks
+// enabled. Rename via `deprecated_alias` instead of in-place edits; new
+// fields must be appended.
+service AdminService {
+  rpc CreateTenant(CreateTenantRequest) returns (CreateTenantResponse);
+  rpc ListTenants(ListTenantsRequest)   returns (ListTenantsResponse);
+  rpc GetTenant(GetTenantRequest)       returns (GetTenantResponse);
+
+  rpc ListChannelTypes(ListChannelTypesRequest) returns (ListChannelTypesResponse);
+
+  rpc StartInstall(StartInstallRequest)       returns (StartInstallResponse);
+  rpc CompleteInstall(CompleteInstallRequest) returns (CompleteInstallResponse);
+
+  rpc ListAccounts(ListAccountsRequest)     returns (ListAccountsResponse);
+  rpc DisableAccount(DisableAccountRequest) returns (DisableAccountResponse);
+  rpc RotateCredential(RotateCredentialRequest) returns (RotateCredentialResponse);
+
+  // TailMessages opens a server-stream of canonical mio messages for a
+  // given account. Server-side filtering on conversation_id is optional.
+  rpc TailMessages(TailMessagesRequest) returns (stream TailMessagesResponse);
+}
+
+// --- Tenants ---
+
+message Tenant {
+  string                    id           = 1;
+  string                    slug         = 2;
+  string                    display_name = 3;
+  string                    status       = 4;
+  google.protobuf.Timestamp created_at   = 5;
+  google.protobuf.Timestamp disabled_at  = 6; // empty unless disabled
+}
+
+message CreateTenantRequest {
+  string slug         = 1;
+  string display_name = 2;
+}
+message CreateTenantResponse { Tenant tenant = 1; }
+
+message ListTenantsRequest {}
+message ListTenantsResponse { repeated Tenant tenants = 1; }
+
+message GetTenantRequest  { string id = 1; }
+message GetTenantResponse { Tenant tenant = 1; }
+
+// --- Channel types ---
+
+message ChannelTypeInfo {
+  string                       slug         = 1;
+  mio.v1.ChannelCapabilities   capabilities = 2;
+  string                       status       = 3; // "active" | "experimental"
+}
+
+message ListChannelTypesRequest {}
+message ListChannelTypesResponse { repeated ChannelTypeInfo channel_types = 1; }
+
+// --- Installs (OAuth dance) ---
+
+message Account {
+  string                    id           = 1;
+  string                    tenant_id    = 2;
+  string                    channel_type = 3;
+  string                    provider     = 4;
+  string                    external_id  = 5;
+  string                    display_name = 6;
+  google.protobuf.Timestamp created_at   = 7;
+  google.protobuf.Timestamp disabled_at  = 8;
+}
+
+message StartInstallRequest {
+  string tenant_id    = 1;
+  string channel_type = 2;
+  string provider     = 3; // optional; defaults to "default"
+}
+
+message StartInstallResponse {
+  string install_id     = 1;
+  string oauth_url      = 2; // operator opens this URL
+  string redirect_uri   = 3; // for the operator to confirm matches the platform's registered URI
+}
+
+message CompleteInstallRequest  { string install_id = 1; }
+message CompleteInstallResponse { Account account   = 1; }
+
+message ListAccountsRequest    { string tenant_id = 1; }
+message ListAccountsResponse   { repeated Account accounts = 1; }
+
+message DisableAccountRequest  { string account_id = 1; }
+message DisableAccountResponse {}
+
+message RotateCredentialRequest  { string account_id = 1; }
+message RotateCredentialResponse {}
+
+// --- Tail ---
+
+message TailMessagesRequest {
+  string account_id      = 1;
+  string conversation_id = 2; // optional filter
+}
+
+message TailMessagesResponse {
+  // Subset of mio.v1.Message useful for UI; not the full canonical envelope
+  // because rendering doesn't need attributes / attachments here. Future
+  // versions can carry the full Message — additive only.
+  string                    id                = 1;
+  string                    tenant_id         = 2;
+  string                    account_id        = 3;
+  string                    conversation_id   = 4;
+  string                    channel_type      = 5;
+  string                    sender_display    = 6;
+  string                    text              = 7;
+  google.protobuf.Timestamp received_at       = 8;
+}

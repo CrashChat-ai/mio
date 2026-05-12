@@ -8,3 +8,11 @@ plugins:
 
   - remote: buf.build/protocolbuffers/python
     out: proto/gen/py
+
+  # Connect-Go server + client stubs for the admin RPCs (mio.admin.v1).
+  # Same module also emits the *_connect.go files for any future RPCs
+  # defined in mio.v1 (no-op today since mio.v1 has no service definitions).
+  - remote: buf.build/connectrpc/go
+    out: proto/gen/go
+    opt:
+      - paths=source_relative

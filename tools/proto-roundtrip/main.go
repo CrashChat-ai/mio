@@ -58,17 +58,17 @@ func repoRoot() string {
 
 func buildMessage() *miov1.Message {
 	return &miov1.Message{
-		Id:                    "018fbe3e-7c00-7a00-8000-000000000001",
-		SchemaVersion:         1,
-		TenantId:              "tenant-alpha",
-		AccountId:             "018fbe3e-7c00-7a00-8000-000000000002",
-		ChannelType:           "zoho_cliq",
-		ConversationId:        "018fbe3e-7c00-7a00-8000-000000000003",
+		Id:                     "018fbe3e-7c00-7a00-8000-000000000001",
+		SchemaVersion:          1,
+		TenantId:               "tenant-alpha",
+		AccountId:              "018fbe3e-7c00-7a00-8000-000000000002",
+		ChannelType:            "zoho_cliq",
+		ConversationId:         "018fbe3e-7c00-7a00-8000-000000000003",
 		ConversationExternalId: "cliq-chat-abc123",
-		ConversationKind:      miov1.ConversationKind_CONVERSATION_KIND_DM,
-		ParentConversationId:  "018fbe3e-7c00-7a00-8000-000000000004",
-		SourceMessageId:       "cliq-msg-xyz789",
-		ThreadRootMessageId:   "018fbe3e-7c00-7a00-8000-000000000005",
+		ConversationKind:       miov1.ConversationKind_CONVERSATION_KIND_DM,
+		ParentConversationId:   "018fbe3e-7c00-7a00-8000-000000000004",
+		SourceMessageId:        "cliq-msg-xyz789",
+		ThreadRootMessageId:    "018fbe3e-7c00-7a00-8000-000000000005",
 		Sender: &miov1.Sender{
 			ExternalId:  "cliq-user-001",
 			DisplayName: "Alice",
@@ -104,7 +104,7 @@ func assertMessageEqual(original, decoded *miov1.Message) error {
 // runPythonHalf pipes raw bytes through the Python script and returns re-encoded bytes.
 func runPythonHalf(root string, raw []byte) ([]byte, error) {
 	scriptPath := filepath.Join(root, "tools", "proto-roundtrip", "roundtrip.py")
-	sdkPyPath := filepath.Join(root, "sdk-py")
+	sdkPyPath := filepath.Join(root, "sdks", "python")
 
 	cmd := exec.Command("uv", "run", "--project", sdkPyPath, scriptPath)
 	cmd.Stdin = bytes.NewReader(raw)
@@ -121,8 +121,9 @@ func runPythonHalf(root string, raw []byte) ([]byte, error) {
 // and 18 (reserved for future use) is decoded without error by both Go and Python.
 //
 // We hand-craft the wire bytes by appending varint-encoded unknown fields:
-//   field 17 (varint wire type 0): tag = (17 << 3) | 0 = 136 → 0x88 0x01
-//   field 18 (varint wire type 0): tag = (18 << 3) | 0 = 144 → 0x90 0x01
+//
+//	field 17 (varint wire type 0): tag = (17 << 3) | 0 = 136 → 0x88 0x01
+//	field 18 (varint wire type 0): tag = (18 << 3) | 0 = 144 → 0x90 0x01
 func testUnknownFieldTolerance(root string, baseRaw []byte) error {
 	// Append unknown field 17 (varint, value=42) and field 18 (varint, value=99).
 	// Wire format: tag (varint) + value (varint)

@@ -27,18 +27,26 @@ the receiver.
 
 ## Components
 
+The repo is organised by role (services / sdks / channels / shared libs).
+Migration history: see `plans/260513-0833-repo-layout-option-b/`.
+
 | Component | Lang | Role |
 |---|---|---|
-| `gateway/` | Go | Stateless. One handler per channel for inbound; one consumer pool per channel for outbound. Per-workspace rate limits. |
-| `sdk-go/` | Go | Thin NATS wrapper. Idempotency, OTel, Prometheus, schema-version checks. |
-| `sdk-py/` | Python | Async-only NATS wrapper for AI service integration (LangGraph-compatible). |
+| `services/gateway/` | Go | Stateless ingress/egress. Per-channel handler + consumer pool, per-workspace rate limits. |
+| `services/media-vault/` | Go | Attachment ingestion within platform TTL → GCS, message enrichment. |
+| `services/sink-gcs/` | Go | Raw-payload sink for cold storage + analytics substrate. |
+| `services/tui/` | Go | Admin terminal UI (bubbletea), read-only v1. |
+| `sdks/go/` | Go | Thin NATS wrapper. Idempotency, OTel, Prometheus, schema-version checks. Importable as `github.com/crashchat-ai/mio/sdk-go` (module path preserved despite directory move). |
+| `sdks/python/` | Python | Async-only NATS wrapper for AI service integration (LangGraph-compatible). |
+| `channels/` | Go | In-tree channel adapters (Cliq today; Slack, Telegram, … planned). Each adapter registers via `init()`; barrel package `channels/all` blank-imports them. |
 | `proto/` | Protobuf | Canonical schema. `Message`, `SendCommand`, `Attachment`, `Capabilities`. `buf`-managed, versioned. |
-| `sink-gcs/` | Go | Consumer that writes raw payloads to GCS. Cold storage + analytics substrate. |
-| `media-vault/` | Go | Attachment ingestion and storage service. Fetches within platform TTL, persists to GCS, enriches messages. |
-| `tui/` | Go | Terminal UI for admin server (bubbletea). Read-only v1. |
-| `examples/echo-consumer/` | Python | Tiny stub proving the loop. |
-| `deploy/local/` | — | `docker-compose.yml` + Postgres init + dev secrets for local dev. |
-| `deploy/charts/` | — | Helm charts (6 sub-charts) for GKE deployment. |
+| `pkg/` | Go | Shared internal libraries (empty placeholder — code lands here only when at least two callers genuinely share it). |
+| `ee/` | — | Reserved for build-tag-gated commercial overlay; not part of the OSS Apache-2.0 distribution. |
+| `tools/` | Go | Build/codegen helpers (`genchanneltypes`, `proto-roundtrip`). |
+| `examples/` | Polyglot | Sample consumers (e.g. `echo-consumer/`). |
+| `deploy/` | — | Helm charts (`deploy/charts/`), local docker-compose (`deploy/local/`), fluxcd manifests (`deploy/fluxcd/`). |
+| `docs/` | — | Project documentation. |
+| `hack/` | — | Dev-only scratch, spikes, playground. Not shipped, not tested. |
 
 ## Stack
 
@@ -98,7 +106,7 @@ POC. Phase tracker:
 
 - [x] **P0** — Repo scaffold
 - [x] **P1** — Proto v1 envelope
-- [x] **P2** — SDKs (`sdk-go`, `sdk-py`)
+- [x] **P2** — SDKs (`sdks/go`, `sdks/python`)
 - [x] **P3** — Gateway + Zoho Cliq inbound
 - [x] **P4** — `examples/echo-consumer/`
 - [x] **P5** — Outbound path → Cliq

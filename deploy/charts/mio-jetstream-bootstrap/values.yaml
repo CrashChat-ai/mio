@@ -14,7 +14,7 @@ image:
 retryCount: 5
 retrySleepSeconds: 10
 
-# Expected streams (verify-only — source of truth is gateway/internal/store/jetstream.go).
+# Expected streams (verify-only — source of truth is services/gateway/store/jetstream.go).
 expectedStreams:
   - name: MESSAGES_INBOUND
     subjects: ["mio.inbound.>"]

@@ -15,7 +15,7 @@ requires = ["setuptools>=70"]
 build-backend = "setuptools.build_meta"
 
 [tool.uv.sources]
-mio-sdk-py = { path = "../../sdk-py", editable = true }
+mio-sdk-py = { path = "../../sdks/python", editable = true }
 
 [dependency-groups]
 dev = [

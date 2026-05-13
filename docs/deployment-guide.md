@@ -71,7 +71,7 @@ go run ./cmd/all-in-one --storage [memory|file] --store-dir ./var/jetstream
 
 ### Guards
 
-**MIO_ENV=prod enforcement:** Panics if `--storage memory` on production deployments (see `gateway/internal/nats/guardrail.go`).
+**MIO_ENV=prod enforcement:** Panics if `--storage memory` on production deployments (see `services/gateway/internal/nats/guardrail.go`).
 
 ```bash
 # This fails in prod (safety guard):
@@ -423,7 +423,7 @@ See [docs/runbooks/media-vault-iam.md](runbooks/media-vault-iam.md).
 ### Operator Notes
 
 - **7-day round-trip test:** Image must be retrievable ≥7d after receipt (verify after first deploy)
-- **Backend swap:** Add new storage backend under `media-vault/internal/storage/{s3,azure}/`, flip `MIO_STORAGE_BACKEND=s3`
+- **Backend swap:** Add new storage backend under `services/media-vault/internal/storage/{s3,azure}/`, flip `MIO_STORAGE_BACKEND=s3`
 - **Old consumer removal:** After successful enriched-stream cutover, remove deprecated `ai-consumer` on `MESSAGES_INBOUND`:
   ```bash
   nats consumer rm MESSAGES_INBOUND ai-consumer

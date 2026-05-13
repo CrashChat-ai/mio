@@ -3,7 +3,7 @@
 -- CREATE ROLE / CREATE DATABASE here — they will fail on cold boot.
 -- (Postgres has no "CREATE ROLE IF NOT EXISTS" syntax.)
 --
--- Schema migrations are owned by gateway/migrations/ from P3.
+-- Schema migrations are owned by services/gateway/migrations/ from P3.
 -- Foundation invariants (enforced by P3 migrations, not here):
 --   - tenant_id, account_id NOT NULL from row 1
 --   - idempotency address: (account_id, source_message_id)

@@ -341,8 +341,8 @@ At-least-once delivery from sink-gcs means duplicates exist in the lake;
 they are resolved at read time, not at write time.
 
 **Schema-evolution rule:** proto change → DDL change in the same PR.
-`sink-gcs/sql/check-proto-drift.sh` (foundation guard, runs in mio CI)
-fails the PR if proto fields outpace `sink-gcs/sql/messages_schema.json`.
+`services/sink-gcs/sql/check-proto-drift.sh` (foundation guard, runs in mio CI)
+fails the PR if proto fields outpace `services/sink-gcs/sql/messages_schema.json`.
 Consumers vendor the schema and verify it against mio main in their own CI.
 
 **Wire format:** sink-gcs emits snake_case NDJSON (`UseProtoNames: true`)
@@ -355,7 +355,7 @@ retention policy lands. `messages_errors` carries 30-day expiry.
 matches the existing `raw_*` dataset policy (no column-level security).
 Revisit if PII concerns escalate.
 
-**Reference:** `sink-gcs/sql/README.md` (DDL + schema contract);
+**Reference:** `services/sink-gcs/sql/README.md` (DDL + schema contract);
 loader implementation lives in the deployer's own infra repo.
 
 ---

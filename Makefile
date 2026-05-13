@@ -19,14 +19,14 @@ proto: ## Run buf generate (outputs to proto/gen/)
 proto-gen: proto ## Regenerate proto + channel-type codegen; CI diffs must be clean
 	go run ./tools/genchanneltypes/
 	@echo "==> Checking for codegen drift..."
-	git diff --exit-code sdk-go/channeltypes.go sdk-py/mio/channeltypes.py || \
+	git diff --exit-code sdks/go/channeltypes.go sdks/python/mio/channeltypes.py || \
 		(echo "ERROR: channeltypes drift detected — commit the generated files"; exit 1)
 
 sdk-go-test: ## Run sdk-go unit tests (no live NATS needed)
-	cd sdk-go && go test ./... -v
+	cd sdks/go && go test ./... -v
 
 sdk-py-test: ## Run sdk-py unit tests (no live NATS needed)
-	cd sdk-py && uv run pytest tests/ -v -m "not integration"
+	cd sdks/python && uv run pytest tests/ -v -m "not integration"
 
 proto-lint: ## Run buf lint (STANDARD ruleset)
 	buf lint
@@ -50,59 +50,61 @@ clean: ## Remove generated proto output and stop infra (wipes volumes)
 	$(COMPOSE) down -v
 
 gateway-build-local: ## Build gateway Docker image locally (no push)
-	docker build -f gateway/Dockerfile -t mio/gateway:dev .
+	docker build -f services/gateway/Dockerfile -t mio/gateway:dev .
 
 gateway-build: ## Build gateway Docker image with version tag (no push)
-	docker build -f gateway/Dockerfile \
+	docker build -f services/gateway/Dockerfile \
 		--build-arg BUILD_VERSION=$(BUILD_VERSION) \
 		-t mio/gateway:$(BUILD_VERSION) .
 
 gateway-test: ## Run gateway unit tests (no live NATS/Postgres needed)
-	cd gateway && go test ./internal/... -v -count=1
+	go test ./services/gateway/internal/... ./services/gateway/sender/... ./services/gateway/store/... -v -count=1
 
 gateway-migrate: ## Run database migrations manually via gateway CLI
-	cd gateway && MIO_MIGRATE_ON_START=true go run ./cmd/gateway/
+	MIO_MIGRATE_ON_START=true go run ./services/gateway/cmd/gateway/
 
 gateway-bench-outbound: ## Fairness bench: burst account A (50/s), assert account B p99 < 2s
-	cd gateway && go test ./integration_test/... -run TestFairness -v -timeout 30s
+	go test ./services/gateway/integration_test/... -run TestFairness -v -timeout 30s
 
 gateway-dispatch-lint: ## CI guard: dispatch.go must have zero channel-specific branches
-	@! grep -E 'zoho|slack|cliq|telegram|discord' gateway/internal/sender/dispatch.go && \
+	@test -f services/gateway/sender/dispatch.go || \
+		(echo "ERROR: services/gateway/sender/dispatch.go not found — repo layout drift"; exit 1)
+	@! grep -E 'zoho|slack|cliq|telegram|discord' services/gateway/sender/dispatch.go && \
 		echo "dispatch.go: clean (no adapter-specific branches)" || \
 		(echo "ERROR: adapter-specific branch found in dispatch.go — P9 litmus FAIL"; exit 1)
 
 admin-build: ## Build the admin connect-go server binary
-	cd gateway && go build -o ../bin/mio-admin ./cmd/admin
+	go build -o ./bin/mio-admin ./services/gateway/cmd/admin
 
 admin-run: ## Run the admin server locally (loopback:9090)
-	cd gateway && go run ./cmd/admin
+	go run ./services/gateway/cmd/admin
 
 admin-test: ## Run admin unit tests
-	cd gateway && go test ./internal/admin/... -v -count=1
+	go test ./services/gateway/internal/admin/... -v -count=1
 
 run-laptop: ## Run mio-all-in-one with embedded NATS (memory storage)
-	cd gateway && go run ./cmd/all-in-one --storage memory
+	go run ./services/gateway/cmd/all-in-one --storage memory
 
 run-laptop-persist: ## Run mio-all-in-one with embedded NATS (file storage, ./var/jetstream)
-	cd gateway && go run ./cmd/all-in-one --storage file --store-dir ./var/jetstream
+	go run ./services/gateway/cmd/all-in-one --storage file --store-dir ./var/jetstream
 
 tui-build: ## Build the mio-tui binary
-	cd tui && go build -o ../bin/mio-tui ./cmd/mio-tui
+	go build -o ./bin/mio-tui ./services/tui/cmd/mio-tui
 
 tui-run: ## Run the TUI against ADMIN_URL (default http://127.0.0.1:9090)
-	cd tui && go run ./cmd/mio-tui
+	go run ./services/tui/cmd/mio-tui
 
 tui-test: ## Run TUI unit tests
-	cd tui && go test ./... -v -count=1
+	go test ./services/tui/... -v -count=1
 
 sink-gcs-test: ## Run sink-gcs unit tests (no live NATS/MinIO needed)
-	cd sink-gcs && go test ./internal/... -v
+	go test ./services/sink-gcs/internal/... -v
 
 sink-gcs-build-local: ## Build sink-gcs Docker image locally (no push)
-	docker build -f sink-gcs/Dockerfile -t mio/sink-gcs:dev .
+	docker build -f services/sink-gcs/Dockerfile -t mio/sink-gcs:dev .
 
 sink-gcs-build: ## Build sink-gcs Docker image with version tag (no push)
-	docker build -f sink-gcs/Dockerfile \
+	docker build -f services/sink-gcs/Dockerfile \
 		--build-arg BUILD_VERSION=$(BUILD_VERSION) \
 		-t mio/sink-gcs:$(BUILD_VERSION) .
 

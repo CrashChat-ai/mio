@@ -2,9 +2,5 @@ go 1.25.10
 
 use (
 	.
-	./media-vault
-	./gateway
-	./sdk-go
-	./sink-gcs
-	./tui
+	./sdks/go
 )

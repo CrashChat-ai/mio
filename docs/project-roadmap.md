@@ -47,7 +47,7 @@
 - Gateway p99 inbound latency < 500ms (unaffected) ✅
 - Per-account rate limiting (unaffected) ✅
 
-**Code:** `media-vault/`, `deploy/charts/mio-media-vault`  
+**Code:** `services/media-vault/`, `deploy/charts/mio-media-vault`  
 **Report:** `plans/reports/Cook-260509-2328-attachment-persistence.md`
 
 ### P8: POC Deploy on GKE
@@ -87,9 +87,9 @@
 
 **SLA:** Rows visible in `messages` within ~10–60 min of NDJSON write (hourly job + 5-min budget)
 
-**Schema contract:** Proto changes must update `sink-gcs/sql/messages_schema.json` (CI guard: `check-proto-drift.sh`)
+**Schema contract:** Proto changes must update `services/sink-gcs/sql/messages_schema.json` (CI guard: `check-proto-drift.sh`)
 
-**Code:** `sink-gcs/sql/{messages_schema.json, check-proto-drift.sh}` (producer-side); loader lives in deployer's infra repo
+**Code:** `services/sink-gcs/sql/{messages_schema.json, check-proto-drift.sh}` (producer-side); loader lives in deployer's infra repo
 
 **Plan:** `plans/260510-1102-bq-sink-lakehouse/`
 
@@ -113,7 +113,7 @@
 
 **TUI integration:** bubbletea UI (read-only v1 → read-write v2)
 
-**Code:** `gateway/internal/admin/`, `tui/`
+**Code:** `services/gateway/internal/admin/`, `services/tui/`
 
 **Plan:** `plans/260513-0351-channel-management-control-plane/`
 

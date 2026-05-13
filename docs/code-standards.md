@@ -27,6 +27,37 @@ mise tasks     # See available task aliases
 
 ---
 
+## Repo Layout
+
+The tree is grouped by **role**, not by service. New files land in the
+directory whose role matches their purpose.
+
+| Dir | Purpose | Rules |
+|---|---|---|
+| `services/` | Runnable binaries | One subdir per binary (`services/<svc>/cmd/<bin>/main.go`). Each service is part of the single root Go module. |
+| `sdks/` | Distributable client libraries | `sdks/go/` (separate Go module, importable as `github.com/crashchat-ai/mio/sdk-go`) and `sdks/python/` (uv-managed). |
+| `channels/` | In-tree messaging adapters | One sub-package per adapter (`channels/<name>/`). Register via `init()`. Add to `channels/all/all.go` to compile into gateway binaries. |
+| `pkg/` | Shared internal libraries | Name by capability — no `utils/`, `common/`, or `helpers/`. Code lands here only when at least two callers genuinely share it. |
+| `ee/` | Commercial overlay | Build-tag-gated (`//go:build ee`). Not part of the OSS Apache-2.0 distribution. OSS code must not import from `ee/`. |
+| `tools/` | Build/codegen helpers | `go run ./tools/<x>/` style invocation. Build-critical. |
+| `examples/` | Sample consumers | First-class demo content (e.g. `examples/echo-consumer/`). |
+| `proto/` | Canonical schema | `buf`-managed. `proto/gen/` outputs are gitignored; checked in for Docker builds via `.dockerignore` negation. |
+| `deploy/` | Deployment artefacts | `deploy/charts/` (Helm), `deploy/local/` (docker-compose), `deploy/fluxcd/` (GitOps). |
+| `docs/` | Project documentation | Living docs for codebase summary, architecture, deployment, roadmap. |
+| `hack/` | Dev-only scratch | Spikes, playground, throwaway. Not shipped, not tested. `hack/playground/` is gitignored. |
+
+**Module layout:** the repo has exactly **two Go modules**:
+
+1. The root module (`github.com/crashchat-ai/mio`) — contains `services/`,
+   `channels/`, `tools/`, `proto/gen/go`, and any future `pkg/` content.
+2. `sdks/go/` (`github.com/crashchat-ai/mio/sdk-go`) — kept as a separate
+   module so downstream consumers can `go get` it independently. The Go
+   module path was intentionally **not renamed** to match the new directory
+   path; module path and directory path diverge.
+
+The root `go.mod` carries `replace github.com/crashchat-ai/mio/sdk-go => ./sdks/go`
+so non-workspace builds (Dockerfiles, `GOWORK=off`) resolve the in-tree SDK.
+
 ## File Naming & Organization
 
 ### Go Files
@@ -41,12 +72,12 @@ mise tasks     # See available task aliases
   └── internal_helper.go        # Private helpers (unexported)
   ```
 - **File limit:** Keep under 200 LOC per file (split large logic into focused modules)
-- **Examples:** gateway/internal/sender/dispatch.go, gateway/internal/store/message.go
+- **Examples:** services/gateway/sender/dispatch.go, services/gateway/store/message.go
 
 ### Python Files
 
 - **Convention:** Kebab-case for modules, snake_case for functions/classes (PEP 8)
-- **Examples:** `sdk-py/mio/client.py`, `examples/echo-consumer/src/echo.py`
+- **Examples:** `sdks/python/mio/client.py`, `examples/echo-consumer/src/echo.py`
 
 ### Proto Files
 
@@ -57,7 +88,7 @@ mise tasks     # See available task aliases
 ### Config & Data Files
 
 - **Helm values:** `deploy/charts/{component}/values.yaml` (YAML)
-- **Migrations:** `gateway/internal/store/migrations/{version}__{slug}.sql` (golang-migrate format)
+- **Migrations:** `services/gateway/store/migrations/{version}__{slug}.sql` (golang-migrate format)
 - **Env example:** `.env.example` (KV pairs, no shell syntax)
 - **Proto registry:** `proto/channels.yaml` (YAML, single source of truth)
 
@@ -124,7 +155,7 @@ buf breaking --against ".git#branch=main"  # WIRE_JSON ruleset
 
 ### Import Paths
 
-- **Go:** Module prefixed (e.g., `github.com/crashchat-ai/mio/gateway/internal/sender`)
+- **Go:** Module prefixed (e.g., `github.com/crashchat-ai/mio/services/gateway/sender`)
 - **Python:** Relative imports within package (e.g., `from .client import Client`)
 
 ### Error Handling
@@ -188,7 +219,7 @@ except Exception as e:
 ### Interface
 
 ```go
-// gateway/internal/sender/adapter.go
+// services/gateway/sender/adapter.go
 type Adapter interface {
     // Send delivers a command to the channel API.
     // Return error must implement IsRetryable(), IsRateLimited() predicates.
@@ -206,7 +237,7 @@ type Adapter interface {
 
 2. **Self-registration.** Adapter registers itself at `init()` time:
    ```go
-   // gateway/internal/channels/zohocliq/inbound.go
+   // services/gateway/internal/channels/zohocliq/inbound.go
    func init() {
        channels.Register("zoho_cliq", &adapter{})
    }
@@ -218,7 +249,7 @@ type Adapter interface {
 
 ### Adding a New Adapter
 
-1. Create `gateway/internal/channels/{slug}/` directory
+1. Create `services/gateway/internal/channels/{slug}/` directory
 2. Implement `Adapter` interface (inbound webhook handler + outbound Send)
 3. Register in `init()`
 4. Add entry to `proto/channels.yaml` with status (planned/active)
@@ -460,7 +491,7 @@ test(gateway): add fairness benchmark for multi-tenant workload
 
 **Go example (Cliq):**
 ```go
-// gateway/internal/channels/zohocliq/inbound.go
+// services/gateway/internal/channels/zohocliq/inbound.go
 func verifySignature(body []byte, signature, secret string) error {
     mac := hmac.New(sha256.New, []byte(secret))
     mac.Write(body)
@@ -477,7 +508,7 @@ func verifySignature(body []byte, signature, secret string) error {
 **Loopback-only + CIDR allowlist** (default: 127.0.0.1/32)
 
 ```go
-// gateway/internal/admin/auth.go
+// services/gateway/internal/admin/auth.go
 func isAllowed(ip string) bool {
     // Check ADMIN_ALLOWED_CIDR env var (comma-separated)
     // Default: 127.0.0.1/32
@@ -495,11 +526,11 @@ Defined in `.github/workflows/ci.yaml` (dorny/paths-filter):
 | Path | Triggers | Job |
 |---|---|---|
 | `proto/**`, `buf.yaml`, `buf.gen.yaml` | test-proto | buf lint + breaking |
-| `gateway/**`, `sdk-go/**` | test-gateway | golangci-lint + go test |
-| `sdk-py/**`, `examples/echo-consumer/**` | test-python | ruff + pytest |
+| `services/gateway/**`, `sdks/go/**` | test-gateway | golangci-lint + go test |
+| `sdks/python/**`, `examples/echo-consumer/**` | test-python | ruff + pytest |
 | `deploy/charts/**` | helm-lint | helm lint all charts |
-| `media-vault/**` | test-media-vault | go test |
-| `sink-gcs/sql/**`, `proto/mio/v1/**` | test-bq-schema | schema drift check |
+| `services/media-vault/**` | test-media-vault | go test |
+| `services/sink-gcs/sql/**`, `proto/mio/v1/**` | test-bq-schema | schema drift check |
 
 ### Image Tagging
 

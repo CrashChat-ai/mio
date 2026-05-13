@@ -8,12 +8,12 @@
 
 ```
 mio/
-├── gateway/              # Main API service (Go). Inbound webhook handler + outbound sender pool.
-├── sdk-go/               # Go SDK. Thin NATS wrapper for consumers.
-├── sdk-py/               # Python SDK (async-only). Same surface as sdk-go, for AI integration.
-├── sink-gcs/             # GCS archiver consumer (Go). Cold storage + analytics substrate.
-├── media-vault/          # Attachment sidecar (Go). Fetches within platform TTL, persists to GCS.
-├── tui/                  # Terminal UI admin client (Go, bubbletea). Read-only v1.
+├── services/gateway/              # Main API service (Go). Inbound webhook handler + outbound sender pool.
+├── sdks/go/               # Go SDK. Thin NATS wrapper for consumers.
+├── sdks/python/               # Python SDK (async-only). Same surface as sdk-go, for AI integration.
+├── services/sink-gcs/             # GCS archiver consumer (Go). Cold storage + analytics substrate.
+├── services/media-vault/          # Attachment sidecar (Go). Fetches within platform TTL, persists to GCS.
+├── services/tui/                  # Terminal UI admin client (Go, bubbletea). Read-only v1.
 ├── examples/
 │   └── echo-consumer/    # Example Python consumer proving the loop.
 ├── proto/                # Protobuf definitions (mio.v1, mio.admin.v1). buf-managed.
@@ -22,7 +22,7 @@ mio/
 │   ├── local/            # docker-compose stack (NATS, Postgres, MinIO, services).
 │   ├── charts/           # Helm charts (6: nats, jetstream-bootstrap, gateway, media-vault, sink-gcs, echo).
 │   └── fluxcd/           # GitOps overlay (external infra repo reconciliation).
-├── playground/           # Learning sandbox (NATS, Cliq integration POCs).
+├── hack/playground/           # Learning sandbox (NATS, Cliq integration POCs).
 ├── docs/                 # Documentation (architecture, deployment, runbooks, journals).
 ├── plans/                # Phased build plans + reports (P0–P11+).
 ├── Makefile              # 40+ build, test, lint, deploy targets.
@@ -41,15 +41,15 @@ mio/
 - `./sink-gcs` — Consumer binary
 - `./tui` — Admin CLI binary
 
-**Python workspace** (`sdk-py/pyproject.toml`):
-- `sdk-py/` — uv-managed project
+**Python workspace** (`sdks/python/pyproject.toml`):
+- `sdks/python/` — uv-managed project
 - `examples/echo-consumer/` — Example consumer project
 
 ---
 
 ## Component Deep-Dive
 
-### `gateway/` — Main API Service
+### `services/gateway/` — Main API Service
 
 **Binaries:**
 - `cmd/gateway` — Production inbound/outbound server (HTTP + gRPC health)
@@ -99,7 +99,7 @@ mio/
 - Errors wrapped with context: `fmt.Errorf("...%w", err)` + custom error types (e.g., `DeliveryError` with `IsRetryable()`, `IsRateLimited()`)
 - Config from env vars (no YAML; secrets via file mounts for webhook secret, age identity)
 
-### `sdk-go/` — Go SDK
+### `sdks/go/` — Go SDK
 
 **Public API:**
 ```go
@@ -124,7 +124,7 @@ func (c *Client) Close() error
 **Key types:**
 - `Delivery` — wraps nats.Msg, provides `Ack()`, `Nak()`
 
-### `sdk-py/` — Python SDK
+### `sdks/python/` — Python SDK
 
 **Async-only surface** (by design, for LangGraph compatibility):
 ```python
@@ -143,7 +143,7 @@ await client.close()
 - MaxAckPending=1 default
 - Deliberately async-only; no sync wrapper
 
-### `sink-gcs/` — GCS Archiver Consumer
+### `services/sink-gcs/` — GCS Archiver Consumer
 
 **Role:** Pull from MESSAGES_INBOUND stream, write raw NDJSON to GCS (cold storage + analytics).
 
@@ -159,9 +159,9 @@ await client.close()
 - `internal/writer/` — NDJSON marshaling (UseProtoNames: true for snake_case keys)
 - `internal/storage/gcs.go` — GCS bucket operations
 
-**Schema contract:** `sink-gcs/sql/messages_schema.json` defines BQ columns. Proto changes must include DDL updates (CI guard: `check-proto-drift.sh` fails PRs with mismatches).
+**Schema contract:** `services/sink-gcs/sql/messages_schema.json` defines BQ columns. Proto changes must include DDL updates (CI guard: `check-proto-drift.sh` fails PRs with mismatches).
 
-### `media-vault/` — Attachment Sidecar
+### `services/media-vault/` — Attachment Sidecar
 
 **Role:** Pull from MESSAGES_INBOUND, fetch attachment bytes within platform TTL, persist to GCS, enrich, publish to MESSAGES_INBOUND_ENRICHED.
 
@@ -192,7 +192,7 @@ mio-media-cli signed-url gs://bucket/mio/attachments/... --ttl=1h
 mio-media-cli gdpr-delete --account-id=abc123
 ```
 
-### `tui/` — Terminal UI Admin Client
+### `services/tui/` — Terminal UI Admin Client
 
 **Status:** Just-scaffolded bubbletea TUI.
 
@@ -251,7 +251,7 @@ mio-media-cli gdpr-delete --account-id=abc123
 
 **`genchanneltypes`:**
 - Input: `proto/channels.yaml`
-- Output: `sdk-go/channeltypes.go` (const registry), `sdk-py/mio/channeltypes.py`
+- Output: `sdks/go/channeltypes.go` (const registry), `sdks/python/mio/channeltypes.py`
 - Run: `go run ./tools/genchanneltypes/` (or `make proto-gen`)
 
 **`proto-roundtrip`:**
@@ -336,7 +336,7 @@ tenant_id → account_id → conversation_id → message_id
 - `messages` — (account_id, source_message_id, text, sender_id, conversation_id, received_at, ...)
 - `attachments` — (message_id, filename, content_type, storage_key, content_sha256, ...)
 - `credentials` — (account_id, channel_type, credential_type, encrypted_value, created_at, rotated_at, ...)
-- (schema source: `gateway/internal/store/migrations/`)
+- (schema source: `services/gateway/store/migrations/`)
 
 ---
 
@@ -404,23 +404,23 @@ make gateway-build            # gateway:$(git describe)
 ## Testing Topology
 
 **Unit tests** (no live deps):
-- `gateway/internal/...` → `go test ./...` (no NATS/Postgres)
-- `sdk-go/...` → `go test ./...`
-- `sdk-py/...` → `pytest -m "not integration"` (pytest markers)
-- `sink-gcs/internal/...` → `go test ./...`
+- `services/gateway/internal/...` → `go test ./...` (no NATS/Postgres)
+- `sdks/go/...` → `go test ./...`
+- `sdks/python/...` → `pytest -m "not integration"` (pytest markers)
+- `services/sink-gcs/internal/...` → `go test ./...`
 
 **Integration tests** (live deps required):
 - Set `MIO_TEST_DSN="postgres://user:pass@localhost/mio"`
-- `gateway/integration_test/...` → `go test ./...`
-- `sdk-py/...` → `pytest -m integration`
+- `services/gateway/integration_test/...` → `go test ./...`
+- `sdks/python/...` → `pytest -m integration`
 
 **CI path filters** (`.github/workflows/ci.yaml`):
 - `proto/**` → test-proto (buf lint + breaking)
-- `gateway/**`, `sdk-go/**` → test-gateway (lint + go test)
-- `sdk-py/**`, `examples/echo-consumer/**` → test-python (ruff + pytest)
+- `services/gateway/**`, `sdks/go/**` → test-gateway (lint + go test)
+- `sdks/python/**`, `examples/echo-consumer/**` → test-python (ruff + pytest)
 - `deploy/charts/**` → helm-lint (all 6 charts)
-- `media-vault/**` → test-media-vault (go test)
-- `sink-gcs/sql/**`, `proto/mio/v1/**` → test-bq-schema (schema drift check)
+- `services/media-vault/**` → test-media-vault (go test)
+- `services/sink-gcs/sql/**`, `proto/mio/v1/**` → test-bq-schema (schema drift check)
 
 ---
 

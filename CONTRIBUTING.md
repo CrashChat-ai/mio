@@ -1,6 +1,6 @@
 # Contributing to MIO
 
-Two rules that are enforced at code review time for all PRs touching proto definitions or gateway/SDK code.
+Two rules that are enforced at code review time for all PRs touching proto definitions or services/gateway/SDK code.
 
 ---
 
@@ -43,7 +43,7 @@ msg.Attributes["zoho_cliq_workspace"] = workspaceID
 
 **Adding a new channel:**
 1. Add an entry to `proto/channels.yaml` with `status: planned` (or `active` if the adapter lands in the same PR).
-2. Add the adapter package under `gateway/internal/channels/<slug>/`.
+2. Add the adapter package under `services/gateway/internal/channels/<slug>/`.
 3. No proto regeneration, no SDK redeploy — the field is a string, not an enum.
 
 **Renaming a channel slug:**

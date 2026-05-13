@@ -2,7 +2,7 @@
 # Multi-stage distroless deferred to P7 production deployment.
 #
 # Build context MUST be the repo root (not examples/echo-consumer/) so both
-# sdk-py/ and proto/gen/py/ are accessible:
+# sdks/python/ and proto/gen/py/ are accessible:
 #   docker build -f examples/echo-consumer/Dockerfile -t mio/echo-consumer:dev .
 
 FROM python:3.12-slim
@@ -10,7 +10,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Copy the SDK and proto-gen directories needed at runtime.
-COPY sdk-py/ /sdk-py/
+COPY sdks/python/ /sdk-py/
 COPY proto/gen/py/ /proto/gen/py/
 
 # Copy the echo-consumer package.

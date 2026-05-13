@@ -104,7 +104,7 @@ func assertMessageEqual(original, decoded *miov1.Message) error {
 // runPythonHalf pipes raw bytes through the Python script and returns re-encoded bytes.
 func runPythonHalf(root string, raw []byte) ([]byte, error) {
 	scriptPath := filepath.Join(root, "tools", "proto-roundtrip", "roundtrip.py")
-	sdkPyPath := filepath.Join(root, "sdk-py")
+	sdkPyPath := filepath.Join(root, "sdks", "python")
 
 	cmd := exec.Command("uv", "run", "--project", sdkPyPath, scriptPath)
 	cmd.Stdin = bytes.NewReader(raw)

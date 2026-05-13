@@ -12,7 +12,7 @@ WORKDIR /src
 
 # Copy go.mod files first for better layer cache reuse.
 COPY go.mod go.sum ./
-COPY sdk-go/go.mod sdk-go/go.sum ./sdk-go/
+COPY sdks/go/go.mod sdks/go/go.sum ./sdks/go/
 COPY gateway/go.mod gateway/go.sum ./gateway/
 
 # Download deps with build cache mounts (warm build: ~5s vs ~60s cold).

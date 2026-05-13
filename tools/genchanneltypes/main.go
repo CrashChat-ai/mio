@@ -1,8 +1,8 @@
 // Package main implements the channel-type code generator.
 //
 // Reads proto/channels.yaml and emits:
-//   - sdk-go/channeltypes.go  (Go: var Known map[string]bool)
-//   - sdk-py/mio/channeltypes.py (Python: KNOWN set[str])
+//   - sdks/go/channeltypes.go  (Go: var Known map[string]bool)
+//   - sdks/python/mio/channeltypes.py (Python: KNOWN set[str])
 //
 // Only channels with status: active are emitted to Known/KNOWN.
 // Deprecated aliases are available via Aliases (Go) / ALIASES (Python).
@@ -154,14 +154,14 @@ func main() {
 	}
 
 	// Emit Go file.
-	goOut := filepath.Join(root, "sdk-go", "channeltypes.go")
+	goOut := filepath.Join(root, "sdks", "go", "channeltypes.go")
 	if err := renderTemplate("go", goTemplate, data, goOut); err != nil {
 		log.Fatalf("emit Go: %v", err)
 	}
 	fmt.Printf("written: %s\n", goOut)
 
 	// Emit Python file.
-	pyOut := filepath.Join(root, "sdk-py", "mio", "channeltypes.py")
+	pyOut := filepath.Join(root, "sdks", "python", "mio", "channeltypes.py")
 	if err := renderTemplate("py", pyTemplate, data, pyOut); err != nil {
 		log.Fatalf("emit Python: %v", err)
 	}

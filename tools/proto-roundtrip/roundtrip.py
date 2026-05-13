@@ -6,8 +6,8 @@ Protocol:
   - Decodes as mio.v1.Message, re-encodes to proto wire format, writes to stdout.
   - The Go half then decodes the re-serialised bytes and checks field equality.
 
-Run via: uv run --project sdk-py tools/proto-roundtrip/roundtrip.py
-(No separate requirements.txt — uses sdk-py/pyproject.toml pinned protobuf.)
+Run via: uv run --project sdks/python tools/proto-roundtrip/roundtrip.py
+(No separate requirements.txt — uses sdks/python/pyproject.toml pinned protobuf.)
 
 Subject-token validator:
   validate_subject_token(token) raises ValueError if the token contains

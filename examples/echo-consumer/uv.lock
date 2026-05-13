@@ -49,7 +49,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "mio-sdk-py", editable = "../../sdk-py" },
+    { name = "mio-sdk-py", editable = "../../sdks/python" },
     { name = "python-ulid", specifier = ">=2.0.0" },
 ]
 
@@ -62,7 +62,7 @@ dev = [
 [[package]]
 name = "mio-sdk-py"
 version = "0.1.0"
-source = { editable = "../../sdk-py" }
+source = { editable = "../../sdks/python" }
 dependencies = [
     { name = "nats-py" },
     { name = "opentelemetry-api" },

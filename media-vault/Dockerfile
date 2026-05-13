@@ -13,7 +13,7 @@ RUN apk add --no-cache ca-certificates git
 WORKDIR /src
 
 COPY go.mod go.sum ./
-COPY sdk-go/go.mod sdk-go/go.sum ./sdk-go/
+COPY sdks/go/go.mod sdks/go/go.sum ./sdks/go/
 COPY media-vault/go.mod media-vault/go.sum ./media-vault/
 
 RUN --mount=type=cache,target=/root/.cache/go-build \

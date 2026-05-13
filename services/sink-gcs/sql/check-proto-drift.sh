@@ -21,8 +21,8 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SCHEMA="${REPO_ROOT}/sink-gcs/sql/messages_schema.json"
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+SCHEMA="${REPO_ROOT}/services/sink-gcs/sql/messages_schema.json"
 PROTO_DIR="${REPO_ROOT}/proto/mio/v1"
 
 [ -f "${SCHEMA}" ] || { echo "FAIL: ${SCHEMA} not found"; exit 1; }

@@ -22,7 +22,7 @@ func TestRefreshCredential_PreservesCallersRefreshToken(t *testing.T) {
 
 	oauthURL, _ := newStubTokenEndpoint(t, func(_ *testing.T, _ *http.Request, w http.ResponseWriter) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintln(w, `{"access_token":"new-access","refresh_token":"rotated-refresh","expires_in":3600}`)
+		_, _ = fmt.Fprintln(w, `{"access_token":"new-access","refresh_token":"rotated-refresh","expires_in":3600}`)
 	})
 
 	tc := buildTokenCredentialsForTest(t, oauthURL)
@@ -48,7 +48,7 @@ func TestRefreshCredential_ExtrasIndependentlyMutable(t *testing.T) {
 
 	oauthURL, _ := newStubTokenEndpoint(t, func(_ *testing.T, _ *http.Request, w http.ResponseWriter) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintln(w, `{"access_token":"new-access","expires_in":3600}`)
+		_, _ = fmt.Fprintln(w, `{"access_token":"new-access","expires_in":3600}`)
 	})
 
 	tc := buildTokenCredentialsForTest(t, oauthURL)

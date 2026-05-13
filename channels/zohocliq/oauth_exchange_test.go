@@ -59,7 +59,7 @@ func TestExchangeCode_Happy(t *testing.T) {
 			t.Errorf("code: %q", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintln(w, `{"access_token":"access-1","refresh_token":"refresh-1","expires_in":3600,"api_domain":"https://www.zohoapis.com","token_type":"Bearer"}`)
+		_, _ = fmt.Fprintln(w, `{"access_token":"access-1","refresh_token":"refresh-1","expires_in":3600,"api_domain":"https://www.zohoapis.com","token_type":"Bearer"}`)
 	})
 
 	tc := buildTokenCredentialsForTest(t, oauthURL)

@@ -82,6 +82,9 @@ func (s *installStash) consume(installID string) (stashedCode, bool) {
 
 // purgeExpired removes entries past their TTL. Called opportunistically
 // from capture/consume; safe to call from a background goroutine too.
+//
+//nolint:unused // reserved for the background-goroutine path; capture/consume
+// rely on TTL expiry during their own walks for now.
 func (s *installStash) purgeExpired() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

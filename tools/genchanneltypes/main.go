@@ -102,11 +102,9 @@ KNOWN: set[str] = {
 }
 
 # ALIASES maps deprecated channel_type slug -> current slug.
-ALIASES: dict[str, str] = {
-{{- range $k, $v := .Aliases }}
-    "{{ $k }}": "{{ $v }}",
-{{- end }}
-}
+ALIASES: dict[str, str] = {{ "{" }}{{ range $k, $v := .Aliases }}
+    "{{ $k }}": "{{ $v }}",{{ end }}{{ if .Aliases }}
+{{ end }}{{ "}" }}
 `
 
 type templateData struct {

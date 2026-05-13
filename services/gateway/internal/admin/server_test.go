@@ -9,8 +9,8 @@ import (
 	"connectrpc.com/connect"
 
 	// Register Cliq via init() so RegisteredAdapters returns at least one.
-	_ "github.com/crashchat-ai/mio/services/gateway/internal/channels/zohocliq"
-	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
+	_ "github.com/crashchat-ai/mio/channels/all"
+	"github.com/crashchat-ai/mio/services/gateway/sender"
 	adminv1 "github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1"
 	"github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1/adminv1connect"
 )

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/crashchat-ai/mio/services/gateway/internal/channels/zohocliq"
+	"github.com/crashchat-ai/mio/channels/zohocliq"
 	"github.com/crashchat-ai/mio/services/gateway/internal/health"
 	sdk "github.com/crashchat-ai/mio/sdk-go"
 	"github.com/go-chi/chi/v5"

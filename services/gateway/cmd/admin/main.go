@@ -25,12 +25,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	// Side-effect import: registers zoho_cliq adapter via init().
-	_ "github.com/crashchat-ai/mio/services/gateway/internal/channels/zohocliq"
+	_ "github.com/crashchat-ai/mio/channels/all"
 
 	"github.com/crashchat-ai/mio/services/gateway/internal/admin"
 	"github.com/crashchat-ai/mio/services/gateway/internal/crypto"
-	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
-	"github.com/crashchat-ai/mio/services/gateway/internal/store"
+	"github.com/crashchat-ai/mio/services/gateway/sender"
+	"github.com/crashchat-ai/mio/services/gateway/store"
 	"github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1/adminv1connect"
 	sdk "github.com/crashchat-ai/mio/sdk-go"
 )

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/crashchat-ai/mio/services/gateway/internal/ratelimit"
-	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
-	"github.com/crashchat-ai/mio/services/gateway/internal/store"
+	"github.com/crashchat-ai/mio/services/gateway/sender"
+	"github.com/crashchat-ai/mio/services/gateway/store"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 	"github.com/prometheus/client_golang/prometheus"
 )

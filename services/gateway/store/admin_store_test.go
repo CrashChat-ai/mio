@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/crashchat-ai/mio/services/gateway/internal/crypto"
-	"github.com/crashchat-ai/mio/services/gateway/internal/store/migrations"
+	"github.com/crashchat-ai/mio/services/gateway/store/migrations"
 )
 
 // requirePool returns a live pool against MIO_TEST_DSN or skips. Migrations

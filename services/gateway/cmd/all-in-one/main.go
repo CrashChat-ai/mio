@@ -22,7 +22,7 @@ import (
 	"github.com/crashchat-ai/mio/services/gateway/internal/runtime"
 
 	// Blank-import each channel package so init() registers the adapter.
-	_ "github.com/crashchat-ai/mio/services/gateway/internal/channels/zohocliq"
+	_ "github.com/crashchat-ai/mio/channels/all"
 )
 
 var version = "dev"

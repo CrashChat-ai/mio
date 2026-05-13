@@ -18,8 +18,8 @@ import (
 	"github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1/adminv1connect"
 
 	"github.com/crashchat-ai/mio/services/gateway/internal/crypto"
-	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
-	"github.com/crashchat-ai/mio/services/gateway/internal/store"
+	"github.com/crashchat-ai/mio/services/gateway/sender"
+	"github.com/crashchat-ai/mio/services/gateway/store"
 	sdk "github.com/crashchat-ai/mio/sdk-go"
 )
 

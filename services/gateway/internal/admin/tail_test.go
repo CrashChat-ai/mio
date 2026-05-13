@@ -17,7 +17,7 @@ import (
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 
 	"github.com/crashchat-ai/mio/services/gateway/internal/nats"
-	"github.com/crashchat-ai/mio/services/gateway/internal/store"
+	"github.com/crashchat-ai/mio/services/gateway/store"
 	sdk "github.com/crashchat-ai/mio/sdk-go"
 )
 

@@ -28,9 +28,9 @@ import (
 
 	"github.com/crashchat-ai/mio/services/gateway/internal/config"
 	"github.com/crashchat-ai/mio/services/gateway/internal/ratelimit"
-	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
+	"github.com/crashchat-ai/mio/services/gateway/sender"
 	"github.com/crashchat-ai/mio/services/gateway/internal/server"
-	"github.com/crashchat-ai/mio/services/gateway/internal/store"
+	"github.com/crashchat-ai/mio/services/gateway/store"
 	sdk "github.com/crashchat-ai/mio/sdk-go"
 )
 

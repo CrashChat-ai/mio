@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
+	"github.com/crashchat-ai/mio/services/gateway/sender"
 )
 
 // stubTokenEndpoint serves both refresh_token + authorization_code grants.

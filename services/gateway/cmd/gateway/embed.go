@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/crashchat-ai/mio/services/gateway/internal/store"
-	"github.com/crashchat-ai/mio/services/gateway/internal/store/migrations"
+	"github.com/crashchat-ai/mio/services/gateway/store"
+	"github.com/crashchat-ai/mio/services/gateway/store/migrations"
 )
 
 // init wires the shared migration FS into the store package. Both

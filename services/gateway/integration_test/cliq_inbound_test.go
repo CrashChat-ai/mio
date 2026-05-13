@@ -18,7 +18,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/crashchat-ai/mio/services/gateway/internal/channels/zohocliq"
+	"github.com/crashchat-ai/mio/channels/zohocliq"
 )
 
 // inMemoryDedup is a minimal stand-in that mimics EnsureUniqueMessage behavior.

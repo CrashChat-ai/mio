@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
+	"github.com/crashchat-ai/mio/services/gateway/sender"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 )
 

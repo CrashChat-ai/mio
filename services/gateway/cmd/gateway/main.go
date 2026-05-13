@@ -12,7 +12,7 @@ import (
 
 	// Blank-import each channel package to trigger its init() which calls
 	// sender.RegisterAdapter(). P9: add _ "…/channels/slack" here only.
-	_ "github.com/crashchat-ai/mio/services/gateway/internal/channels/zohocliq"
+	_ "github.com/crashchat-ai/mio/channels/all"
 )
 
 // version is injected at build time via -ldflags="-X main.version=<ver>".

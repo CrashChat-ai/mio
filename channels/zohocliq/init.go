@@ -1,11 +1,11 @@
 package zohocliq
 
 import (
-	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
+	"github.com/crashchat-ai/mio/services/gateway/sender"
 )
 
 // init self-registers the Cliq adapter with the sender registry.
-// main.go triggers this via: import _ "github.com/crashchat-ai/mio/services/gateway/internal/channels/zohocliq"
+// main.go triggers this via: import _ "github.com/crashchat-ai/mio/channels/zohocliq"
 //
 // P9 litmus: adding a new channel = new package with its own init().
 // dispatch.go has zero channel-specific branches (grep test in CI confirms this).

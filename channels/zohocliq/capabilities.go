@@ -1,7 +1,7 @@
 package zohocliq
 
 import (
-	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
+	"github.com/crashchat-ai/mio/services/gateway/sender"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 	"google.golang.org/protobuf/proto"
 )

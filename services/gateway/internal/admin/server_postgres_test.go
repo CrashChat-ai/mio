@@ -20,9 +20,9 @@ import (
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 
 	"github.com/crashchat-ai/mio/services/gateway/internal/crypto"
-	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
-	"github.com/crashchat-ai/mio/services/gateway/internal/store"
-	"github.com/crashchat-ai/mio/services/gateway/internal/store/migrations"
+	"github.com/crashchat-ai/mio/services/gateway/sender"
+	"github.com/crashchat-ai/mio/services/gateway/store"
+	"github.com/crashchat-ai/mio/services/gateway/store/migrations"
 )
 
 // ── Stubs ─────────────────────────────────────────────────────────────────

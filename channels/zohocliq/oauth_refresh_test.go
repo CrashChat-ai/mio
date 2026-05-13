@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
+	"github.com/crashchat-ai/mio/services/gateway/sender"
 )
 
 // TestRefreshCredential_PreservesCallersRefreshToken pins the current

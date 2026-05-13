@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
+	"github.com/crashchat-ai/mio/services/gateway/sender"
 )
 
 // oauthBodyCap caps the OAuth-endpoint response body to 1 MB. Matches the

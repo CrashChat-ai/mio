@@ -90,6 +90,12 @@ func buildMessage() *miov1.Message {
 			"zoho_cliq_workspace": "alpha-workspace",
 			"zoho_cliq_bot_id":    "bot-001",
 		},
+		Relation: &miov1.MessageRelation{
+			Kind:              miov1.MessageRelation_KIND_REACTION,
+			TargetMessageId:   "018fbe3e-7c00-7a00-8000-000000000006",
+			TargetExternalId:  "cliq-msg-target-987",
+			ReactionEmoji:     "🚀",
+		},
 	}
 }
 

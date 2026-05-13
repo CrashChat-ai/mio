@@ -27,9 +27,9 @@ import (
 	// Side-effect import: registers zoho_cliq adapter via init().
 	_ "github.com/crashchat-ai/mio/channels/all"
 
+	"github.com/crashchat-ai/mio/pkg/channels"
 	"github.com/crashchat-ai/mio/services/gateway/internal/admin"
 	"github.com/crashchat-ai/mio/services/gateway/internal/crypto"
-	"github.com/crashchat-ai/mio/services/gateway/sender"
 	"github.com/crashchat-ai/mio/services/gateway/store"
 	"github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1/adminv1connect"
 	sdk "github.com/crashchat-ai/mio/sdk-go"
@@ -122,7 +122,7 @@ func main() {
 	}
 
 	metrics := admin.NewAdminMetrics(prometheus.DefaultRegisterer)
-	registry := sender.RegisteredAdapters()
+	registry := channels.RegisteredAdapters()
 	logger.Info("admin: registered adapters", "count", len(registry))
 
 	srv := admin.NewServer(admin.Deps{
@@ -134,6 +134,7 @@ func main() {
 		Logger:    logger,
 		PublicURL: f.publicURL,
 	})
+	srv.StartBackground(ctx)
 
 	// Wire HTTP mux: connect-go path + /oauth/callback + /metrics + /healthz.
 	mux := http.NewServeMux()

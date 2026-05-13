@@ -10,7 +10,7 @@ import (
 
 	// Register Cliq via init() so RegisteredAdapters returns at least one.
 	_ "github.com/crashchat-ai/mio/channels/all"
-	"github.com/crashchat-ai/mio/services/gateway/sender"
+	"github.com/crashchat-ai/mio/pkg/channels"
 	adminv1 "github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1"
 	"github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1/adminv1connect"
 )
@@ -21,7 +21,7 @@ import (
 // admin UI consume.
 func TestListChannelTypes_ReturnsCliqVerbatim(t *testing.T) {
 	srv := NewServer(Deps{
-		Registry: sender.RegisteredAdapters(),
+		Registry: channels.RegisteredAdapters(),
 		Logger:   nil,
 	})
 

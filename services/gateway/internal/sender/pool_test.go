@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/crashchat-ai/mio/pkg/channels"
 	"github.com/crashchat-ai/mio/services/gateway/internal/ratelimit"
-	"github.com/crashchat-ai/mio/services/gateway/sender"
+	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
 	"github.com/crashchat-ai/mio/services/gateway/store"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 	"github.com/prometheus/client_golang/prometheus"
@@ -39,8 +40,8 @@ func (m *mockAdapter) ChannelType() string                      { return m.slug 
 func (m *mockAdapter) MaxDeliver() int                          { return 5 }
 func (m *mockAdapter) RateLimitKey(_ *miov1.SendCommand) string { return m.rateLimitKey }
 func (m *mockAdapter) Capabilities() *miov1.ChannelCapabilities { return &miov1.ChannelCapabilities{} }
-func (m *mockAdapter) Inbound() sender.InboundAdapter           { return nil }
-func (m *mockAdapter) Credentials() sender.CredentialAdapter    { return nil }
+func (m *mockAdapter) Inbound() channels.InboundAdapter         { return nil }
+func (m *mockAdapter) Credentials() channels.CredentialAdapter  { return nil }
 
 // ── mock delivery error ───────────────────────────────────────────────────────
 
@@ -59,9 +60,9 @@ func (e *mockDeliveryErr) StatusCode() int        { return e.status }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-func newTestPool(t *testing.T, adapter sender.Adapter) (*sender.Pool, *store.OutboundState, *ratelimit.Limiter) {
+func newTestPool(t *testing.T, adapter channels.Adapter) (*sender.Pool, *store.OutboundState, *ratelimit.Limiter) {
 	t.Helper()
-	d := sender.New([]sender.Adapter{adapter})
+	d := sender.New([]channels.Adapter{adapter})
 	state := store.NewOutboundState()
 	reg := prometheus.NewRegistry()
 	ctx := context.Background()
@@ -189,7 +190,7 @@ func TestPool_429_RetryAfterDelay(t *testing.T) {
 
 // TestDispatch_UnregisteredChannel_TermPath: ForCommand returns nil for unknown type.
 func TestDispatch_UnregisteredChannel_TermPath(t *testing.T) {
-	d := sender.New([]sender.Adapter{&mockAdapter{slug: "known"}})
+	d := sender.New([]channels.Adapter{&mockAdapter{slug: "known"}})
 	cmd := &miov1.SendCommand{ChannelType: "unknown"}
 	if d.ForCommand(cmd) != nil {
 		t.Fatal("expected nil adapter for unknown channel_type")

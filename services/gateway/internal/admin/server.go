@@ -17,8 +17,8 @@ import (
 	adminv1 "github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1"
 	"github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1/adminv1connect"
 
+	"github.com/crashchat-ai/mio/pkg/channels"
 	"github.com/crashchat-ai/mio/services/gateway/internal/crypto"
-	"github.com/crashchat-ai/mio/services/gateway/sender"
 	"github.com/crashchat-ai/mio/services/gateway/store"
 	sdk "github.com/crashchat-ai/mio/sdk-go"
 )
@@ -32,7 +32,7 @@ type AdminServer struct {
 	Pool     *pgxpool.Pool
 	Cipher   crypto.Cipher
 	SDK      *sdk.Client
-	Registry []sender.Adapter
+	Registry []channels.Adapter
 	Metrics  *AdminMetrics
 	Logger   *slog.Logger
 
@@ -45,7 +45,7 @@ type Deps struct {
 	Pool      *pgxpool.Pool
 	Cipher    crypto.Cipher
 	SDK       *sdk.Client
-	Registry  []sender.Adapter
+	Registry  []channels.Adapter
 	Metrics   *AdminMetrics
 	Logger    *slog.Logger
 	PublicURL string
@@ -76,8 +76,16 @@ func (s *AdminServer) PublicURL() string { return s.publicURL }
 // oauth_callback.go) can capture codes against reserved state nonces.
 func (s *AdminServer) Stash() *installStash { return s.stash }
 
+// StartBackground launches background goroutines tied to ctx's lifetime.
+// Currently: a ticker that sweeps expired install-stash entries so
+// abandoned StartInstall flows don't leak state nonces. Call exactly once
+// per AdminServer after wiring; it returns immediately.
+func (s *AdminServer) StartBackground(ctx context.Context) {
+	go s.stash.startStashPurger(ctx, installStashPurgeInterval)
+}
+
 // adapterByChannelType walks the registry; returns nil on miss.
-func (s *AdminServer) adapterByChannelType(slug string) sender.Adapter {
+func (s *AdminServer) adapterByChannelType(slug string) channels.Adapter {
 	for _, a := range s.Registry {
 		if a.ChannelType() == slug {
 			return a
@@ -354,7 +362,7 @@ func (s *AdminServer) RotateCredential(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeFailedPrecondition,
 			errors.New("adapter has no credential flow"))
 	}
-	cur := sender.Credential{
+	cur := channels.Credential{
 		AccessToken:  row.Plaintext.AccessToken,
 		RefreshToken: row.Plaintext.RefreshToken,
 		ExpiresAt:    row.Plaintext.ExpiresAt,

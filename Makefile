@@ -58,7 +58,7 @@ gateway-build: ## Build gateway Docker image with version tag (no push)
 		-t mio/gateway:$(BUILD_VERSION) .
 
 gateway-test: ## Run gateway unit tests (no live NATS/Postgres needed)
-	go test ./services/gateway/internal/... ./services/gateway/sender/... ./services/gateway/store/... -v -count=1
+	go test ./services/gateway/internal/... ./services/gateway/store/... ./pkg/channels/... -v -count=1
 
 gateway-migrate: ## Run database migrations manually via gateway CLI
 	MIO_MIGRATE_ON_START=true go run ./services/gateway/cmd/gateway/
@@ -67,9 +67,9 @@ gateway-bench-outbound: ## Fairness bench: burst account A (50/s), assert accoun
 	go test ./services/gateway/integration_test/... -run TestFairness -v -timeout 30s
 
 gateway-dispatch-lint: ## CI guard: dispatch.go must have zero channel-specific branches
-	@test -f services/gateway/sender/dispatch.go || \
-		(echo "ERROR: services/gateway/sender/dispatch.go not found — repo layout drift"; exit 1)
-	@! grep -E 'zoho|slack|cliq|telegram|discord' services/gateway/sender/dispatch.go && \
+	@test -f services/gateway/internal/sender/dispatch.go || \
+		(echo "ERROR: services/gateway/internal/sender/dispatch.go not found — repo layout drift"; exit 1)
+	@! grep -E 'zoho|slack|cliq|telegram|discord' services/gateway/internal/sender/dispatch.go && \
 		echo "dispatch.go: clean (no adapter-specific branches)" || \
 		(echo "ERROR: adapter-specific branch found in dispatch.go — P9 litmus FAIL"; exit 1)
 

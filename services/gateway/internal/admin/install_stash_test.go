@@ -70,3 +70,43 @@ func TestInstallStash_TTLExpiry(t *testing.T) {
 		t.Errorf("expired entry should not consume")
 	}
 }
+
+func TestInstallStash_CaptureRejectsExpiredReservation(t *testing.T) {
+	s := newInstallStash()
+	now := time.Now()
+	s.clock = func() time.Time { return now }
+	s.reserve("install-1", "state-1")
+
+	// Callback arrives after the reservation TTL window.
+	s.clock = func() time.Time { return now.Add(installStashTTL + time.Second) }
+	if got := s.capture("state-1", "code-late"); got != "" {
+		t.Errorf("late callback should not capture; got install_id=%q", got)
+	}
+}
+
+func TestInstallStash_PurgeExpiredSweepsBothMaps(t *testing.T) {
+	s := newInstallStash()
+	now := time.Now()
+	s.clock = func() time.Time { return now }
+
+	// Abandoned StartInstall: state reserved but callback never fires.
+	s.reserve("install-abandoned", "state-abandoned")
+	// Captured but never completed: byID entry left behind.
+	s.reserve("install-stranded", "state-stranded")
+	s.capture("state-stranded", "code-stranded")
+	// Fresh reservation that should survive the sweep.
+	s.clock = func() time.Time { return now.Add(installStashTTL + time.Second) }
+	s.reserve("install-fresh", "state-fresh")
+
+	s.purgeExpired()
+
+	if _, ok := s.byState["state-abandoned"]; ok {
+		t.Errorf("expired byState entry not purged")
+	}
+	if _, ok := s.byID["install-stranded"]; ok {
+		t.Errorf("expired byID entry not purged")
+	}
+	if _, ok := s.byState["state-fresh"]; !ok {
+		t.Errorf("non-expired byState entry was purged")
+	}
+}

@@ -8,11 +8,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/crashchat-ai/mio/services/gateway/store"
+	"github.com/crashchat-ai/mio/pkg/channels"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 	sdk "github.com/crashchat-ai/mio/sdk-go"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -20,7 +19,7 @@ const channelType = "zoho_cliq"
 
 // HandlerDeps holds dependencies injected into the Cliq webhook handler.
 type HandlerDeps struct {
-	Pool      *pgxpool.Pool
+	Store     channels.Store
 	SDK       *sdk.Client
 	TenantID  string
 	AccountID string
@@ -104,7 +103,7 @@ func Handler(deps HandlerDeps) http.HandlerFunc {
 			displayNamePtr = &displayName
 		}
 
-		conv, err := store.EnsureConversation(ctx, deps.Pool,
+		conv, err := deps.Store.EnsureConversation(ctx,
 			convID,
 			deps.TenantID, deps.AccountID, channelType, kindStr,
 			nm.ConversationExternalID,
@@ -123,7 +122,7 @@ func Handler(deps HandlerDeps) http.HandlerFunc {
 
 		// Step 6: idempotent message upsert.
 		msgID := uuid.New()
-		dbMsgID, fresh, err := store.EnsureUniqueMessage(ctx, deps.Pool,
+		dbMsgID, fresh, err := deps.Store.EnsureUniqueMessage(ctx,
 			msgID,
 			deps.TenantID, deps.AccountID,
 			conv.ID.String(),

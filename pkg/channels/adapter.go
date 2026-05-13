@@ -1,8 +1,4 @@
-// Package sender defines the Adapter interface and its supporting types.
-// Each channel adapter implements Adapter and self-registers via init().
-// dispatch.go builds a lookup table from RegisteredAdapters(); no adapter-
-// specific branches ever appear in dispatch.go (P9 litmus: zero-edit).
-package sender
+package channels
 
 import (
 	"context"

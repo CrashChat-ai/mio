@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/crashchat-ai/mio/services/gateway/sender"
+	"github.com/crashchat-ai/mio/pkg/channels"
 )
 
 // oauthBodyCap caps the OAuth-endpoint response body to 1 MB. Matches the
@@ -35,7 +35,7 @@ const authorizeDefaultURL = "https://accounts.zoho.com/oauth/v2/auth"
 // per Zoho convention.
 const cliqOAuthScope = "ZohoCliq.Webhooks.CREATE,ZohoCliq.messages.CREATE"
 
-// tokenCredentials wraps *Adapter to satisfy sender.CredentialAdapter.
+// tokenCredentials wraps *Adapter to satisfy channels.CredentialAdapter.
 // Reuses tokenSource for the refresh path; AuthorizeURL + ExchangeCode are
 // net-new code paths (the existing adapter only refreshed long-lived
 // refresh tokens; the OAuth bootstrap was operator-manual before this
@@ -112,15 +112,15 @@ func (t *tokenCredentials) AuthorizeURL(state string) string {
 // Reads CLIQ_CLIENT_ID / CLIQ_CLIENT_SECRET / CLIQ_REDIRECT_URI from env.
 // The OAuth token endpoint is the same as token.go's refresh path
 // (oauthDefaultURL or overridden via the tokenSource).
-func (t *tokenCredentials) ExchangeCode(ctx context.Context, code string) (sender.Credential, error) {
+func (t *tokenCredentials) ExchangeCode(ctx context.Context, code string) (channels.Credential, error) {
 	clientID := os.Getenv("CLIQ_CLIENT_ID")
 	clientSecret := os.Getenv("CLIQ_CLIENT_SECRET")
 	redirectURI := os.Getenv("CLIQ_REDIRECT_URI")
 	if clientID == "" || clientSecret == "" || redirectURI == "" {
-		return sender.Credential{}, fmt.Errorf("zohocliq: ExchangeCode: missing CLIQ_CLIENT_ID/CLIQ_CLIENT_SECRET/CLIQ_REDIRECT_URI")
+		return channels.Credential{}, fmt.Errorf("zohocliq: ExchangeCode: missing CLIQ_CLIENT_ID/CLIQ_CLIENT_SECRET/CLIQ_REDIRECT_URI")
 	}
 	if code == "" {
-		return sender.Credential{}, fmt.Errorf("zohocliq: ExchangeCode: empty code")
+		return channels.Credential{}, fmt.Errorf("zohocliq: ExchangeCode: empty code")
 	}
 
 	tokenURL := oauthDefaultURL
@@ -138,7 +138,7 @@ func (t *tokenCredentials) ExchangeCode(ctx context.Context, code string) (sende
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL,
 		strings.NewReader(form.Encode()))
 	if err != nil {
-		return sender.Credential{}, fmt.Errorf("zohocliq: ExchangeCode: build request: %w", err)
+		return channels.Credential{}, fmt.Errorf("zohocliq: ExchangeCode: build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -148,13 +148,13 @@ func (t *tokenCredentials) ExchangeCode(ctx context.Context, code string) (sende
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return sender.Credential{}, fmt.Errorf("zohocliq: ExchangeCode: http: %w", err)
+		return channels.Credential{}, fmt.Errorf("zohocliq: ExchangeCode: http: %w", err)
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, oauthBodyCap))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return sender.Credential{}, fmt.Errorf("zohocliq: ExchangeCode: http %d: %s",
+		return channels.Credential{}, fmt.Errorf("zohocliq: ExchangeCode: http %d: %s",
 			resp.StatusCode, truncate(string(body), errBodyCap))
 	}
 
@@ -167,17 +167,17 @@ func (t *tokenCredentials) ExchangeCode(ctx context.Context, code string) (sende
 		Error        string `json:"error"`
 	}
 	if err := json.Unmarshal(body, &parsed); err != nil {
-		return sender.Credential{}, fmt.Errorf("zohocliq: ExchangeCode: parse json: %w", err)
+		return channels.Credential{}, fmt.Errorf("zohocliq: ExchangeCode: parse json: %w", err)
 	}
 	if parsed.AccessToken == "" {
-		return sender.Credential{}, fmt.Errorf("zohocliq: ExchangeCode: missing access_token (error=%q)", parsed.Error)
+		return channels.Credential{}, fmt.Errorf("zohocliq: ExchangeCode: missing access_token (error=%q)", parsed.Error)
 	}
 
 	ttl := time.Duration(parsed.ExpiresIn)*time.Second - 30*time.Second
 	if ttl <= 0 {
 		ttl = time.Minute
 	}
-	cred := sender.Credential{
+	cred := channels.Credential{
 		AccessToken:  parsed.AccessToken,
 		RefreshToken: parsed.RefreshToken,
 		ExpiresAt:    time.Now().Add(ttl),
@@ -201,14 +201,14 @@ func (t *tokenCredentials) ExchangeCode(ctx context.Context, code string) (sende
 // RefreshToken is preserved (Zoho re-uses refresh tokens until explicitly
 // revoked); Extras is copied to avoid alias-mutation between caller and
 // returned Credential.
-func (t *tokenCredentials) RefreshCredential(ctx context.Context, cur sender.Credential) (sender.Credential, error) {
+func (t *tokenCredentials) RefreshCredential(ctx context.Context, cur channels.Credential) (channels.Credential, error) {
 	if cur.RefreshToken == "" {
-		return sender.Credential{}, fmt.Errorf("zohocliq: RefreshCredential: empty refresh_token")
+		return channels.Credential{}, fmt.Errorf("zohocliq: RefreshCredential: empty refresh_token")
 	}
 	clientID := os.Getenv("CLIQ_CLIENT_ID")
 	clientSecret := os.Getenv("CLIQ_CLIENT_SECRET")
 	if clientID == "" || clientSecret == "" {
-		return sender.Credential{}, fmt.Errorf("zohocliq: RefreshCredential: missing CLIQ_CLIENT_ID/CLIQ_CLIENT_SECRET")
+		return channels.Credential{}, fmt.Errorf("zohocliq: RefreshCredential: missing CLIQ_CLIENT_ID/CLIQ_CLIENT_SECRET")
 	}
 
 	oauthURL := oauthDefaultURL
@@ -217,11 +217,11 @@ func (t *tokenCredentials) RefreshCredential(ctx context.Context, cur sender.Cre
 	}
 	ts := newTokenSource(clientID, clientSecret, cur.RefreshToken, withOAuthURL(oauthURL))
 	if ts == nil {
-		return sender.Credential{}, fmt.Errorf("zohocliq: RefreshCredential: build token source")
+		return channels.Credential{}, fmt.Errorf("zohocliq: RefreshCredential: build token source")
 	}
 	access, err := ts.Get(ctx)
 	if err != nil {
-		return sender.Credential{}, fmt.Errorf("zohocliq: RefreshCredential: %w", err)
+		return channels.Credential{}, fmt.Errorf("zohocliq: RefreshCredential: %w", err)
 	}
 	ts.mu.Lock()
 	expiresAt := ts.expiresAt
@@ -231,7 +231,7 @@ func (t *tokenCredentials) RefreshCredential(ctx context.Context, cur sender.Cre
 	if cur.Extras != nil {
 		extras = maps.Clone(cur.Extras)
 	}
-	out := sender.Credential{
+	out := channels.Credential{
 		AccessToken:  access,
 		RefreshToken: cur.RefreshToken,
 		ExpiresAt:    expiresAt,

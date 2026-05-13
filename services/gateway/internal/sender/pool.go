@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/crashchat-ai/mio/pkg/channels"
 	"github.com/crashchat-ai/mio/services/gateway/internal/ratelimit"
 	"github.com/crashchat-ai/mio/services/gateway/store"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
@@ -37,19 +38,6 @@ const (
 	minJitter = 500 * time.Millisecond
 	maxJitter = 2 * time.Second
 )
-
-// DeliveryError is the interface adapter errors must satisfy to allow the
-// pool to route Nak vs Term without importing any concrete adapter package.
-// Adapters return a concrete struct that implements this interface.
-type DeliveryError interface {
-	error
-	// IsRetryable returns true for 5xx / transient errors (→ Nak).
-	IsRetryable() bool
-	// IsRateLimited returns true when the platform returned 429.
-	IsRateLimited() bool
-	// RetryAfterSeconds returns the Retry-After value in seconds (0 = not present).
-	RetryAfterSeconds() int
-}
 
 // PoolConfig holds Pool construction parameters.
 type PoolConfig struct {
@@ -202,8 +190,8 @@ func (p *Pool) handle(ctx context.Context, d sdk.CommandDelivery) {
 		return
 	}
 
-	// Try to classify via DeliveryError interface.
-	var de DeliveryError
+	// Try to classify via channels.DeliveryError interface.
+	var de channels.DeliveryError
 	if asDeliveryError(callErr, &de) {
 		p.routeDeliveryError(d, cmd, channelType, de)
 		return
@@ -216,12 +204,12 @@ func (p *Pool) handle(ctx context.Context, d sdk.CommandDelivery) {
 	_ = d.Nak(jitter())
 }
 
-// routeDeliveryError applies Nak/Term based on the DeliveryError classification.
+// routeDeliveryError applies Nak/Term based on the channels.DeliveryError classification.
 func (p *Pool) routeDeliveryError(
 	d sdk.CommandDelivery,
 	cmd *miov1.SendCommand,
 	channelType string,
-	de DeliveryError,
+	de channels.DeliveryError,
 ) {
 	switch {
 	case de.IsRateLimited():
@@ -278,11 +266,11 @@ func (p *Pool) resolveEdit(cmd *miov1.SendCommand, channelType string) bool {
 }
 
 // asDeliveryError checks if err (or any error in its chain) implements
-// DeliveryError, assigning it to *target. Returns true on success.
-func asDeliveryError(err error, target *DeliveryError) bool {
+// channels.DeliveryError, assigning it to *target. Returns true on success.
+func asDeliveryError(err error, target *channels.DeliveryError) bool {
 	// Walk the error chain manually since errors.As requires a concrete type.
 	for err != nil {
-		if de, ok := err.(DeliveryError); ok { //nolint:errorlint
+		if de, ok := err.(channels.DeliveryError); ok { //nolint:errorlint
 			*target = de
 			return true
 		}
@@ -308,9 +296,9 @@ func retryAfterDelay(retryAfterSecs int) time.Duration {
 	return j
 }
 
-// classify4xx maps a DeliveryError to a bounded reason label.
+// classify4xx maps a channels.DeliveryError to a bounded reason label.
 // Bounded set: auth, forbidden, not_found, bad_request, refresh_failed, other.
-func classify4xx(de DeliveryError) string {
+func classify4xx(de channels.DeliveryError) string {
 	// Adapters can override the default status-code mapping by implementing
 	// Reason() — useful for distinguishing OAuth-refresh-endpoint failures
 	// from regular Cliq-API auth failures (operationally different fixes).

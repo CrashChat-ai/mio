@@ -26,9 +26,10 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/crashchat-ai/mio/pkg/channels"
 	"github.com/crashchat-ai/mio/services/gateway/internal/config"
 	"github.com/crashchat-ai/mio/services/gateway/internal/ratelimit"
-	"github.com/crashchat-ai/mio/services/gateway/sender"
+	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
 	"github.com/crashchat-ai/mio/services/gateway/internal/server"
 	"github.com/crashchat-ai/mio/services/gateway/store"
 	sdk "github.com/crashchat-ai/mio/sdk-go"
@@ -108,9 +109,9 @@ func RunGateway(logger *slog.Logger, version string) error {
 	}
 	defer sdkClient.Close()
 
-	dispatcher := sender.New(sender.RegisteredAdapters())
+	dispatcher := sender.New(channels.RegisteredAdapters())
 	logger.Info("sender: dispatcher built",
-		"adapters", len(sender.RegisteredAdapters()))
+		"adapters", len(channels.RegisteredAdapters()))
 
 	poolCtx, poolCancel := context.WithCancel(ctx)
 	defer poolCancel()

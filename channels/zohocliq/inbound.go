@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/crashchat-ai/mio/services/gateway/sender"
+	"github.com/crashchat-ai/mio/pkg/channels"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// cliqInbound satisfies sender.InboundAdapter for Zoho Cliq webhook
+// cliqInbound satisfies channels.InboundAdapter for Zoho Cliq webhook
 // requests. It is a thin façade over the existing free functions
 // VerifySignature, ParseWebhookPayload, and Normalize — no behaviour
 // change vs the pre-Phase-2 handler.
@@ -42,7 +42,7 @@ var ErrSecretNotConfigured = errors.New("zohocliq: cliqInbound: secret not confi
 // NewInbound returns a cliqInbound configured with a shared secret.
 // Exposed for callers that need to verify signatures via Adapter.Inbound()
 // at request time (e.g. P4 admin server diagnostic endpoints).
-func NewInbound(secret []byte) sender.InboundAdapter { return &cliqInbound{secret: secret} }
+func NewInbound(secret []byte) channels.InboundAdapter { return &cliqInbound{secret: secret} }
 
 // VerifySignature validates the X-Webhook-Signature header against the body
 // using HMAC-SHA256 (hex or base64).

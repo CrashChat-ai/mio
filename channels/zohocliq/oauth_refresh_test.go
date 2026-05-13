@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/crashchat-ai/mio/services/gateway/sender"
+	"github.com/crashchat-ai/mio/pkg/channels"
 )
 
 // TestRefreshCredential_PreservesCallersRefreshToken pins the current
@@ -26,7 +26,7 @@ func TestRefreshCredential_PreservesCallersRefreshToken(t *testing.T) {
 	})
 
 	tc := buildTokenCredentialsForTest(t, oauthURL)
-	out, err := tc.RefreshCredential(context.Background(), sender.Credential{RefreshToken: "rt-original"})
+	out, err := tc.RefreshCredential(context.Background(), channels.Credential{RefreshToken: "rt-original"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestRefreshCredential_ExtrasIndependentlyMutable(t *testing.T) {
 	})
 
 	tc := buildTokenCredentialsForTest(t, oauthURL)
-	cur := sender.Credential{
+	cur := channels.Credential{
 		RefreshToken: "rt-1",
 		Extras:       map[string]string{"api_domain": "https://www.zohoapis.com"},
 	}
@@ -80,28 +80,28 @@ func TestRefreshCredential_Preconditions(t *testing.T) {
 		name      string
 		clientID  string
 		secret    string
-		input     sender.Credential
+		input     channels.Credential
 		wantSubst string // substring expected in err.Error()
 	}{
 		{
 			name:      "empty refresh_token rejects",
 			clientID:  "client-id",
 			secret:    "client-secret",
-			input:     sender.Credential{},
+			input:     channels.Credential{},
 			wantSubst: "empty refresh_token",
 		},
 		{
 			name:      "missing client_id rejects",
 			clientID:  "",
 			secret:    "client-secret",
-			input:     sender.Credential{RefreshToken: "rt-1"},
+			input:     channels.Credential{RefreshToken: "rt-1"},
 			wantSubst: "missing CLIQ_CLIENT_ID",
 		},
 		{
 			name:      "missing client_secret rejects",
 			clientID:  "client-id",
 			secret:    "",
-			input:     sender.Credential{RefreshToken: "rt-1"},
+			input:     channels.Credential{RefreshToken: "rt-1"},
 			wantSubst: "missing CLIQ_CLIENT_ID",
 		},
 	}

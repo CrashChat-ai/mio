@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/crashchat-ai/mio/services/gateway/sender"
+	"github.com/crashchat-ai/mio/pkg/channels"
 )
 
 // stubTokenEndpoint serves both refresh_token + authorization_code grants.
@@ -196,9 +196,9 @@ func TestRefreshCredential_DelegatesToTokenSource(t *testing.T) {
 	}
 }
 
-// tokenCredEpsilon is a tiny helper that builds a sender.Credential with
+// tokenCredEpsilon is a tiny helper that builds a channels.Credential with
 // just the RefreshToken populated. Inline to avoid leaking helper into prod.
-func tokenCredEpsilon(t *testing.T, refresh string) sender.Credential {
+func tokenCredEpsilon(t *testing.T, refresh string) channels.Credential {
 	t.Helper()
-	return sender.Credential{RefreshToken: refresh}
+	return channels.Credential{RefreshToken: refresh}
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/crashchat-ai/mio/services/gateway/internal/runtime"
 
 	// Blank-import each channel package to trigger its init() which calls
-	// sender.RegisterAdapter(). P9: add _ "…/channels/slack" here only.
+	// channels.RegisterAdapter(). P9: add _ "…/channels/slack" here only.
 	_ "github.com/crashchat-ai/mio/channels/all"
 )
 

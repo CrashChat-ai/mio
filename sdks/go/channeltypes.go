@@ -11,13 +11,13 @@ package sdk
 // SDK publish calls reject any channel_type not present here.
 //
 // Asymmetry note (publish-only validation):
-//   Publish: SDK rejects channel_type not in Known.
-//   Consume: SDK passes through — consumers must tolerate forward-compatible values.
+//
+//	Publish: SDK rejects channel_type not in Known.
+//	Consume: SDK passes through — consumers must tolerate forward-compatible values.
 var Known = map[string]bool{
 	"zoho_cliq": true,
 }
 
 // Aliases maps deprecated channel_type slug → current slug.
 // The SDK accepts both the alias and the current name during migration windows.
-var Aliases = map[string]string{
-}
+var Aliases = map[string]string{}

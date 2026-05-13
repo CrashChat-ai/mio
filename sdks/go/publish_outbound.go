@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nats-io/nats.go"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
+	"github.com/nats-io/nats.go"
 	"google.golang.org/protobuf/proto"
 )
 

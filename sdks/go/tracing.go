@@ -1,6 +1,7 @@
 package sdk
 
 import (
+	"context"
 	"github.com/nats-io/nats.go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -8,7 +9,6 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
-	"context"
 )
 
 const tracerName = "github.com/crashchat-ai/mio/sdk-go"

@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
-	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 )
 
 // --- Subject builder tests ---
@@ -165,7 +165,7 @@ func TestVerify_SchemaMismatch(t *testing.T) {
 
 func TestVerify_EmptyFields(t *testing.T) {
 	cases := []struct {
-		name string
+		name   string
 		mutate func(*miov1.Message)
 	}{
 		{"empty tenant_id", func(m *miov1.Message) { m.TenantId = "" }},

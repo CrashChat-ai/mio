@@ -1,8 +1,9 @@
 # MIO — Project Roadmap
 
 **Last updated:** 2026-05-13  
-**Current phase:** P9 ✅ (attachment persistence shipped)  
-**Next focus:** P10–P11 (BigQuery sink, channel registry control plane)
+**Current phase:** P9.5 ✅ (admin control plane + TUI scaffold shipped)  
+**Shipped in recent commits:** Admin server (connect-rpc loopback), TUI (bubbletea read-only v1), embedded NATS option, pkg/channels adapter contract, role-based monorepo layout  
+**Next focus:** P10–P11 (BigQuery sink, channel registry control plane write ops)
 
 ---
 
@@ -20,8 +21,9 @@
 | **P7** | ✅ | Helm charts + NATS | 6 Helm charts, NATS StatefulSet, JetStream bootstrap | — |
 | **P8** | ✅ | POC deploy on GKE | Reference Kubernetes topology, CNPG Postgres, Flux reconciliation | `plans/260509-2125-p8-poc-deploy-gke/` |
 | **P9** | ✅ | Attachment persistence | Media-vault sidecar, content-addressed storage, 7-day TTL | `plans/260509-2328-attachment-persistence/` |
+| **P9.5** | ✅ | Admin control plane + TUI scaffold | Admin server (connect-rpc), TUI (bubbletea, read-only v1), embedded NATS option | Recent |
 | **P10** | 🚧 | BigQuery sink / lakehouse | External tables + native warehouse table, loader pipeline | `plans/260510-1102-bq-sink-lakehouse/` |
-| **P11** | 🚧 | Channel registry control plane | Admin server RPC for channel installs, credentials, tenants | `plans/260513-0351-channel-management-control-plane/` |
+| **P11** | 🚧 | Channel registry control plane | Admin RPCs (credentials, tenants, capabilities), TUI write operations | `plans/260513-0351-channel-management-control-plane/` |
 | **—** | — | Second channel adapter (Slack) | Webhook inbound, API outbound, per-channel rate limits | open |
 | **—** | — | ELT pipeline (Airflow DAG) | Scheduled Cloud Run Job for BigQuery loader | `plans/260510-2333-elt-mio-airflow-dag/` |
 | **—** | — | Cliq OAuth refresh hardening | Token refresh retry/backoff, credential rotation | `plans/260510-0152-cliq-oauth-token-refresh/` |
@@ -32,7 +34,34 @@
 
 ## Shipped Highlights
 
-### P9: Attachment Persistence (Latest)
+### P9.5: Admin Control Plane + TUI (Latest)
+
+**Date shipped:** 2026-05-13  
+**Key features:**
+- Admin server (`cmd/admin`): Connect-RPC on loopback:9090, CIDR allowlist
+- TUI client (`services/tui`): bubbletea, read-only v1 (inspect messages, channels, consumer lag)
+- Embedded NATS option: `cmd/all-in-one` with JetStream (memory or file-backed)
+- Role-based monorepo layout: `channels/`, `pkg/`, `services/`, `ee/`, `sdks/` with clear ownership boundaries
+- Public adapter contract: `pkg/channels/` interfaces (Adapter, InboundAdapter, CredentialAdapter, DeliveryError)
+
+**Admin RPCs** (read-only for now):
+- `ListTenants`, `CreateAccount`, `ListAccounts` — tenant/account enumeration
+- `GetCredentials` — inspect encrypted OAuth tokens
+- `ChannelCapabilities` — get per-channel feature flags (reactions, threads, edits)
+- `TailMessages` — streaming tail of inbound messages (debugging)
+- `install_stash` OAuth flow with `purgeExpired` ticker
+
+**Codebase changes:**
+- `services/gateway/internal/admin/` — control plane server + CIDR auth
+- `services/tui/` — bubbletea TUI client
+- `pkg/channels/` — public adapter contract (extracted from gateway internals)
+- `channels/` — in-tree adapters (zohocliq today)
+- `ee/` — commercial overlay placeholder (build-tag-gated)
+- `deploy/charts/` — 6 charts (mio-nats, mio-jetstream-bootstrap, mio-gateway, mio-media-vault, mio-sink-gcs, mio-echo-consumer)
+
+**Code:** `services/gateway/internal/admin/`, `services/tui/`, `pkg/channels/`, `channels/`
+
+### P9: Attachment Persistence
 
 **Date shipped:** 2026-05-10  
 **Key features:**

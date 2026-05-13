@@ -41,8 +41,10 @@ flowchart LR
   end
 
   subgraph "MIO (this repo)"
-    gw["mio-gateway<br/>(Go, stateless)"]
-    bus[("NATS JetStream<br/>3-replica cluster")]
+    gw["mio-gateway<br/>(Go, stateless)<br/>+ embedded NATS option"]
+    admin["mio-admin<br/>(connect-rpc<br/>loopback:9090)"]
+    tui["mio-tui<br/>(bubbletea,<br/>read-only)"]
+    bus[("NATS JetStream<br/>3-replica cluster<br/>or embedded")]
     sink["mio-sink-gcs<br/>(Go consumer)"]
     dl["mio-media-vault<br/>(Go sidecar)"]
     sdkgo["sdk-go"]
@@ -63,6 +65,8 @@ flowchart LR
   disc -- webhook --> gw
 
   gw -- "publish<br/>MESSAGES_INBOUND" --> bus
+  admin -.-> gw
+  tui --> admin
   bus -- "consume<br/>(gcs-archiver)" --> sink
   sink --> gcs
   bus -- "consume<br/>(media-vault)" --> dl
@@ -91,7 +95,32 @@ is the boundary that keeps "intelligence" and "transport" separable.
 
 ---
 
-## 3. Inbound data flow
+## 3. Admin Control Plane & TUI
+
+**mio-admin** (`cmd/admin`): Connect-RPC server (loopback:9090 by default, CIDR allowlist).
+
+**RPCs:**
+- `ListTenants` — enumerate registered tenants
+- `CreateAccount` — provision new workspace + OAuth flow setup
+- `ListAccounts` — enumerate accounts per tenant
+- `GetCredentials` — inspect encrypted OAuth tokens (admin eyes only)
+- `ChannelCapabilities` — get per-channel feature flags (reactions, threads, edits)
+- `TailMessages` — streaming tail of inbound messages (debugging)
+- `install_stash` OAuth flow with `purgeExpired` ticker — rotate old credentials
+
+**mio-tui** (`services/tui`, bubbletea): Read-only v1 terminal client.
+- Connects to admin server over HTTP (default `ADMIN_URL=http://127.0.0.1:9090`)
+- Inspect messages, list channels, view consumer lag
+- Write ops deferred to P6+
+
+**Embedded NATS Option:** All-in-one binary (`cmd/all-in-one`) bundles gateway + NATS JetStream (memory or file-backed).
+- Laptop demos, single-host POC, development
+- Guard: panics on `MIO_ENV=prod` + `--storage memory`
+- Production: always external 3-replica cluster
+
+---
+
+## 4. Inbound data flow
 
 The hot path on receive. Every step has a clear owner.
 
@@ -132,7 +161,7 @@ sequenceDiagram
   end
   DL->>JSE: Publish enriched Message to MESSAGES_INBOUND_ENRICHED
   DL->>JS: Ack
-  Note over DL: idempotent; republish safe on error redo
+  Note over DL: idempotent, republish safe on error redo
 
   JSE->>AI: Pull (ai-consumer-enriched, MaxAckPending=1)
   AI->>AI: LangGraph run (2-30s)
@@ -147,7 +176,7 @@ Postgres upsert, NATS publish) is moved off-path or pre-warmed.
 
 ---
 
-## 4. Outbound data flow
+## 5. Outbound data flow
 
 The reply path. AI publishes a `SendCommand`; gateway delivers to the
 channel and reports back.
@@ -187,7 +216,7 @@ a blank thread.
 
 ---
 
-## 5. Streams and subjects
+## 6. Streams and subjects
 
 Three streams, all file-backed, all `mio.v1` envelope.
 
@@ -229,7 +258,7 @@ Why these dimensions live in the subject:
 
 ---
 
-## 6. Consumer model
+## 7. Consumer model
 
 | Consumer | Stream | Type | `MaxAckPending` | Notes |
 |---|---|---|---|---|
@@ -246,7 +275,7 @@ change, not an engineering task. That's the *whole point* of the decoupled bus.
 
 ---
 
-## 7. Idempotency, ordering, rate limits
+## 8. Idempotency, ordering, rate limits
 
 ### Idempotency
 
@@ -293,7 +322,7 @@ Burst is fine. The bucket refills; the workqueue retries on Nak.
 
 ---
 
-## 8. Storage tiers
+## 9. Storage tiers
 
 Two lifetimes, two access patterns, never shared.
 
@@ -360,7 +389,7 @@ loader implementation lives in the deployer's own infra repo.
 
 ---
 
-## 9. Deployment topology
+## 10. Deployment topology
 
 POC target: GKE.
 
@@ -405,7 +434,7 @@ Stack rules carried over:
 
 ---
 
-## 10. Observability
+## 11. Observability
 
 Everything emits OpenTelemetry traces and Prometheus metrics. Logs are
 structured JSON via `slog` (Go) and `structlog` (Python).
@@ -436,7 +465,7 @@ are acceptable; see P5.
 
 ---
 
-## 11. Non-goals (explicit)
+## 12. Non-goals (explicit)
 
 - **No UI in MIO.** Workspace OAuth onboarding lives in MIU's admin console.
 - **No staging cluster.** Solo dev scale; feature flags + fast rollback.
@@ -447,7 +476,7 @@ are acceptable; see P5.
 
 ---
 
-## 12. Open questions
+## 13. Open questions
 
 - Per-thread ordering on enriched stream: stay global `MaxAckPending=1` or shard-by-subject? Decide when first throughput regression appears. (Attachment-downloader's `MaxAckPending > 1` doesn't need ordering guarantees.)
 - Edit semantics across channels: Slack and Cliq both support edits with the original `channel_message_id`; Telegram supports `edit_message_text`; Discord requires the original message be from the same bot. The `SendCommand.edit_of` field needs a per-channel resolver — design at P5, not now.

@@ -1,7 +1,7 @@
 # MIO — Project Overview & Product Development Requirements
 
-**Last updated:** 2026-05-13 (P9 attachment persistence shipped)  
-**Status:** POC, locked design for core inbound/outbound path
+**Last updated:** 2026-05-13 (P9.5 admin control plane + TUI shipped)  
+**Status:** POC, locked design for core inbound/outbound path, admin introspection, control plane ready for tenant management
 
 ---
 

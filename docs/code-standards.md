@@ -214,46 +214,82 @@ except Exception as e:
 
 ---
 
-## Adapter Pattern (Enforced)
+## Public Adapter Contract (`pkg/channels/`)
 
-### Interface
+All gateway + media-vault + SDKs depend on **only** the public contract in `pkg/channels/`, never on concrete adapter implementations.
+
+**Exported interfaces:**
 
 ```go
-// services/gateway/sender/adapter.go
+// pkg/channels/adapter.go
 type Adapter interface {
-    // Send delivers a command to the channel API.
-    // Return error must implement IsRetryable(), IsRateLimited() predicates.
-    Send(ctx context.Context, cmd *mio.SendCommand) error
-
-    // Capabilities advertises what this adapter supports.
+    Send(context.Context, *mio.SendCommand) error
     Capabilities() *mio.ChannelCapabilities
 }
+
+type InboundAdapter interface {
+    ParseWebhook([]byte, signature string) (*mio.Message, error)
+    VerifySignature([]byte, signature string) bool
+}
+
+type CredentialAdapter interface {
+    StoreCredential(ctx context.Context, accountID, channelType, value string) error
+    GetCredential(ctx context.Context, accountID, channelType string) (string, error)
+    RefreshToken(ctx context.Context, accountID, channelType string) error
+}
+
+type DeliveryError interface {
+    error
+    IsRetryable() bool
+    IsRateLimited() bool
+}
 ```
+
+**Registry pattern** (`pkg/channels/registry.go`):
+- Adapters self-register at `init()` via `channels.Register(slug, impl)`
+- Gateway loads all adapters via `channels/all/all.go` blank-imports
+- No concrete adapter imports in dispatcher or core gateway logic
+
+---
+
+## Adapter Pattern (Enforced)
 
 ### Rules
 
 1. **No adapter-specific branches in dispatcher.** All send logic lives in the adapter's `Send()` method.
-   - **CI guard:** `make gateway-dispatch-lint` fails PR if `dispatch.go` contains channel names (zoho, slack, cliq, telegram, discord)
+   - **CI guard:** `make gateway-dispatch-lint` fails PR if `dispatch.go` contains channel names
 
-2. **Self-registration.** Adapter registers itself at `init()` time:
+2. **Self-registration.** Adapter registers at `init()`:
    ```go
-   // services/gateway/internal/channels/zohocliq/inbound.go
    func init() {
        channels.Register("zoho_cliq", &adapter{})
    }
    ```
 
-3. **Zero globals per adapter.** All state (HTTP client, OAuth token manager) is owned by the Adapter instance.
+3. **Zero globals per adapter.** All state (HTTP client, OAuth token manager) owned by Adapter instance.
 
-4. **Rate limiter key is configurable.** Default `account_id`, but adapter can override (e.g., Slack: `account_id:conversation_external_id` for per-channel fairness).
+4. **Rate limiter key is configurable.** Default `account_id`, adapter can override (e.g., Slack: per-channel fairness).
 
 ### Adding a New Adapter
 
-1. Create `services/gateway/internal/channels/{slug}/` directory
-2. Implement `Adapter` interface (inbound webhook handler + outbound Send)
+1. Create `channels/{slug}/` directory (at `channels/` level, not `services/gateway/internal/`)
+2. Implement `pkg/channels` interfaces
 3. Register in `init()`
 4. Add entry to `proto/channels.yaml` with status (planned/active)
-5. PR includes: code + tests + CONTRIBUTING.md audit (attributes + channel_type registry)
+5. Update `channels/all/all.go` blank-import
+6. PR includes: code + tests
+
+---
+
+## Commercial Overlay (`ee/`)
+
+**Policy:**
+- Build-tag-gated: `//go:build ee` on all files in `ee/`
+- OSS Apache-2.0 distribution excludes `ee/`; OSS code must compile without it
+- **Dependency direction:** `ee/` may import `services/`, `pkg/`, `sdks/` only (no reverse dependencies)
+- Enforcement: CI test runs `go build -tags="" ./...` (without `ee` tag) to verify OSS purity
+
+**Today:** Placeholder directory (empty). Reserved for future commercial features (audit logs, advanced rate limiting, RBAC, SLA/support tiers).
 
 ---
 

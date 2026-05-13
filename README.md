@@ -35,13 +35,14 @@ Migration history: see `plans/260513-0833-repo-layout-option-b/`.
 | `services/gateway/` | Go | Stateless ingress/egress. Per-channel handler + consumer pool, per-workspace rate limits. |
 | `services/media-vault/` | Go | Attachment ingestion within platform TTL → GCS, message enrichment. |
 | `services/sink-gcs/` | Go | Raw-payload sink for cold storage + analytics substrate. |
-| `services/tui/` | Go | Admin terminal UI (bubbletea), read-only v1. |
+| `services/tui/` | Go | Admin terminal UI (bubbletea), read-only v1. Connect-RPC client to admin server. |
 | `sdks/go/` | Go | Thin NATS wrapper. Idempotency, OTel, Prometheus, schema-version checks. Importable as `github.com/crashchat-ai/mio/sdk-go` (module path preserved despite directory move). |
 | `sdks/python/` | Python | Async-only NATS wrapper for AI service integration (LangGraph-compatible). |
 | `channels/` | Go | In-tree channel adapters (Cliq today; Slack, Telegram, … planned). Each adapter registers via `init()`; barrel package `channels/all` blank-imports them. |
-| `proto/` | Protobuf | Canonical schema. `Message`, `SendCommand`, `Attachment`, `Capabilities`. `buf`-managed, versioned. |
-| `pkg/` | Go | Shared internal libraries (empty placeholder — code lands here only when at least two callers genuinely share it). |
-| `ee/` | — | Reserved for build-tag-gated commercial overlay; not part of the OSS Apache-2.0 distribution. |
+| `pkg/channels/` | Go | Public adapter contract (Adapter, InboundAdapter, CredentialAdapter, DeliveryError interfaces). Gateway + media-vault depend on this only. |
+| `proto/` | Protobuf | Canonical schema. `Message`, `SendCommand`, `Attachment`, `Capabilities`, `AdminService`. `buf`-managed, versioned. |
+| `pkg/` | Go | Shared internal libraries (code lands here only when at least two callers genuinely share it). |
+| `ee/` | — | Build-tag-gated commercial overlay (`//go:build ee`); not part of OSS Apache-2.0 distribution. |
 | `tools/` | Go | Build/codegen helpers (`genchanneltypes`, `proto-roundtrip`). |
 | `examples/` | Polyglot | Sample consumers (e.g. `echo-consumer/`). |
 | `deploy/` | — | Helm charts (`deploy/charts/`), local docker-compose (`deploy/local/`), fluxcd manifests (`deploy/fluxcd/`). |
@@ -113,11 +114,11 @@ POC. Phase tracker:
 - [x] **P6** — `mio-sink-gcs`
 - [x] **P7** — Helm charts + NATS on GKE
 - [x] **P8** — POC deploy on GKE
-- [x] **P9** — Attachment persistence ✅
+- [x] **P9** — Attachment persistence
+- [x] **P9.5** — Admin control plane (connect-rpc) + TUI (bubbletea, read-only v1) + embedded NATS option + role-based monorepo layout ✅
 - [ ] **P10** — BigQuery sink / lakehouse (planned)
-- [ ] **P11** — Channel registry control plane (planned)
+- [ ] **P11** — Channel registry control plane + TUI write ops (planned)
 - [ ] Second channel adapter (Slack) — open
-- [ ] TUI write operations — open
 
 ## License
 

@@ -6,44 +6,54 @@
 
 ## Repository Layout
 
+**Role-based monorepo** (Option B: grouped by responsibility, not service).
+
 ```
 mio/
-├── services/gateway/              # Main API service (Go). Inbound webhook handler + outbound sender pool.
-├── sdks/go/               # Go SDK. Thin NATS wrapper for consumers.
-├── sdks/python/               # Python SDK (async-only). Same surface as sdk-go, for AI integration.
-├── services/sink-gcs/             # GCS archiver consumer (Go). Cold storage + analytics substrate.
-├── services/media-vault/          # Attachment sidecar (Go). Fetches within platform TTL, persists to GCS.
-├── services/tui/                  # Terminal UI admin client (Go, bubbletea). Read-only v1.
+├── channels/              # In-tree messaging adapters. Per-adapter subpackage.
+│   ├── zohocliq/         # Zoho Cliq (active: webhook + OAuth + send)
+│   └── all/all.go        # Barrel: blank-imports all adapters for compilation
+├── pkg/                  # Shared libraries (minimal: no utils/common/helpers rule).
+│   └── channels/         # Public adapter contract (adapter.go, inbound_adapter.go, credential_adapter.go, registry.go, store.go, delivery_error.go)
+├── services/             # Long-running binaries (Go).
+│   ├── gateway/          # Main API service. Inbound webhook handler + outbound sender pool + admin control plane + embedded NATS option.
+│   ├── sink-gcs/         # GCS archiver consumer. Cold storage + analytics substrate.
+│   ├── media-vault/      # Attachment sidecar. Fetches within platform TTL, persists to GCS.
+│   └── tui/              # Terminal UI admin client (bubbletea). Read-only v1.
+├── ee/                   # Commercial overlay (build-tag-gated, //go:build ee). OSS must compile without it.
+├── sdks/                 # Distributable client libraries.
+│   ├── go/               # Go SDK (separate module: github.com/crashchat-ai/mio/sdk-go). Thin NATS wrapper for consumers.
+│   └── python/           # Python SDK (async-only, uv-managed). Same surface as sdk-go, for AI integration.
 ├── examples/
 │   └── echo-consumer/    # Example Python consumer proving the loop.
-├── proto/                # Protobuf definitions (mio.v1, mio.admin.v1). buf-managed.
+├── proto/                # Protobuf definitions (buf-managed). mio/v1/ (locked for POC), mio/admin/v1/, channels.yaml registry.
 ├── tools/                # Code generation: genchanneltypes, proto-roundtrip.
 ├── deploy/
-│   ├── local/            # docker-compose stack (NATS, Postgres, MinIO, services).
-│   ├── charts/           # Helm charts (6: nats, jetstream-bootstrap, gateway, media-vault, sink-gcs, echo).
-│   └── fluxcd/           # GitOps overlay (external infra repo reconciliation).
-├── hack/playground/           # Learning sandbox (NATS, Cliq integration POCs).
-├── docs/                 # Documentation (architecture, deployment, runbooks, journals).
+│   ├── local/            # docker-compose stack (NATS 2.10, Postgres 16, MinIO, services).
+│   ├── charts/           # Helm charts (6: mio-nats, mio-jetstream-bootstrap, mio-gateway, mio-media-vault, mio-sink-gcs, mio-echo-consumer).
+│   ├── gke/              # GKE POC setup.sh
+│   ├── fluxcd/           # GitOps overlay (external infra repo reconciliation).
+│   └── appdata/          # Persistent storage for local dev (NATS, Postgres).
+├── hack/                 # Dev-only scratch. Not shipped, not tested. playground/ is gitignored.
+├── docs/                 # Documentation (architecture, deployment, journals, roadmap, standards).
 ├── plans/                # Phased build plans + reports (P0–P11+).
 ├── Makefile              # 40+ build, test, lint, deploy targets.
-├── go.work               # Go 1.25 workspace (5 modules).
+├── go.work               # Go 1.25 workspace (root + sdks/go).
+├── .env.example          # Environment variables template.
 ├── README.md             # Top-level overview.
 └── CONTRIBUTING.md       # Governance rules (attributes promotion, channel_type registry).
 ```
 
 ## Workspace & Module Structure
 
-**Go workspace** (`go.work`):
-- `.` — Root (proto generation utilities, shared pkg)
-- `./gateway` — Main service binary
-- `./sdk-go` — SDK library
-- `./media-vault` — Sidecar binary
-- `./sink-gcs` — Consumer binary
-- `./tui` — Admin CLI binary
+**Go workspace** (`go.work`), single root module + one separate SDK module:
+1. **Root module** (`github.com/crashchat-ai/mio`) — `services/`, `channels/`, `tools/`, `proto/gen/go`, `pkg/`, `ee/`
+2. **SDK module** (`github.com/crashchat-ai/mio/sdk-go`) — `sdks/go/` (separate module, importable independently)
+   - Root `go.mod` carries `replace github.com/crashchat-ai/mio/sdk-go => ./sdks/go` for workspace builds
 
 **Python workspace** (`sdks/python/pyproject.toml`):
-- `sdks/python/` — uv-managed project
-- `examples/echo-consumer/` — Example consumer project
+- `sdks/python/` — uv-managed project (async-only SDK)
+- `examples/echo-consumer/` — Example consumer project (also uv-managed)
 
 ---
 
@@ -52,17 +62,29 @@ mio/
 ### `services/gateway/` — Main API Service
 
 **Binaries:**
-- `cmd/gateway` — Production inbound/outbound server (HTTP + gRPC health)
-- `cmd/all-in-one` — Demo binary with embedded NATS JetStream (memory or file-backed)
-- `cmd/admin` — Control-plane gRPC server (connect-go on loopback:9090)
+- `cmd/gateway` — Production inbound/outbound server (HTTP + gRPC health). Connects to external NATS cluster + Postgres.
+- `cmd/all-in-one` — Demo binary with embedded NATS JetStream (memory or file-backed). Single-binary for laptop demos.
+- `cmd/admin` — Control-plane gRPC server (connect-go on loopback:9090 by default). Read-only v1.
+
+**Admin Control Plane** (`internal/admin/`):
+- **RPCs** (connect-go, loopback-only by default, CIDR allowlist via auth.go):
+  - `ListTenants` — enumerate registered tenants
+  - `CreateAccount` — provision new workspace
+  - `ListAccounts` — enumerate accounts per tenant
+  - `GetCredentials` — read encrypted OAuth tokens (admin inspection only)
+  - `ChannelCapabilities` — get per-channel feature flags (reactions, threads, edits)
+  - `TailMessages` — streaming tail of inbound messages (debugging)
+  - `install_stash` OAuth flow with `purgeExpired` ticker — clean up old credentials
+- **Observability:** Prometheus instruments wired on all admin RPCs (request duration, error rates)
+- **Auth:** CIDR allowlist (loopback-only by default). Set `ADMIN_LISTEN_ADDR` to override.
 
 **Key internal packages:**
 - `internal/channels/zohocliq/` — Zoho Cliq adapter (only concrete implementation)
   - `inbound.go` — Webhook handler, signature verify, normalize to Message
-  - `oauth_callback.go` — OAuth token refresh flow
-  - `outbound.go` — SendCommand → Cliq API calls
+  - `oauth.go` — OAuth token fetch, refresh, storage
+  - `sender.go` — SendCommand → Cliq API calls
+  - `capabilities.go` — Cliq feature flags (reactions, threads, edits)
 - `internal/sender/` — Outbound dispatcher
-  - `adapter.go` — Interface for channel-specific send logic (zero adapter branches in `dispatch.go`)
   - `dispatch.go` — Stateless: pull SendCommand → rate limit → call adapter → ack/nak
   - `pool.go` — Consumer pool per adapter
   - `rate_limit.go` — Token bucket per account_id (bucket size/refill per channel)
@@ -70,23 +92,19 @@ mio/
   - `message.go` — Idempotency upsert (account_id, source_message_id)
   - `credentials.go` — OAuth token storage + refresh
   - `migrations/` — Flyway-style SQL (golang-migrate)
-- `internal/admin/` — Control-plane
-  - `server.go` — Connect-go RPC handler
-  - `auth.go` — CIDR allowlist (loopback-only by default)
 - `internal/runtime/` — Orchestration
   - `run.go` — Boot gateway, start NATS client, wire consumers, health checks
 - `internal/config/` — Env var parsing
-- `internal/crypto/` — Credential encryption
+- `internal/crypto/` — Credential encryption (AgeFileCipher v2)
   - `cipher.go` — Interface: `Encrypt(plaintext) → ciphertext`, `Decrypt(ciphertext) → plaintext`
-  - `age_file_cipher.go` — age envelope (age-linux binary + private key file)
+  - `age_file_cipher.go` — age envelope (age binary + private key file, rotatable)
   - `noop_cipher.go` — No-op (dev only, logs warning if used in prod)
 - `internal/nats/` — NATS utilities
-  - `embedded.go` — Embedded JetStream server (all-in-one binary)
+  - `embedded.go` — Embedded JetStream server (all-in-one binary, memory or file-backed)
   - `guardrail.go` — Guards against memory storage in production (panics if `MIO_ENV=prod` and `--storage memory`)
-- `internal/server/` — HTTP server
-  - `chi/` router with metrics middleware
+- `internal/server/` — HTTP server (chi router)
   - `/health` liveness/readiness
-  - `/webhooks/{channel-slug}` inbound POST
+  - `/webhooks/{channel-slug}` inbound POST (signed)
 - `internal/ratelimit/` — Per-account token bucket
 
 **Key types:**
@@ -98,6 +116,50 @@ mio/
 - Snake case file names (`outbound.go`, `rate_limit.go`)
 - Errors wrapped with context: `fmt.Errorf("...%w", err)` + custom error types (e.g., `DeliveryError` with `IsRetryable()`, `IsRateLimited()`)
 - Config from env vars (no YAML; secrets via file mounts for webhook secret, age identity)
+
+### `channels/` — In-Tree Messaging Adapters
+
+**Role:** One subdirectory per adapter. Register via `init()`. Compile into gateway binaries via `channels/all/all.go`.
+
+**Today:** Only `zohocliq/` (active). Slack/Telegram/Discord reserved for future phases.
+
+**Each adapter exports:**
+- Inbound handler: webhook → normalized Message
+- Outbound sender: SendCommand → platform API call
+- Capability flags: reactions, threads, edits, etc.
+- OAuth flow: token fetch, refresh, storage (via pkg/channels contract)
+
+**Pattern:** Adapters are NOT packages; they're top-level `services/gateway/internal/channels/{name}/` during POC. After P5 generalization, they graduate to `channels/{name}/` as public in-tree packages (no separate module—stays in root module).
+
+### `pkg/channels/` — Adapter Contract
+
+**Public interface** (exported from root module, versioned):
+
+```go
+type Adapter interface {
+  Send(context, SendCommand) error
+  Capabilities() proto.ChannelCapabilities
+}
+
+type InboundAdapter interface {
+  ParseWebhook([]byte, signature) (Message, error)
+  VerifySignature([]byte, signature) bool
+}
+
+type CredentialAdapter interface {
+  StoreCredential(account_id, channel_type, value) error
+  GetCredential(account_id, channel_type) (value, error)
+  RefreshToken(account_id) error
+}
+
+type DeliveryError interface {
+  error
+  IsRetryable() bool
+  IsRateLimited() bool
+}
+```
+
+Gateway + media-vault depend on `pkg/channels` only; they never import from `channels/{specific}/`. Registry pattern enables swappable implementations.
 
 ### `sdks/go/` — Go SDK
 
@@ -273,33 +335,49 @@ mio-media-cli gdpr-delete --account-id=abc123
 
 **Port overrides:** Via `.env.local` (POSTGRES_PORT, NATS_PORT, NATS_MON_PORT, MINIO_API_PORT, MINIO_CONSOLE_PORT).
 
+### `ee/` — Commercial Overlay
+
+**Policy:**
+- Build-tag-gated: `//go:build ee`
+- Not part of Apache-2.0 OSS distribution
+- OSS code must NOT import from `ee/`
+- Dep direction: `ee/` → `services/`, `pkg/`, `sdks/` only (no reverse deps)
+
+**Today:** Placeholder (empty). Reserved for future commercial features (e.g., audit logs, advanced rate limiting, RBAC).
+
 ### `deploy/charts/` — Helm Charts (6)
 
-1. **mio-nats** — NATS JetStream cluster
-   - `values.yaml` (prod), `values-kind.yaml` (local kind)
+1. **mio-nats** — NATS JetStream cluster (3-replica StatefulSet)
    - Upstream nats chart as dependency
-   - Config: JetStream mode, cluster replicas, file store (PVC)
+   - `values.yaml` (GKE prod), `values-kind.yaml` (local kind cluster)
+   - Config: JetStream mode, file store (PVC), cluster replication
 
-2. **mio-jetstream-bootstrap** — Initializes NATS streams post-cluster
-   - Job template, RBAC (ServiceAccount + Role)
-   - ConfigMap with stream definitions (MESSAGES_INBOUND, MESSAGES_INBOUND_ENRICHED, MESSAGES_OUTBOUND)
+2. **mio-jetstream-bootstrap** — Stream + Consumer initialization (Job post-NATS)
+   - Job template with RBAC (ServiceAccount, Role)
+   - ConfigMap: stream definitions (MESSAGES_INBOUND, MESSAGES_INBOUND_ENRICHED, MESSAGES_OUTBOUND)
+   - Durable consumer configs (media-vault, ai-consumer-enriched, sender-pool, gcs-archiver)
 
-3. **mio-gateway** — Main API Deployment
-   - Templates: Deployment, Service, Ingress, ConfigMap, Secret, ServiceAccount, HPA, ServiceMonitor
-   - Values: replica count, resource limits, image tag, env vars
+3. **mio-gateway** — Main API Deployment (2 replicas POC)
+   - Deployment, Service, Ingress, ConfigMap, Secret, ServiceAccount, HPA, ServiceMonitor
+   - Env: NATS cluster URL, Postgres DSN, webhook secret, age identity file
+   - Readiness: `/health` gate
+   - Metrics: ServiceMonitor for Prometheus scrape
 
-4. **mio-media-vault** — Attachment sidecar Deployment
-   - ServiceAccount, Deployment, lifecycle/init Job
-   - Pulls from MESSAGES_INBOUND, publishes to MESSAGES_INBOUND_ENRICHED
+4. **mio-media-vault** — Attachment persistence sidecar (1 replica POC)
+   - Deployment, ServiceAccount, lifecycle init Job
+   - Env: GCS bucket (Workload Identity), NATS cluster URL
+   - Flow: consume MESSAGES_INBOUND → fetch platform attachments → enrich → publish MESSAGES_INBOUND_ENRICHED
 
-5. **mio-sink-gcs** — GCS archive Deployment
-   - ServiceAccount (Workload Identity to GCP SA), Deployment, ServiceMonitor
-   - Pulls from MESSAGES_INBOUND, writes to GCS
+5. **mio-sink-gcs** — Cold storage archiver (1 replica)
+   - Deployment, ServiceAccount (Workload Identity to GCP SA), ServiceMonitor
+   - Env: GCS bucket path, NATS cluster URL
+   - Flow: consume MESSAGES_INBOUND → batch NDJSON → flush to GCS
 
-6. **mio-echo-consumer** — Example consumer Deployment
-   - ServiceAccount, Deployment
+6. **mio-echo-consumer** — Example Python consumer (1 replica, reference only)
+   - Deployment, ServiceAccount
+   - Env: NATS cluster URL, optional dry-run flag
 
-**Tagging:** Per-SHA tags to `ghcr.io/crashchat-ai/mio/{component}:<sha>`. Manual bump via infra repo; auto-bump deferred to P10.
+**Image registry:** `ghcr.io/crashchat-ai/mio/{component}:{sha}` (per-commit tags). Manual bump via infra repo; auto-bump deferred.
 
 ### `docs/` — Documentation
 
@@ -309,11 +387,6 @@ mio-media-cli gdpr-delete --account-id=abc123
 - `project-overview-pdr.md` — Vision, scope, functional/non-functional requirements, success metrics
 - `code-standards.md` — Coding conventions, governance rules, adapter pattern, proto policy
 - `codebase-summary.md` — This file
-
-**Runbooks:**
-- `runbooks/attachment-gdpr-delete.md` — Data deletion procedure
-- `runbooks/cliq-webhook-down.md` — Incident response
-- `runbooks/media-vault-iam.md` — IAM setup (GCP Workload Identity)
 
 **Journals:**
 - `journals/journal-260507-the-problem.md` — Pre-POC problem statement

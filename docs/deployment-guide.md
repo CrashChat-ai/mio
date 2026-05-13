@@ -82,20 +82,56 @@ MIO_ENV=prod go run ./cmd/all-in-one --storage memory
 MIO_ENV=prod go run ./cmd/all-in-one --storage file --store-dir /data/jetstream
 ```
 
-### Admin Server
+### Admin Server & TUI
 
-Even with all-in-one, you can run the admin server on loopback:
+Even with all-in-one, you can run the admin server and TUI on loopback:
 
 ```bash
 # Terminal 1: gateway with embedded NATS
 make run-laptop
 
-# Terminal 2: admin server
+# Terminal 2: admin server (connect-rpc)
 make admin-run  # Listens on http://127.0.0.1:9090
 
-# Terminal 3: TUI client
-make tui-run    # Connects to admin server
+# Terminal 3: TUI client (read-only v1)
+make tui-run    # Connects to admin server (default ADMIN_URL=http://127.0.0.1:9090)
 ```
+
+**Admin server RPCs** (loopback-only by default):
+- `ListTenants`, `CreateAccount`, `ListAccounts` — tenant/account management
+- `GetCredentials` — inspect encrypted OAuth tokens
+- `ChannelCapabilities` — get per-channel feature flags
+- `TailMessages` — streaming tail of inbound messages (debugging)
+
+**TUI v1 features:**
+- Read-only: inspect messages, list channels, view consumer lag
+- Write ops (create account, rotate credentials) deferred to P6+
+
+---
+
+## Embedded NATS Option
+
+For development and single-host POC deployments, the `cmd/all-in-one` binary bundles gateway + NATS JetStream.
+
+**Storage modes:**
+```bash
+# Memory (volatile, loses on restart)
+make run-laptop
+
+# File (persistent, ./var/jetstream/)
+make run-laptop-persist
+
+# Manual invocation
+go run ./services/gateway/cmd/all-in-one \
+  --storage [memory|file] \
+  --store-dir ./var/jetstream \
+  --listen 127.0.0.1:8080
+```
+
+**Guard on production:**
+- Panics if `MIO_ENV=prod` AND `--storage memory`
+- File storage is safe for prod single-host deployments
+- Recommended for production: external 3-replica NATS cluster
 
 ---
 
@@ -412,14 +448,6 @@ Default TTL: 1 hour. Re-mint from storage_key:
 mio-media-cli signed-url gs://bucket/mio/attachments/... --ttl=1h
 ```
 
-### GDPR Delete
-
-See [docs/runbooks/attachment-gdpr-delete.md](runbooks/attachment-gdpr-delete.md).
-
-### IAM Setup
-
-See [docs/runbooks/media-vault-iam.md](runbooks/media-vault-iam.md).
-
 ### Operator Notes
 
 - **7-day round-trip test:** Image must be retrievable ≥7d after receipt (verify after first deploy)
@@ -441,14 +469,6 @@ make kind-deploy      # Install NATS + gateway + sink-gcs (templates only)
 make kind-smoke       # Full: helm lint + template + NATS pod ready
 make kind-down        # Destroy cluster
 ```
-
----
-
-## Operational Runbooks
-
-- [Attachment GDPR Delete](runbooks/attachment-gdpr-delete.md) — Data deletion procedure
-- [Cliq Webhook Down](runbooks/cliq-webhook-down.md) — Incident response
-- [Media Vault IAM Setup](runbooks/media-vault-iam.md) — GCP Workload Identity
 
 ---
 

@@ -109,6 +109,22 @@ NATS_URL: str = os.environ.get("NATS_URL", "nats://localhost:4222")
 INBOUND_SUBJECT: str = "mio.inbound_enriched.>"
 DURABLE: str = "ai-consumer-enriched"  # new durable; old `ai-consumer` is left in place for rollback
 
+
+def _parse_bool(raw: str, default: bool) -> bool:
+    """Accept the usual 1/0, true/false, yes/no, on/off spellings."""
+    v = raw.strip().lower()
+    if v in ("1", "true", "yes", "on"):
+        return True
+    if v in ("0", "false", "no", "off"):
+        return False
+    return default
+
+
+# When disabled, the consumer still drains its durable + acks (so JetStream
+# state doesn't drift) but skips the outbound publish — useful for staging
+# canaries where you want to verify subscription health without speaking.
+ECHO_ENABLED: bool = _parse_bool(os.environ.get("ECHO_ENABLED", "true"), default=True)
+
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
@@ -201,8 +217,14 @@ async def main() -> None:
         loop.add_signal_handler(sig, _on_signal)
 
     log.info(
-        "connecting url=%s durable=%s subject=%s", NATS_URL, DURABLE, INBOUND_SUBJECT
+        "connecting url=%s durable=%s subject=%s echo_enabled=%s",
+        NATS_URL,
+        DURABLE,
+        INBOUND_SUBJECT,
+        ECHO_ENABLED,
     )
+    if not ECHO_ENABLED:
+        log.warning("ECHO_ENABLED=false — draining inbound + acking, NOT publishing")
 
     # 2. Connect using sdk-py Client (owns pull-fetch, OTel, metrics).
     client = await mio.Client.connect(
@@ -219,7 +241,8 @@ async def main() -> None:
         async def _consume_loop() -> None:
             async for delivery in client.consume_inbound(INBOUND_SUBJECT, DURABLE):
                 try:
-                    await handle(delivery.msg, client)
+                    if ECHO_ENABLED:
+                        await handle(delivery.msg, client)
                     await delivery.ack()
                 except asyncio.CancelledError:
                     await delivery.nak(delay=5)

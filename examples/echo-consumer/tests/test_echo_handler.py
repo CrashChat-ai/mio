@@ -258,3 +258,23 @@ async def test_handle_conversation_external_id_preserved():
     cmd = await handle(msg, client)
 
     assert cmd.conversation_external_id == "EXT-CONV-XYZ"
+
+
+# ---------------------------------------------------------------------------
+# ECHO_ENABLED env var
+# ---------------------------------------------------------------------------
+
+
+def test_parse_bool_recognises_common_spellings():
+    """_parse_bool accepts the usual on/off, true/false, 1/0, yes/no forms."""
+    from echo import _parse_bool
+
+    truthy = ["1", "true", "True", "yes", "on"]
+    falsy = ["0", "false", "False", "no", "off"]
+    for v in truthy:
+        assert _parse_bool(v, default=False) is True, v
+    for v in falsy:
+        assert _parse_bool(v, default=True) is False, v
+    # Unrecognised → default.
+    assert _parse_bool("maybe", default=True) is True
+    assert _parse_bool("", default=False) is False

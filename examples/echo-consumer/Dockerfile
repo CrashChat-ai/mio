@@ -25,6 +25,7 @@ RUN pip install --no-cache-dir -e /sdk-py && \
 
 # Runtime environment defaults — overridden by docker-compose or K8s.
 ENV NATS_URL=nats://nats:4222
+ENV ECHO_ENABLED=true
 
 # Do NOT set PYTHONPATH=/proto/gen/py — it injects /proto/gen/py/mio as a
 # namespace package that shadows the sdk-py 'mio' module on first import,

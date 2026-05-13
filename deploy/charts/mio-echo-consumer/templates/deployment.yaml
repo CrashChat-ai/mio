@@ -35,6 +35,8 @@ spec:
           env:
             - name: NATS_URL
               value: {{ .Values.config.natsUrl | quote }}
+            - name: ECHO_ENABLED
+              value: {{ .Values.config.echoEnabled | quote }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

@@ -22,6 +22,9 @@ serviceAccount:
 
 config:
   natsUrl: "nats://mio-nats:4222"
+  # Set false to drain + ack inbound without publishing echoes
+  # (staging canary / quiet mode).
+  echoEnabled: true
 
 resources:
   requests:

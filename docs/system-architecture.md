@@ -102,7 +102,7 @@ sequenceDiagram
   participant GW as mio-gateway
   participant DB as Postgres (idempotency)
   participant JS as JetStream MESSAGES_INBOUND
-  participant DL as mio-attachment-downloader
+  participant DL as mio-media-vault
   participant GCS as GCS (attachments)
   participant JSE as JetStream MESSAGES_INBOUND_ENRICHED
   participant AI as AI service (ai-consumer-enriched)

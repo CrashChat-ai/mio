@@ -30,29 +30,30 @@ the receiver.
 | Component | Lang | Role |
 |---|---|---|
 | `gateway/` | Go | Stateless. One handler per channel for inbound; one consumer pool per channel for outbound. Per-workspace rate limits. |
-| `proto/` | Protobuf | Canonical schema. `Message`, `SendCommand`, `Channel`, `User`, `Attachment`. `buf`-managed, versioned. |
 | `sdk-go/` | Go | Thin NATS wrapper. Idempotency, OTel, Prometheus, schema-version checks. |
-| `sdk-py/` | Python | Same, for the AI side. |
+| `sdk-py/` | Python | Async-only NATS wrapper for AI service integration (LangGraph-compatible). |
+| `proto/` | Protobuf | Canonical schema. `Message`, `SendCommand`, `Attachment`, `Capabilities`. `buf`-managed, versioned. |
 | `sink-gcs/` | Go | Consumer that writes raw payloads to GCS. Cold storage + analytics substrate. |
-| `media-vault/` | Go | Attachment ingestion and storage service backed by GCS. |
+| `media-vault/` | Go | Attachment ingestion and storage service. Fetches within platform TTL, persists to GCS, enriches messages. |
+| `tui/` | Go | Terminal UI for admin server (bubbletea). Read-only v1. |
 | `examples/echo-consumer/` | Python | Tiny stub proving the loop. |
 | `deploy/local/` | — | `docker-compose.yml` + Postgres init + dev secrets for local dev. |
-| `deploy/charts/` | — | Helm charts for GKE; `fluxcd/`, `gke/` for prod GitOps. |
+| `deploy/charts/` | — | Helm charts (6 sub-charts) for GKE deployment. |
 
 ## Stack
 
 - **Bus**: NATS JetStream (3-replica on GKE; cloud-agnostic)
-- **Schema**: Protobuf via `buf`
-- **Storage**: Postgres + pgvector (operational); GCS (raw + analytics)
+- **Schema**: Protobuf via `buf` (lint STANDARD, breaking WIRE_JSON)
+- **Storage**: Postgres + pgvector (operational); GCS (raw + attachments)
 - **Platform**: GKE for POC; only K8s primitives, no managed lock-in
 - **Local dev**: `docker compose` brings up NATS + Postgres + MinIO
 
 ## Quickstart
 
 ```bash
-git clone https://github.com/vanducng/mio.git
+git clone https://github.com/crashchat-ai/mio.git
 cd mio
-mise install            # pins Go 1.23, Python 3.12, buf, protoc
+mise install            # pins Go 1.25, Python 3.12, buf, protoc 27
 make up                 # NATS + Postgres + MinIO (all three healthy)
 make proto              # buf generate → proto/gen/
 ```
@@ -81,11 +82,15 @@ See `.env.example` for the full list of overridable variables.
 5. **Per-thread ordering** via single-replica AI consumer with `MaxAckPending=1`.
 6. **Two-step UX for slow LLM calls.** Send "thinking…" immediately, edit-in-place when answered.
 
-Full design doc and phased roadmap live in `docs/system-architecture.md`.
+## Documentation
 
-## Working docs
-
-`docs/` — authoritative specs (system architecture, deployment, runbooks). What MIO **is**.
+- [Project Overview & PDR](docs/project-overview-pdr.md) — Vision, scope, requirements
+- [System Architecture](docs/system-architecture.md) — Design doc, component map, inbound/outbound flows
+- [Code Standards](docs/code-standards.md) — Coding conventions, governance rules
+- [Deployment Guide](docs/deployment-guide.md) — GKE reference, secret rotation, operations
+- [Project Roadmap](docs/project-roadmap.md) — Phased build plan, status tracker
+- [Codebase Summary](docs/codebase-summary.md) — Directory layout, component deep-dive
+- [Contributing](CONTRIBUTING.md) — Attributes promotion, channel_type registry, proto field numbers
 
 ## Status
 
@@ -100,7 +105,11 @@ POC. Phase tracker:
 - [x] **P6** — `mio-sink-gcs`
 - [x] **P7** — Helm charts + NATS on GKE
 - [x] **P8** — POC deploy on GKE
-- [ ] **P9** — Second channel adapter
+- [x] **P9** — Attachment persistence ✅
+- [ ] **P10** — BigQuery sink / lakehouse (planned)
+- [ ] **P11** — Channel registry control plane (planned)
+- [ ] Second channel adapter (Slack) — open
+- [ ] TUI write operations — open
 
 ## License
 

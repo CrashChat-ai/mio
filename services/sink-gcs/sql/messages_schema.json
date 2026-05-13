@@ -100,6 +100,18 @@
     ]
   },
   {
+    "name": "relation",
+    "type": "RECORD",
+    "mode": "NULLABLE",
+    "description": "Links this message to another (reply, edit, delete, reaction, pin). NULL when the message stands alone.",
+    "fields": [
+      { "name": "kind",                "type": "STRING", "mode": "NULLABLE", "description": "MessageRelation.Kind enum NAME (KIND_REPLY, KIND_EDIT, KIND_DELETE, KIND_REACTION, KIND_PIN)." },
+      { "name": "target_message_id",   "type": "STRING", "mode": "NULLABLE", "description": "mio UUID of the target message (prefer when present — stable across renames)." },
+      { "name": "target_external_id",  "type": "STRING", "mode": "NULLABLE", "description": "Platform-side opaque id of the target message." },
+      { "name": "reaction_emoji",      "type": "STRING", "mode": "NULLABLE", "description": "Populated when kind = KIND_REACTION." }
+    ]
+  },
+  {
     "name": "received_at",
     "type": "TIMESTAMP",
     "mode": "NULLABLE",

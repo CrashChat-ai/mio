@@ -47,6 +47,12 @@ CREATE OR REPLACE EXTERNAL TABLE `${PROJECT_ID}.${DATASET}.messages_external` (
     content_sha256 STRING,
     error_code     STRING
   >>,
+  relation                 STRUCT<
+    kind                STRING,
+    target_message_id   STRING,
+    target_external_id  STRING,
+    reaction_emoji      STRING
+  >,
   received_at              TIMESTAMP,
   attributes               JSON
 )

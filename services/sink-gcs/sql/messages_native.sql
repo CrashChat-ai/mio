@@ -46,6 +46,12 @@ CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.${DATASET}.messages` (
     content_sha256 STRING,
     error_code     STRING
   >>,
+  relation                 STRUCT<
+    kind                STRING,
+    target_message_id   STRING,
+    target_external_id  STRING,
+    reaction_emoji      STRING
+  >,
   received_at              TIMESTAMP,
   attributes               JSON,
   _ingest_at               TIMESTAMP,

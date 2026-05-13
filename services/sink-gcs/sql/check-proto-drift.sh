@@ -31,13 +31,14 @@ PROTO_DIR="${REPO_ROOT}/proto/mio/v1"
 # Loader-added columns — declared in the BQ schema but never in proto.
 LOADER_FIELDS_RX='^(_ingest_at|_source_object)$'
 
-# --- Extract proto field names (top-level Message + nested Attachment/Sender,
-# regardless of nesting). Field names are lowercase_snake; enum constants are
-# UPPERCASE so the [a-z_] anchor in the regex naturally filters them out. ---
+# --- Extract proto field names (top-level Message + nested records
+# Attachment / Sender / MessageRelation, regardless of nesting). Field names
+# are lowercase_snake; enum constants are UPPERCASE so the [a-z_] anchor in
+# the regex naturally filters them out. ---
 proto_fields() {
-  for f in message.proto attachment.proto sender.proto; do
+  for f in message.proto attachment.proto sender.proto relation.proto; do
     awk '
-      /^message[[:space:]]+(Message|Sender|Attachment)[[:space:]]*\{/ { in_msg=1; next }
+      /^message[[:space:]]+(Message|Sender|Attachment|MessageRelation)[[:space:]]*\{/ { in_msg=1; next }
       in_msg && /^\}/                     { in_msg=0; next }
       in_msg && /^[[:space:]]*reserved/   { next }
       in_msg && match($0, /([a-z_][a-z0-9_]*)[[:space:]]*=[[:space:]]*[0-9]+;/) {

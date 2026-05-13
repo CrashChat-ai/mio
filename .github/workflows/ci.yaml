@@ -31,13 +31,14 @@ jobs:
         with:
           filters: |
             gateway:
-              - 'gateway/**'
-              - 'sdk-go/**'
+              - 'services/gateway/**'
+              - 'channels/**'
+              - 'sdks/go/**'
               - 'proto/gen/go/**'
               - 'go.mod'
               - 'go.sum'
             sdk-py:
-              - 'sdk-py/**'
+              - 'sdks/python/**'
               - 'examples/echo-consumer/**'
               - 'proto/gen/py/**'
             proto:
@@ -47,11 +48,11 @@ jobs:
             helm:
               - 'deploy/charts/**'
             media-vault:
-              - 'media-vault/**'
-              - 'sdk-go/**'
+              - 'services/media-vault/**'
+              - 'sdks/go/**'
               - 'proto/gen/go/**'
             bq-schema:
-              - 'sink-gcs/sql/**'
+              - 'services/sink-gcs/sql/**'
               - 'proto/mio/v1/**'
 
   # ── Proto lint + breaking check ────────────────────────────────────────────
@@ -95,13 +96,13 @@ jobs:
 
       - name: golangci-lint
         run: |
-          (cd gateway && golangci-lint run ./...)
-          (cd sdk-go && golangci-lint run ./...)
+          golangci-lint run ./services/gateway/... ./channels/...
+          (cd sdks/go && golangci-lint run ./...)
 
       - name: go test (race detector)
         run: |
-          (cd gateway && go test -race -cover ./...)
-          (cd sdk-go && go test -race -cover ./...)
+          go test -race -cover ./services/gateway/... ./channels/...
+          (cd sdks/go && go test -race -cover ./...)
 
   # ── Python SDK + echo-consumer tests ──────────────────────────────────────
   test-python:
@@ -120,12 +121,12 @@ jobs:
 
       - name: ruff lint + format check
         run: |
-          ruff check sdk-py examples/echo-consumer
-          ruff format --check sdk-py examples/echo-consumer
+          ruff check sdks/python examples/echo-consumer
+          ruff format --check sdks/python examples/echo-consumer
 
       - name: pytest sdk-py
         run: |
-          cd sdk-py && uv run pytest tests/ -v -m "not integration"
+          cd sdks/python && uv run pytest tests/ -v -m "not integration"
 
       - name: pytest echo-consumer
         run: |
@@ -206,7 +207,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: gateway/Dockerfile
+          file: services/gateway/Dockerfile
           push: true
           # Tag policy: sha (always) + main (rolling) + semver (on git tag only).
           # Never floating :latest on non-tag pushes.
@@ -249,7 +250,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: sink-gcs/Dockerfile
+          file: services/sink-gcs/Dockerfile
           push: true
           tags: |
             ghcr.io/crashchat-ai/mio/sink-gcs:${{ github.sha }}
@@ -274,7 +275,7 @@ jobs:
         run: buf generate proto
 
       - name: go test
-        run: cd media-vault && go test ./...
+        run: go test ./services/media-vault/...
 
   # ── Build + push media-vault image (main push only) ─────────────
   build-media-vault:
@@ -308,7 +309,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: media-vault/Dockerfile
+          file: services/media-vault/Dockerfile
           push: true
           tags: |
             ghcr.io/crashchat-ai/mio/media-vault:${{ github.sha }}
@@ -329,10 +330,10 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Validate JSON schema syntax
-        run: jq -e 'length > 0' sink-gcs/sql/messages_schema.json
+        run: jq -e 'length > 0' services/sink-gcs/sql/messages_schema.json
 
       - name: Schema drift (proto vs BQ)
-        run: sink-gcs/sql/check-proto-drift.sh
+        run: services/sink-gcs/sql/check-proto-drift.sh
 
   # ── Build + push echo-consumer image (main push only) ─────────────────────
   build-echo-consumer:

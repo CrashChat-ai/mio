@@ -14,7 +14,7 @@ proto/gen/
 !proto/gen/py/
 
 # Local-only areas
-playground/
+hack/
 plans/
 docs/
 

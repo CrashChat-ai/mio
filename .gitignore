@@ -31,8 +31,8 @@ node_modules/
 # generated proto (we'll commit the .proto sources, not the gen output, by default)
 proto/gen/
 
-# local-only working areas (design docs, scratch, channel POCs)
-playground/
+# Personal playground / scratch — never committed.
+hack/playground/
 
 # local data
 appdata/

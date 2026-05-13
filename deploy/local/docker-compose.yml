@@ -56,7 +56,7 @@ services:
   gateway:
     build:
       context: ../..
-      dockerfile: gateway/Dockerfile
+      dockerfile: services/gateway/Dockerfile
     ports:
       - "${GATEWAY_PORT:-8080}:8080"
     environment:
@@ -87,7 +87,7 @@ services:
   sink-gcs:
     build:
       context: ../..
-      dockerfile: sink-gcs/Dockerfile
+      dockerfile: services/sink-gcs/Dockerfile
     environment:
       NATS_URL: nats://nats:4222
       SINK_BACKEND: minio

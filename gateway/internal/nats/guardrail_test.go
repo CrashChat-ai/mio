@@ -5,43 +5,81 @@ import (
 	"testing"
 )
 
-func TestCheckProdStorage_DefaultsEnvToDev(t *testing.T) {
-	dec, err := CheckProdStorage("", "memory")
-	if err != nil {
-		t.Fatalf("empty env should default to dev (memory allowed); got %v", err)
-	}
-	if dec.WarnSingleNode {
-		t.Error("dev+memory should not warn")
-	}
-}
+// TestCheckProdStorage covers the full env × storage matrix that the
+// all-in-one binary's boot path delegates to. The matrix is small and
+// closed (env ∈ {"", dev, staging, prod} × storage ∈ {memory, file});
+// asserting every cell catches both regressions and accidental new
+// branches that would broaden the guard rail.
+func TestCheckProdStorage(t *testing.T) {
+	t.Parallel()
 
-func TestCheckProdStorage_ProdMemoryRejected(t *testing.T) {
-	_, err := CheckProdStorage("prod", "memory")
-	if !errors.Is(err, ErrProdMemoryForbidden) {
-		t.Fatalf("want ErrProdMemoryForbidden, got %v", err)
+	tests := []struct {
+		name      string
+		env       string
+		storage   string
+		wantErr   error // nil = no error
+		wantWarn  bool  // expected WarnSingleNode value
+	}{
+		{
+			name:    "empty env defaults to dev (memory allowed)",
+			env:     "",
+			storage: "memory",
+		},
+		{
+			name:    "empty env defaults to dev (file allowed)",
+			env:     "",
+			storage: "file",
+		},
+		{
+			name:    "dev + memory",
+			env:     "dev",
+			storage: "memory",
+		},
+		{
+			name:    "dev + file",
+			env:     "dev",
+			storage: "file",
+		},
+		{
+			name:    "staging + memory",
+			env:     "staging",
+			storage: "memory",
+		},
+		{
+			name:    "staging + file",
+			env:     "staging",
+			storage: "file",
+		},
+		{
+			name:    "prod + memory rejected",
+			env:     "prod",
+			storage: "memory",
+			wantErr: ErrProdMemoryForbidden,
+		},
+		{
+			name:     "prod + file warns single-node",
+			env:      "prod",
+			storage:  "file",
+			wantWarn: true,
+		},
 	}
-}
 
-func TestCheckProdStorage_ProdFileWarns(t *testing.T) {
-	dec, err := CheckProdStorage("prod", "file")
-	if err != nil {
-		t.Fatalf("prod+file must not error: %v", err)
-	}
-	if !dec.WarnSingleNode {
-		t.Error("prod+file should warn about single-node durability")
-	}
-}
-
-func TestCheckProdStorage_NonProdNeverWarns(t *testing.T) {
-	for _, env := range []string{"dev", "staging"} {
-		for _, storage := range []string{"memory", "file"} {
-			dec, err := CheckProdStorage(env, storage)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dec, err := CheckProdStorage(tt.env, tt.storage)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("err: got %v want %v", err, tt.wantErr)
+				}
+				return
+			}
 			if err != nil {
-				t.Errorf("env=%s storage=%s: unexpected err %v", env, storage, err)
+				t.Fatalf("unexpected err: %v", err)
 			}
-			if dec.WarnSingleNode {
-				t.Errorf("env=%s storage=%s: should not warn", env, storage)
+			if dec.WarnSingleNode != tt.wantWarn {
+				t.Errorf("WarnSingleNode: got %v want %v", dec.WarnSingleNode, tt.wantWarn)
 			}
-		}
+		})
 	}
 }

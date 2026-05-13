@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -37,7 +38,7 @@ func TestAdminMetrics_OAuthTotal_IncrementsOnStartInstall(t *testing.T) {
 
 	resp, err := rig.client.CreateTenant(context.Background(),
 		connect.NewRequest(&adminv1.CreateTenantRequest{
-			Slug:        "metrics-" + randHex(4),
+			Slug:        "metrics-" + uuid.New().String()[:8],
 			DisplayName: "Metrics Co",
 		}))
 	if err != nil {

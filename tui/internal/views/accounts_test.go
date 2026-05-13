@@ -10,6 +10,7 @@ import (
 )
 
 func TestAccountsModel_FoldsLoadedMsg(t *testing.T) {
+	t.Parallel()
 	m := NewAccounts(&fakeAdmin{})
 	m.SetTenant("tenant-abc")
 	loaded := AccountsLoadedMsg{
@@ -34,6 +35,7 @@ func TestAccountsModel_FoldsLoadedMsg(t *testing.T) {
 }
 
 func TestAccountsModel_CursorBounded(t *testing.T) {
+	t.Parallel()
 	m := NewAccounts(&fakeAdmin{})
 	m.SetTenant("t")
 	m, _ = m.Update(AccountsLoadedMsg{Accounts: []*adminv1.Account{
@@ -54,6 +56,7 @@ func TestAccountsModel_CursorBounded(t *testing.T) {
 }
 
 func TestAccountsModel_NoTenantSelectedHint(t *testing.T) {
+	t.Parallel()
 	m := NewAccounts(&fakeAdmin{})
 	if !strings.Contains(m.View(), "select a tenant") {
 		t.Errorf("expected no-tenant hint")
@@ -61,6 +64,7 @@ func TestAccountsModel_NoTenantSelectedHint(t *testing.T) {
 }
 
 func TestAccountsModel_EmptyAndErrorStates(t *testing.T) {
+	t.Parallel()
 	m := NewAccounts(&fakeAdmin{})
 	m.SetTenant("t")
 

@@ -21,43 +21,79 @@ func signedHeaders(t *testing.T, secret, body []byte) http.Header {
 	return h
 }
 
-func TestCliqInbound_VerifySignature_NilSecret(t *testing.T) {
-	inbound := &cliqInbound{secret: nil}
-	err := inbound.VerifySignature(http.Header{}, []byte(`{}`))
-	if !errors.Is(err, ErrSecretNotConfigured) {
-		t.Fatalf("want ErrSecretNotConfigured, got %v", err)
-	}
-}
+// TestCliqInbound_VerifySignature_Matrix covers the four documented modes
+// of cliqInbound.VerifySignature in a single table:
+//
+//   nil-secret   → ErrSecretNotConfigured (Adapter.Inbound() default)
+//   empty secret → nil (dev-mode bypass)
+//   valid sig    → nil
+//   wrong sig    → ErrBadSignature
+func TestCliqInbound_VerifySignature_Matrix(t *testing.T) {
+	t.Parallel()
 
-func TestCliqInbound_VerifySignature_EmptySecret_DevMode(t *testing.T) {
-	inbound := &cliqInbound{secret: []byte("")}
-	if err := inbound.VerifySignature(http.Header{}, []byte(`{}`)); err != nil {
-		t.Fatalf("dev-mode (empty secret) should accept all; got %v", err)
-	}
-}
+	const (
+		realSecret = "hunter2"
+		body       = `{"operation":"message_sent"}`
+	)
 
-func TestCliqInbound_VerifySignature_ValidSig(t *testing.T) {
-	secret := []byte("hunter2")
-	body := []byte(`{"operation":"message_sent"}`)
-	inbound := &cliqInbound{secret: secret}
-	if err := inbound.VerifySignature(signedHeaders(t, secret, body), body); err != nil {
-		t.Fatalf("valid signature rejected: %v", err)
+	tests := []struct {
+		name    string
+		secret  []byte
+		headers func(t *testing.T) http.Header
+		wantErr error // matched via errors.Is; nil = no error expected
+	}{
+		{
+			name:    "nil secret returns ErrSecretNotConfigured",
+			secret:  nil,
+			headers: func(_ *testing.T) http.Header { return http.Header{} },
+			wantErr: ErrSecretNotConfigured,
+		},
+		{
+			name:    "empty secret accepts in dev mode",
+			secret:  []byte(""),
+			headers: func(_ *testing.T) http.Header { return http.Header{} },
+			wantErr: nil,
+		},
+		{
+			name:   "valid signature accepted",
+			secret: []byte(realSecret),
+			headers: func(t *testing.T) http.Header {
+				return signedHeaders(t, []byte(realSecret), []byte(body))
+			},
+			wantErr: nil,
+		},
+		{
+			name:   "wrong signature returns ErrBadSignature",
+			secret: []byte(realSecret),
+			headers: func(_ *testing.T) http.Header {
+				h := http.Header{}
+				h.Set("X-Webhook-Signature", "sha256=deadbeef")
+				return h
+			},
+			wantErr: ErrBadSignature,
+		},
 	}
-}
 
-func TestCliqInbound_VerifySignature_BadSig(t *testing.T) {
-	secret := []byte("hunter2")
-	body := []byte(`{"operation":"message_sent"}`)
-	h := http.Header{}
-	h.Set("X-Webhook-Signature", "sha256=deadbeef")
-	inbound := &cliqInbound{secret: secret}
-	err := inbound.VerifySignature(h, body)
-	if !errors.Is(err, ErrBadSignature) {
-		t.Fatalf("want ErrBadSignature, got %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			inbound := &cliqInbound{secret: tt.secret}
+			err := inbound.VerifySignature(tt.headers(t), []byte(body))
+			if tt.wantErr == nil {
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				return
+			}
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("want %v, got %v", tt.wantErr, err)
+			}
+		})
 	}
 }
 
 func TestCliqInbound_Normalize_ChannelText(t *testing.T) {
+	t.Parallel()
 	body := loadFixture(t, "2026-05-03T10-38-07-channel-text.json")
 	inbound := &cliqInbound{}
 	msg, err := inbound.Normalize(body)
@@ -82,6 +118,7 @@ func TestCliqInbound_Normalize_ChannelText(t *testing.T) {
 }
 
 func TestCliqInbound_Normalize_ParseError(t *testing.T) {
+	t.Parallel()
 	inbound := &cliqInbound{}
 	if _, err := inbound.Normalize([]byte("not json {")); err == nil {
 		t.Fatal("expected parse error")
@@ -89,6 +126,7 @@ func TestCliqInbound_Normalize_ParseError(t *testing.T) {
 }
 
 func TestCliqInbound_HandleHandshake_AlwaysFalse(t *testing.T) {
+	t.Parallel()
 	inbound := &cliqInbound{}
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/cliq", nil)
@@ -101,6 +139,7 @@ func TestCliqInbound_HandleHandshake_AlwaysFalse(t *testing.T) {
 }
 
 func TestNewInbound_BuildsConfiguredInbound(t *testing.T) {
+	t.Parallel()
 	secret := []byte("hunter2")
 	body := []byte(`{"operation":"message_sent"}`)
 	inbound := NewInbound(secret)

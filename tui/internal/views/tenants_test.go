@@ -10,6 +10,7 @@ import (
 )
 
 func TestTenantsModel_FoldsLoadedMsg(t *testing.T) {
+	t.Parallel()
 	fake := &fakeAdmin{}
 	m := NewTenants(fake)
 	loaded := TenantsLoadedMsg{
@@ -32,6 +33,7 @@ func TestTenantsModel_FoldsLoadedMsg(t *testing.T) {
 }
 
 func TestTenantsModel_CursorMovesWithinBounds(t *testing.T) {
+	t.Parallel()
 	fake := &fakeAdmin{}
 	m := NewTenants(fake)
 	loaded := TenantsLoadedMsg{
@@ -59,6 +61,7 @@ func TestTenantsModel_CursorMovesWithinBounds(t *testing.T) {
 }
 
 func TestTenantsModel_EmptyAndErrorStates(t *testing.T) {
+	t.Parallel()
 	fake := &fakeAdmin{}
 	m := NewTenants(fake)
 

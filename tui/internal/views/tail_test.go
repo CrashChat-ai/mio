@@ -10,6 +10,7 @@ import (
 )
 
 func TestTailModel_NoAccountSelectedHint(t *testing.T) {
+	t.Parallel()
 	m := NewTail(&fakeAdmin{})
 	if !strings.Contains(m.View(), "select an account") {
 		t.Errorf("expected no-account hint")
@@ -17,6 +18,7 @@ func TestTailModel_NoAccountSelectedHint(t *testing.T) {
 }
 
 func TestTailModel_FoldsTailMsg(t *testing.T) {
+	t.Parallel()
 	m := NewTail(&fakeAdmin{})
 	m.SetAccount("acct-1")
 
@@ -43,6 +45,7 @@ func TestTailModel_FoldsTailMsg(t *testing.T) {
 }
 
 func TestTailModel_RingCapacityCaps(t *testing.T) {
+	t.Parallel()
 	m := NewTail(&fakeAdmin{})
 	m.SetAccount("acct-cap")
 
@@ -58,6 +61,7 @@ func TestTailModel_RingCapacityCaps(t *testing.T) {
 }
 
 func TestTailModel_ErrorRendering(t *testing.T) {
+	t.Parallel()
 	m := NewTail(&fakeAdmin{})
 	m.SetAccount("acct-err")
 	updated, _ := m.Update(TailMsg{Err: errOops})
@@ -67,6 +71,7 @@ func TestTailModel_ErrorRendering(t *testing.T) {
 }
 
 func TestTailModel_StopIdempotent(t *testing.T) {
+	t.Parallel()
 	m := NewTail(&fakeAdmin{})
 	// Stop without Init is a no-op.
 	m.Stop()

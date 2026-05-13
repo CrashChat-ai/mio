@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/crashchat-ai/mio/gateway/internal/sender"
@@ -72,22 +73,51 @@ func TestRefreshCredential_ExtrasIndependentlyMutable(t *testing.T) {
 	}
 }
 
-// TestRefreshCredential_EmptyRefreshToken_Errors guards the precondition.
-func TestRefreshCredential_EmptyRefreshToken_Errors(t *testing.T) {
-	t.Setenv("CLIQ_CLIENT_ID", "client-id")
-	t.Setenv("CLIQ_CLIENT_SECRET", "client-secret")
-	tc := &tokenCredentials{adapter: &Adapter{tokens: &tokenSource{}}}
-	if _, err := tc.RefreshCredential(context.Background(), sender.Credential{}); err == nil {
-		t.Fatal("expected error for empty refresh_token")
+// TestRefreshCredential_Preconditions covers the early-return paths
+// before any HTTP request is made.
+func TestRefreshCredential_Preconditions(t *testing.T) {
+	tests := []struct {
+		name      string
+		clientID  string
+		secret    string
+		input     sender.Credential
+		wantSubst string // substring expected in err.Error()
+	}{
+		{
+			name:      "empty refresh_token rejects",
+			clientID:  "client-id",
+			secret:    "client-secret",
+			input:     sender.Credential{},
+			wantSubst: "empty refresh_token",
+		},
+		{
+			name:      "missing client_id rejects",
+			clientID:  "",
+			secret:    "client-secret",
+			input:     sender.Credential{RefreshToken: "rt-1"},
+			wantSubst: "missing CLIQ_CLIENT_ID",
+		},
+		{
+			name:      "missing client_secret rejects",
+			clientID:  "client-id",
+			secret:    "",
+			input:     sender.Credential{RefreshToken: "rt-1"},
+			wantSubst: "missing CLIQ_CLIENT_ID",
+		},
 	}
-}
 
-// TestRefreshCredential_MissingConfig errors when env is unset.
-func TestRefreshCredential_MissingConfig(t *testing.T) {
-	t.Setenv("CLIQ_CLIENT_ID", "")
-	t.Setenv("CLIQ_CLIENT_SECRET", "")
-	tc := &tokenCredentials{adapter: &Adapter{tokens: &tokenSource{}}}
-	if _, err := tc.RefreshCredential(context.Background(), sender.Credential{RefreshToken: "rt-1"}); err == nil {
-		t.Fatal("expected error for missing client_id/secret")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("CLIQ_CLIENT_ID", tt.clientID)
+			t.Setenv("CLIQ_CLIENT_SECRET", tt.secret)
+			tc := &tokenCredentials{adapter: &Adapter{tokens: &tokenSource{}}}
+			_, err := tc.RefreshCredential(context.Background(), tt.input)
+			if err == nil {
+				t.Fatalf("expected error containing %q", tt.wantSubst)
+			}
+			if got := err.Error(); !strings.Contains(got, tt.wantSubst) {
+				t.Errorf("err %q missing substring %q", got, tt.wantSubst)
+			}
+		})
 	}
 }

@@ -37,7 +37,10 @@ func main() {
 
 	decision, err := nats.CheckProdStorage(os.Getenv("MIO_ENV"), *storage)
 	if err != nil {
-		logger.Error("all-in-one: " + err.Error())
+		logger.Error("all-in-one: prod-storage guard rail",
+			"env", os.Getenv("MIO_ENV"),
+			"storage", *storage,
+			"err", err)
 		os.Exit(2)
 	}
 	if decision.WarnSingleNode {

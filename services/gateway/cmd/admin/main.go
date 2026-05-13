@@ -134,6 +134,7 @@ func main() {
 		Logger:    logger,
 		PublicURL: f.publicURL,
 	})
+	srv.StartBackground(ctx)
 
 	// Wire HTTP mux: connect-go path + /oauth/callback + /metrics + /healthz.
 	mux := http.NewServeMux()

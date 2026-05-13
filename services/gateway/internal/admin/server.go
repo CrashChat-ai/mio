@@ -76,6 +76,14 @@ func (s *AdminServer) PublicURL() string { return s.publicURL }
 // oauth_callback.go) can capture codes against reserved state nonces.
 func (s *AdminServer) Stash() *installStash { return s.stash }
 
+// StartBackground launches background goroutines tied to ctx's lifetime.
+// Currently: a ticker that sweeps expired install-stash entries so
+// abandoned StartInstall flows don't leak state nonces. Call exactly once
+// per AdminServer after wiring; it returns immediately.
+func (s *AdminServer) StartBackground(ctx context.Context) {
+	go s.stash.startStashPurger(ctx, installStashPurgeInterval)
+}
+
 // adapterByChannelType walks the registry; returns nil on miss.
 func (s *AdminServer) adapterByChannelType(slug string) channels.Adapter {
 	for _, a := range s.Registry {

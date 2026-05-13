@@ -1,6 +1,7 @@
 package sender
 
 import (
+	"github.com/crashchat-ai/mio/pkg/channels"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 )
 
@@ -8,14 +9,14 @@ import (
 // Built once in main.go after all adapter init() blocks have run.
 // Zero adapter-specific branches — P9 litmus is enforced by make gateway-dispatch-lint.
 type Dispatcher struct {
-	byChannel map[string]Adapter
+	byChannel map[string]channels.Adapter
 }
 
 // New constructs a Dispatcher from the given adapters.
 // Panics on duplicate ChannelType() slug (defensive: registry already panics,
 // but New is called with a snapshot so double-check here).
-func New(adapters []Adapter) *Dispatcher {
-	m := make(map[string]Adapter, len(adapters))
+func New(adapters []channels.Adapter) *Dispatcher {
+	m := make(map[string]channels.Adapter, len(adapters))
 	for _, a := range adapters {
 		slug := a.ChannelType()
 		if _, dup := m[slug]; dup {
@@ -29,6 +30,6 @@ func New(adapters []Adapter) *Dispatcher {
 // ForCommand returns the adapter for the command's channel_type.
 // Returns nil if no adapter is registered for that type — callers must
 // handle nil by terminating the message with reason="other".
-func (d *Dispatcher) ForCommand(cmd *miov1.SendCommand) Adapter {
+func (d *Dispatcher) ForCommand(cmd *miov1.SendCommand) channels.Adapter {
 	return d.byChannel[cmd.GetChannelType()]
 }

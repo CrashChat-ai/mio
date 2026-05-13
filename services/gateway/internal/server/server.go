@@ -8,6 +8,7 @@ import (
 
 	"github.com/crashchat-ai/mio/channels/zohocliq"
 	"github.com/crashchat-ai/mio/services/gateway/internal/health"
+	"github.com/crashchat-ai/mio/services/gateway/store"
 	sdk "github.com/crashchat-ai/mio/sdk-go"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -97,7 +98,7 @@ func buildZohoCliqDeps(
 	m *gatewayMetrics,
 ) zohocliq.HandlerDeps {
 	return zohocliq.HandlerDeps{
-		Pool:      pg,
+		Store:     store.NewInboundStore(pg),
 		SDK:       sdkClient,
 		TenantID:  cfg.TenantID,
 		AccountID: cfg.AccountID,

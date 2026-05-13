@@ -1,7 +1,7 @@
 package zohocliq
 
 import (
-	"github.com/crashchat-ai/mio/services/gateway/sender"
+	"github.com/crashchat-ai/mio/pkg/channels"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 	"google.golang.org/protobuf/proto"
 )
@@ -71,13 +71,13 @@ func (a *Adapter) Capabilities() *miov1.ChannelCapabilities {
 // (ListChannelTypes / install discovery) can introspect the adapter; that
 // path does not call VerifySignature. Configurable injection happens in
 // P4 when admin actually issues webhook requests on behalf of operators.
-func (a *Adapter) Inbound() sender.InboundAdapter {
+func (a *Adapter) Inbound() channels.InboundAdapter {
 	return &cliqInbound{}
 }
 
 // Credentials returns the CredentialAdapter wrapping the OAuth token
 // source. Always non-nil — when OAuth env vars are absent, AuthorizeURL /
 // ExchangeCode return typed errors but the wrapper itself is constructed.
-func (a *Adapter) Credentials() sender.CredentialAdapter {
+func (a *Adapter) Credentials() channels.CredentialAdapter {
 	return &tokenCredentials{adapter: a}
 }

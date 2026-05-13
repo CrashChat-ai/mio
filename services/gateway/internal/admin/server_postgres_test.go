@@ -19,8 +19,8 @@ import (
 	"github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1/adminv1connect"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 
+	"github.com/crashchat-ai/mio/pkg/channels"
 	"github.com/crashchat-ai/mio/services/gateway/internal/crypto"
-	"github.com/crashchat-ai/mio/services/gateway/sender"
 	"github.com/crashchat-ai/mio/services/gateway/store"
 	"github.com/crashchat-ai/mio/services/gateway/store/migrations"
 )
@@ -39,10 +39,10 @@ type stubCredentialAdapter struct {
 	refreshCalls   atomic.Int32
 
 	exchangeErr  error
-	exchangeCred sender.Credential
+	exchangeCred channels.Credential
 
 	refreshErr  error
-	refreshCred sender.Credential
+	refreshCred channels.Credential
 }
 
 func (s *stubCredentialAdapter) AuthorizeURL(state string) string {
@@ -53,23 +53,23 @@ func (s *stubCredentialAdapter) AuthorizeURL(state string) string {
 	return "https://stub.example/authorize?state=" + state
 }
 
-func (s *stubCredentialAdapter) ExchangeCode(_ context.Context, _ string) (sender.Credential, error) {
+func (s *stubCredentialAdapter) ExchangeCode(_ context.Context, _ string) (channels.Credential, error) {
 	s.exchangeCalls.Add(1)
 	if s.exchangeErr != nil {
-		return sender.Credential{}, s.exchangeErr
+		return channels.Credential{}, s.exchangeErr
 	}
 	return s.exchangeCred, nil
 }
 
-func (s *stubCredentialAdapter) RefreshCredential(_ context.Context, _ sender.Credential) (sender.Credential, error) {
+func (s *stubCredentialAdapter) RefreshCredential(_ context.Context, _ channels.Credential) (channels.Credential, error) {
 	s.refreshCalls.Add(1)
 	if s.refreshErr != nil {
-		return sender.Credential{}, s.refreshErr
+		return channels.Credential{}, s.refreshErr
 	}
 	return s.refreshCred, nil
 }
 
-// stubAdapter is the minimal sender.Adapter the admin server needs for
+// stubAdapter is the minimal channels.Adapter the admin server needs for
 // these tests. Send/Edit are unused (admin path).
 type stubAdapter struct {
 	creds *stubCredentialAdapter
@@ -88,8 +88,8 @@ func (a *stubAdapter) Edit(_ context.Context, _ *miov1.SendCommand) error {
 func (a *stubAdapter) ChannelType() string                      { return stubChannelType }
 func (a *stubAdapter) MaxDeliver() int                          { return 5 }
 func (a *stubAdapter) RateLimitKey(_ *miov1.SendCommand) string { return "" }
-func (a *stubAdapter) Inbound() sender.InboundAdapter           { return nil }
-func (a *stubAdapter) Credentials() sender.CredentialAdapter    { return a.creds }
+func (a *stubAdapter) Inbound() channels.InboundAdapter         { return nil }
+func (a *stubAdapter) Credentials() channels.CredentialAdapter    { return a.creds }
 func (a *stubAdapter) Capabilities() *miov1.ChannelCapabilities {
 	return &miov1.ChannelCapabilities{AuthKind: "oauth2_refresh"}
 }
@@ -125,7 +125,7 @@ func newTestRig(t *testing.T) (*testRig, func()) {
 	srv := NewServer(Deps{
 		Pool:      pool,
 		Cipher:    crypto.NewNoopCipher("dev"),
-		Registry:  []sender.Adapter{adapter},
+		Registry:  []channels.Adapter{adapter},
 		PublicURL: "http://127.0.0.1:9999", // placeholder, replaced after httptest binds
 	})
 
@@ -391,7 +391,7 @@ func TestAdminServer_CompleteInstall_Happy(t *testing.T) {
 	rig.server.Stash().capture(stateNonce, "code-happy")
 
 	// Tell the stub adapter what credential to return.
-	rig.adapter.creds.exchangeCred = sender.Credential{
+	rig.adapter.creds.exchangeCred = channels.Credential{
 		AccessToken:  "access-from-stub",
 		RefreshToken: "refresh-from-stub",
 		ExpiresAt:    time.Now().Add(time.Hour),
@@ -534,7 +534,7 @@ func TestAdminServer_RotateCredential_WritesNewKeyVersion(t *testing.T) {
 	// Stub returns a fresh access token; server re-encrypts under the
 	// configured cipher (Noop in this rig). Asserting the call happened
 	// AND key_version landed unchanged validates the flow end-to-end.
-	rig.adapter.creds.refreshCred = sender.Credential{
+	rig.adapter.creds.refreshCred = channels.Credential{
 		AccessToken:  "ax-new",
 		RefreshToken: "rt-new",
 		ExpiresAt:    time.Now().Add(time.Hour),

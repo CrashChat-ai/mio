@@ -1,4 +1,4 @@
-package sender
+package channels
 
 import (
 	"slices"
@@ -18,7 +18,7 @@ func RegisterAdapter(a Adapter) {
 	defer regMu.Unlock()
 	for _, existing := range registered {
 		if existing.ChannelType() == a.ChannelType() {
-			panic("sender: duplicate adapter registration for channel_type=" + a.ChannelType())
+			panic("channels: duplicate adapter registration for channel_type=" + a.ChannelType())
 		}
 	}
 	registered = append(registered, a)

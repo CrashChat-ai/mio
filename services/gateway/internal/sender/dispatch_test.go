@@ -4,11 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/crashchat-ai/mio/services/gateway/sender"
+	"github.com/crashchat-ai/mio/pkg/channels"
+	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 )
 
-// stubAdapter implements sender.Adapter for testing.
+// stubAdapter implements channels.Adapter for testing.
 type stubAdapter struct {
 	slug string
 }
@@ -21,12 +22,12 @@ func (s *stubAdapter) ChannelType() string                                { retu
 func (s *stubAdapter) MaxDeliver() int                                    { return 5 }
 func (s *stubAdapter) RateLimitKey(_ *miov1.SendCommand) string           { return "" }
 func (s *stubAdapter) Capabilities() *miov1.ChannelCapabilities           { return &miov1.ChannelCapabilities{} }
-func (s *stubAdapter) Inbound() sender.InboundAdapter                     { return nil }
-func (s *stubAdapter) Credentials() sender.CredentialAdapter              { return nil }
+func (s *stubAdapter) Inbound() channels.InboundAdapter                   { return nil }
+func (s *stubAdapter) Credentials() channels.CredentialAdapter            { return nil }
 
 func TestDispatcher_ForCommand_Found(t *testing.T) {
 	a := &stubAdapter{slug: "test_channel"}
-	d := sender.New([]sender.Adapter{a})
+	d := sender.New([]channels.Adapter{a})
 
 	cmd := &miov1.SendCommand{ChannelType: "test_channel"}
 	got := d.ForCommand(cmd)
@@ -40,7 +41,7 @@ func TestDispatcher_ForCommand_Found(t *testing.T) {
 
 func TestDispatcher_ForCommand_NotFound(t *testing.T) {
 	a := &stubAdapter{slug: "test_channel"}
-	d := sender.New([]sender.Adapter{a})
+	d := sender.New([]channels.Adapter{a})
 
 	cmd := &miov1.SendCommand{ChannelType: "other_channel"}
 	got := d.ForCommand(cmd)
@@ -57,7 +58,7 @@ func TestDispatcher_New_PanicOnDuplicate(t *testing.T) {
 	}()
 	a1 := &stubAdapter{slug: "dup"}
 	a2 := &stubAdapter{slug: "dup"}
-	sender.New([]sender.Adapter{a1, a2}) // must panic
+	sender.New([]channels.Adapter{a1, a2}) // must panic
 }
 
 func TestDispatcher_Empty(t *testing.T) {
@@ -74,7 +75,7 @@ func TestDispatcher_Empty(t *testing.T) {
 func TestDispatch_ZeroAdapterBranches(t *testing.T) {
 	// This test is structural documentation; the grep CI target is the real gate.
 	// If dispatch.go compiles and ForCommand works via table lookup, the design is correct.
-	d := sender.New([]sender.Adapter{
+	d := sender.New([]channels.Adapter{
 		&stubAdapter{slug: "alpha"},
 		&stubAdapter{slug: "beta"},
 		&stubAdapter{slug: "gamma"},

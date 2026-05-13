@@ -1,6 +1,6 @@
 // Package zohocliq implements the inbound webhook handler and the outbound
-// sender adapter for Zoho Cliq. The sender.Adapter interface is satisfied by
-// Adapter; its init() in init.go self-registers with the sender registry so
+// sender adapter for Zoho Cliq. The channels.Adapter interface is satisfied by
+// Adapter; its init() in init.go self-registers with the channels registry so
 // main.go only needs a blank import.
 package zohocliq
 
@@ -41,7 +41,7 @@ var cliqSendSelfHealedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 	Help: "Cliq REST calls that hit a stale-token 401 and re-attempted with a fresh token.",
 }, []string{"outcome"})
 
-// Adapter implements sender.Adapter for Zoho Cliq.
+// Adapter implements channels.Adapter for Zoho Cliq.
 // Constructed in init.go; all fields except tokens are read-only after construction.
 type Adapter struct {
 	baseURL    string
@@ -256,8 +256,8 @@ func checkHTTPStatus(resp *http.Response, body []byte) error {
 }
 
 // HTTPError carries the HTTP status code so the pool can route Nak vs Term.
-// Implements sender.DeliveryError via the StatusCode/IsRetryable/IsRateLimited
-// methods — no import cycle because sender package defines the interface only.
+// Implements channels.DeliveryError via the StatusCode/IsRetryable/IsRateLimited
+// methods — no import cycle because pkg/channels defines the interface only.
 type HTTPError struct {
 	Code       int    // HTTP status code
 	Body       string // raw response body (for logging)

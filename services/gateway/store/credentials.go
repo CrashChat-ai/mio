@@ -16,8 +16,8 @@ import (
 )
 
 // CredentialPayload is the plaintext shape stored under credentials.ciphertext
-// after encryption. Mirrors sender.Credential but lives in store to avoid an
-// import cycle (store has no dependency on sender).
+// after encryption. Mirrors channels.Credential but lives in store to avoid an
+// import cycle (store has no dependency on the gateway-internal sender).
 //
 // JSON-marshalled before encryption; the cipher sees an opaque blob.
 type CredentialPayload struct {

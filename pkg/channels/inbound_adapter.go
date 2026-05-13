@@ -1,4 +1,4 @@
-package sender
+package channels
 
 import (
 	"net/http"

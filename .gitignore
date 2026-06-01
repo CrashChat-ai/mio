@@ -37,6 +37,10 @@ hack/playground/
 # local data
 appdata/
 
+# channel-pulse prototype: internal channel titles + any real-data snapshots (PHI safety)
+prototypes/channel-pulse-stack/backend/channel_names.json
+prototypes/channel-pulse-stack/backend/real_*.json
+
 # Go workspace committed — CI relies on it for multi-module resolution.
 # Dockerfiles ignore go.work via .dockerignore.
 
@@ -54,3 +58,4 @@ plans/
 .claude/
 
 repomix-output.xml
+prototypes

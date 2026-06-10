@@ -9,6 +9,30 @@ import (
 	"time"
 )
 
+const (
+	MetadataSchemaVersion            = "mio_media_metadata_version"
+	MetadataMessageID                = "message_id"
+	MetadataSourceMessageID          = "source_message_id"
+	MetadataTenantID                 = "tenant_id"
+	MetadataAccountID                = "account_id"
+	MetadataChannelType              = "channel_type"
+	MetadataConversationID           = "conversation_id"
+	MetadataConversationExternalID   = "conversation_external_id"
+	MetadataAttachmentIndex          = "attachment_index"
+	MetadataStorageKey               = "storage_key"
+	MetadataObjectKey                = "object_key"
+	MetadataFilename                 = "filename"
+	MetadataMIME                     = "mime"
+	MetadataBytes                    = "bytes"
+	MetadataContentSHA256            = "content_sha256"
+	MetadataErrorCode                = "error_code"
+	MetadataReceivedAt               = "received_at"
+	MetadataThreadRootMessageID      = "thread_root_message_id"
+	MetadataRelationKind             = "relation_kind"
+	MetadataRelationTargetMessageID  = "relation_target_message_id"
+	MetadataRelationTargetExternalID = "relation_target_external_id"
+)
+
 // Object describes a stored object's metadata (returned by Stat / List).
 //
 // TenantID / ConversationID / SourceMessageID are forward-only — they are
@@ -27,7 +51,10 @@ type Object struct {
 	AccountID       string
 	ConversationID  string
 	SourceMessageID string
-	ModifiedAt      time.Time
+	// Metadata contains backend custom metadata copied without fetching bytes.
+	// Backends drop empty keys and values before writing.
+	Metadata   map[string]string
+	ModifiedAt time.Time
 }
 
 // PutOptions controls write behaviour.
@@ -40,6 +67,7 @@ type PutOptions struct {
 	AccountID       string
 	ConversationID  string
 	SourceMessageID string
+	Metadata        map[string]string
 }
 
 // SignOptions controls signed-URL issuance.

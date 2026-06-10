@@ -64,8 +64,13 @@ func (m *memStorage) Put(_ context.Context, key string, body io.Reader, _ int64,
 		}
 	}
 	b, _ := io.ReadAll(body)
+	metadata := map[string]string{}
+	for key, value := range opts.Metadata {
+		metadata[key] = value
+	}
 	m.objects[key] = b
 	m.lastOpts = opts
+	m.lastOpts.Metadata = metadata
 	m.puts++
 	return nil
 }
@@ -165,14 +170,23 @@ func TestProcessStampsOwnerIdentifiersOnPutOptions(t *testing.T) {
 	p := newProc(t, mem, pub)
 
 	msg := &miov1.Message{
-		Id:              "m-meta",
-		ChannelType:     "ch_meta",
-		TenantId:        "tenant-T",
-		AccountId:       "account-A",
-		ConversationId:  "conversation-C",
-		SourceMessageId: "src-msg-S",
-		ReceivedAt:      timestamppb.New(time.Date(2026, 5, 9, 0, 0, 0, 0, time.UTC)),
-		Attachments:     []*miov1.Attachment{{Url: "https://platform/x"}},
+		Id:                     "m-meta",
+		ChannelType:            "ch_meta",
+		TenantId:               "tenant-T",
+		AccountId:              "account-A",
+		ConversationId:         "conversation-C",
+		ConversationExternalId: "conversation-ext-E",
+		SourceMessageId:        "src-msg-S",
+		ThreadRootMessageId:    "thread-root-R",
+		Relation: &miov1.MessageRelation{
+			Kind:             miov1.MessageRelation_KIND_REPLY,
+			TargetMessageId:  "target-msg-M",
+			TargetExternalId: "target-ext-X",
+		},
+		ReceivedAt: timestamppb.New(time.Date(2026, 5, 9, 0, 0, 0, 0, time.UTC)),
+		Attachments: []*miov1.Attachment{
+			{Url: "https://platform/x", Filename: "x.png"},
+		},
 	}
 	if err := p.Process(t.Context(), msg); err != nil {
 		t.Fatalf("unexpected: %v", err)
@@ -193,6 +207,33 @@ func TestProcessStampsOwnerIdentifiersOnPutOptions(t *testing.T) {
 	}
 	if !opts.IfNotExists {
 		t.Error("PutOptions.IfNotExists should remain true (dedup contract)")
+	}
+
+	metadata := opts.Metadata
+	assertMetadata(t, metadata, storage.MetadataSchemaVersion, "1")
+	assertMetadata(t, metadata, storage.MetadataMessageID, "m-meta")
+	assertMetadata(t, metadata, storage.MetadataSourceMessageID, "src-msg-S")
+	assertMetadata(t, metadata, storage.MetadataTenantID, "tenant-T")
+	assertMetadata(t, metadata, storage.MetadataAccountID, "account-A")
+	assertMetadata(t, metadata, storage.MetadataChannelType, "ch_meta")
+	assertMetadata(t, metadata, storage.MetadataConversationID, "conversation-C")
+	assertMetadata(t, metadata, storage.MetadataConversationExternalID, "conversation-ext-E")
+	assertMetadata(t, metadata, storage.MetadataAttachmentIndex, "0")
+	assertMetadata(t, metadata, storage.MetadataFilename, "x.png")
+	assertMetadata(t, metadata, storage.MetadataMIME, "image/png")
+	assertMetadata(t, metadata, storage.MetadataBytes, "12")
+	assertMetadata(t, metadata, storage.MetadataContentSHA256, opts.SHA256Hex)
+	assertMetadata(t, metadata, storage.MetadataErrorCode, "ERROR_CODE_OK")
+	assertMetadata(t, metadata, storage.MetadataReceivedAt, "2026-05-09T00:00:00Z")
+	assertMetadata(t, metadata, storage.MetadataThreadRootMessageID, "thread-root-R")
+	assertMetadata(t, metadata, storage.MetadataRelationKind, "KIND_REPLY")
+	assertMetadata(t, metadata, storage.MetadataRelationTargetMessageID, "target-msg-M")
+	assertMetadata(t, metadata, storage.MetadataRelationTargetExternalID, "target-ext-X")
+	if got := metadata[storage.MetadataStorageKey]; !strings.HasPrefix(got, "gs://test-bucket/mio/attachments/") {
+		t.Fatalf("metadata storage_key = %q; want gs:// prefix", got)
+	}
+	if got := metadata[storage.MetadataObjectKey]; !strings.HasPrefix(got, "mio/attachments/") {
+		t.Fatalf("metadata object_key = %q; want object key prefix", got)
 	}
 }
 
@@ -345,6 +386,13 @@ func TestProcessPropagatesPublishError(t *testing.T) {
 type failingPub struct{ err error }
 
 func (f *failingPub) Publish(_ context.Context, _ *miov1.Message) error { return f.err }
+
+func assertMetadata(t *testing.T, metadata map[string]string, key string, want string) {
+	t.Helper()
+	if got := metadata[key]; got != want {
+		t.Fatalf("metadata[%q] = %q; want %q", key, got, want)
+	}
+}
 
 // silence unused import warnings if test bodies omit them.
 var _ = bytes.NewReader

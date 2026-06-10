@@ -11,7 +11,7 @@
 
 | Phase | Status | Title | Description | Plan Ref |
 |---|---|---|---|---|
-| **P0** | ✅ | Repo scaffold | Initialize monorepo, Makefile, docker-compose | `plans/260507-0904-mio-bootstrap/` |
+| **P0** | ✅ | Repo scaffold | Initialize monorepo, Makefile, docker-compose | `.work/plans/260507-0904-mio-bootstrap/` |
 | **P1** | ✅ | Proto v1 envelope | Define Message, SendCommand, Attachment, Capabilities | — |
 | **P2** | ✅ | SDKs (Go + Python) | Implement sdk-go and sdk-py with OTel + Prometheus | — |
 | **P3** | ✅ | Gateway + Cliq inbound | Webhook handler, HMAC verify, normalize to Message | — |
@@ -19,14 +19,14 @@
 | **P5** | ✅ | Outbound path → Cliq | SendCommand dispatch, rate limiting, edit support | — |
 | **P6** | ✅ | Sink-GCS archiver | Consumer that writes raw payloads to GCS (cold storage) | — |
 | **P7** | ✅ | Helm charts + NATS | 6 Helm charts, NATS StatefulSet, JetStream bootstrap | — |
-| **P8** | ✅ | POC deploy on GKE | Reference Kubernetes topology, CNPG Postgres, Flux reconciliation | `plans/260509-2125-p8-poc-deploy-gke/` |
-| **P9** | ✅ | Attachment persistence | Media-vault sidecar, content-addressed storage, 7-day TTL | `plans/260509-2328-attachment-persistence/` |
+| **P8** | ✅ | POC deploy on GKE | Reference Kubernetes topology, CNPG Postgres, Flux reconciliation | `.work/plans/260509-2125-p8-poc-deploy-gke/` |
+| **P9** | ✅ | Attachment persistence | Media-vault sidecar, content-addressed storage, 7-day TTL | `.work/plans/260509-2328-attachment-persistence/` |
 | **P9.5** | ✅ | Admin control plane + TUI scaffold | Admin server (connect-rpc), TUI (bubbletea, read-only v1), embedded NATS option | Recent |
-| **P10** | 🚧 | BigQuery sink / lakehouse | External tables + native warehouse table, loader pipeline | `plans/260510-1102-bq-sink-lakehouse/` |
-| **P11** | 🚧 | Channel registry control plane | Admin RPCs (credentials, tenants, capabilities), TUI write operations | `plans/260513-0351-channel-management-control-plane/` |
+| **P10** | 🚧 | BigQuery sink / lakehouse | External tables + native warehouse table, loader pipeline | `.work/plans/260510-1102-bq-sink-lakehouse/` |
+| **P11** | 🚧 | Channel registry control plane | Admin RPCs (credentials, tenants, capabilities), TUI write operations | `.work/plans/260513-0351-channel-management-control-plane/` |
 | **—** | — | Second channel adapter (Slack) | Webhook inbound, API outbound, per-channel rate limits | open |
-| **—** | — | ELT pipeline (Airflow DAG) | Scheduled Cloud Run Job for BigQuery loader | `plans/260510-2333-elt-mio-airflow-dag/` |
-| **—** | — | Cliq OAuth refresh hardening | Token refresh retry/backoff, credential rotation | `plans/260510-0152-cliq-oauth-token-refresh/` |
+| **—** | — | ELT pipeline (Airflow DAG) | Scheduled Cloud Run Job for BigQuery loader | `.work/plans/260510-2333-elt-mio-airflow-dag/` |
+| **—** | — | Cliq OAuth refresh hardening | Token refresh retry/backoff, credential rotation | `.work/plans/260510-0152-cliq-oauth-token-refresh/` |
 | **—** | — | TUI write operations | Admin TUI: create tenants, manage channels, set credentials | open |
 | **—** | — | NATS HA upgrade | 3-replica cluster + PVC storage, stream replication | see deployment-guide |
 
@@ -77,7 +77,7 @@
 - Per-account rate limiting (unaffected) ✅
 
 **Code:** `services/media-vault/`, `deploy/charts/mio-media-vault`  
-**Report:** `plans/reports/Cook-260509-2328-attachment-persistence.md`
+**Report:** `.work/reports/Cook-260509-2328-attachment-persistence.md`
 
 ### P8: POC Deploy on GKE
 
@@ -96,7 +96,7 @@
 - ingress-nginx + cert-manager (HTTP-01 via Cloud DNS)
 
 **Code:** `deploy/charts/`, `deploy/fluxcd/`  
-**Report:** `plans/reports/Cook-260509-2125-p8-poc-deploy-gke.md`
+**Report:** `.work/reports/Cook-260509-2125-p8-poc-deploy-gke.md`
 
 ---
 
@@ -120,7 +120,7 @@
 
 **Code:** `services/sink-gcs/sql/{messages_schema.json, check-proto-drift.sh}` (producer-side); loader lives in deployer's infra repo
 
-**Plan:** `plans/260510-1102-bq-sink-lakehouse/`
+**Plan:** `.work/plans/260510-1102-bq-sink-lakehouse/`
 
 ### P11: Channel Registry Control Plane
 
@@ -144,7 +144,7 @@
 
 **Code:** `services/gateway/internal/admin/`, `services/tui/`
 
-**Plan:** `plans/260513-0351-channel-management-control-plane/`
+**Plan:** `.work/plans/260513-0351-channel-management-control-plane/`
 
 ---
 
@@ -203,14 +203,14 @@ Option B (future): N consumers, each watches mio.inbound_enriched.<channel>.<acc
 **Status:** 🚧 Research phase  
 **Goal:** Hardened token refresh with retry/backoff
 
-**Plan:** `plans/260510-0152-cliq-oauth-token-refresh/`
+**Plan:** `.work/plans/260510-0152-cliq-oauth-token-refresh/`
 
 ### ELT Pipeline (Airflow DAG)
 
 **Status:** 🚧 Design phase  
 **Goal:** Scheduled Cloud Run Job for BigQuery loader
 
-**Plan:** `plans/260510-2333-elt-mio-airflow-dag/`
+**Plan:** `.work/plans/260510-2333-elt-mio-airflow-dag/`
 
 ---
 
@@ -263,5 +263,5 @@ Option B (future): N consumers, each watches mio.inbound_enriched.<channel>.<acc
 - [System Architecture](system-architecture.md) — Design invariants, open questions detail
 - [Deployment Guide](deployment-guide.md) — Kubernetes reference, HA paths
 - [Code Standards](code-standards.md) — Governance rules, adapter pattern
-- `plans/` — Detailed phase plans and research reports
+- `.work/plans/` — Detailed phase plans and research reports
 - `README.md` — Status table

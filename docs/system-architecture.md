@@ -9,7 +9,7 @@ canonical envelope so MIU's AI service receives a `Message` and returns
 a `SendCommand` — without ever importing a channel SDK.
 
 This document is the source of truth for **what MIO is**. The phased
-build plan and morning journal live in `plans/plan.md` (local-only).
+build plan and morning journal live in `.work/plans/plan.md` (local-only).
 
 ---
 

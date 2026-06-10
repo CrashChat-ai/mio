@@ -36,7 +36,7 @@ mio/
 │   └── appdata/          # Persistent storage for local dev (NATS, Postgres).
 ├── hack/                 # Dev-only scratch. Not shipped, not tested. playground/ is gitignored.
 ├── docs/                 # Documentation (architecture, deployment, journals, roadmap, standards).
-├── plans/                # Phased build plans + reports (P0–P11+).
+├── .work/                # Local planning artifacts: plans, reports, journals (P0–P11+).
 ├── Makefile              # 40+ build, test, lint, deploy targets.
 ├── go.work               # Go 1.25 workspace (root + sdks/go).
 ├── .env.example          # Environment variables template.

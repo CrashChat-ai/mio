@@ -93,9 +93,6 @@ jobs:
         with:
           cache: true
 
-      - name: Enable Corepack
-        run: corepack enable
-
       - name: Install web dependencies
         run: pnpm --dir ui/web/app install --frozen-lockfile
 

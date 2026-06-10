@@ -115,12 +115,15 @@ is the boundary that keeps "intelligence" and "transport" separable.
 - Inspect messages, list channels, view consumer lag
 - Write ops deferred to P6+
 
-**mio-web** (`ui/web`): Internal read-only operator console with a Go BFF and
-embedded React SPA. Local development can front a loopback admin server, but
-cluster deploys must not rely on cross-pod loopback. The default cluster
-topology is a non-public AdminService listener behind an internal ClusterIP,
-with `MIO_ADMIN_ALLOW_CIDRS` and NetworkPolicy allowing only the web-admin pods
-to dial `:9090`. Customer-facing workspace onboarding remains in MIU.
+**mio-web** (`ui/web`): Internal role-gated operator console with a Go BFF and
+embedded React SPA. Viewer operators can inspect tenants, accounts, channels,
+credential metadata, and live message tails; operator and credential-admin
+roles can perform audited mutations. Local development can front a loopback
+admin server, but cluster deploys must not rely on cross-pod loopback. The
+default cluster topology is a non-public AdminService listener behind an
+internal ClusterIP, with `MIO_ADMIN_ALLOW_CIDRS` and NetworkPolicy allowing
+only the web-admin pods to dial `:9090`. Customer-facing workspace onboarding
+remains in MIU.
 
 **Embedded NATS Option:** All-in-one binary (`cmd/all-in-one`) bundles gateway + NATS JetStream (memory or file-backed).
 - Laptop demos, single-host POC, development

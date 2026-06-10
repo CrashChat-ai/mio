@@ -15,15 +15,17 @@ import (
 // Provider distinguishes vendor variants of the same channel_type
 // (whatsapp_cloud vs whatsapp_360 under channel_type='whatsapp').
 type Account struct {
-	ID          uuid.UUID
-	TenantID    uuid.UUID
-	ChannelType string
-	Provider    string
-	ExternalID  string
-	DisplayName string
-	Attributes  map[string]string // currently always {}; admin RPCs set
-	DisabledAt  *time.Time
-	CreatedAt   time.Time
+	ID                 uuid.UUID
+	TenantID           uuid.UUID
+	ChannelType        string
+	Provider           string
+	ExternalID         string
+	DisplayName        string
+	Attributes         map[string]string // currently always {}; admin RPCs set
+	DisabledAt         *time.Time
+	CreatedAt          time.Time
+	RateLimitPerSecond int32
+	RateLimitScope     string
 }
 
 // ErrAccountNotFound is returned by GetAccount when the lookup misses.
@@ -52,11 +54,10 @@ func CreateAccount(
 	const q = `
 INSERT INTO accounts (id, tenant_id, channel_type, provider, external_id, display_name, attributes)
 VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
-RETURNING id, tenant_id, channel_type, provider, external_id, display_name, attributes, disabled_at, created_at`
+RETURNING id, tenant_id, channel_type, provider, external_id, display_name, attributes, disabled_at, created_at, rate_limit_per_second, rate_limit_scope`
 	var a Account
 	var attrsRaw []byte
-	if err := pool.QueryRow(ctx, q, id, tenantID, channelType, provider, externalID, displayName, attrsJSON).
-		Scan(&a.ID, &a.TenantID, &a.ChannelType, &a.Provider, &a.ExternalID, &a.DisplayName, &attrsRaw, &a.DisabledAt, &a.CreatedAt); err != nil {
+	if err := scanAccount(pool.QueryRow(ctx, q, id, tenantID, channelType, provider, externalID, displayName, attrsJSON), &a, &attrsRaw); err != nil {
 		return Account{}, fmt.Errorf("store: create account: %w", err)
 	}
 	a.Attributes, _ = unmarshalAttrs(attrsRaw)
@@ -66,7 +67,7 @@ RETURNING id, tenant_id, channel_type, provider, external_id, display_name, attr
 // ListAccounts returns all accounts for a tenant, newest first.
 func ListAccounts(ctx context.Context, pool *pgxpool.Pool, tenantID uuid.UUID) ([]Account, error) {
 	const q = `
-SELECT id, tenant_id, channel_type, provider, external_id, display_name, attributes, disabled_at, created_at
+SELECT id, tenant_id, channel_type, provider, external_id, display_name, attributes, disabled_at, created_at, rate_limit_per_second, rate_limit_scope
 FROM accounts
 WHERE tenant_id = $1
 ORDER BY created_at DESC`
@@ -79,7 +80,7 @@ ORDER BY created_at DESC`
 	for rows.Next() {
 		var a Account
 		var attrsRaw []byte
-		if err := rows.Scan(&a.ID, &a.TenantID, &a.ChannelType, &a.Provider, &a.ExternalID, &a.DisplayName, &attrsRaw, &a.DisabledAt, &a.CreatedAt); err != nil {
+		if err := scanAccount(rows, &a, &attrsRaw); err != nil {
 			return nil, fmt.Errorf("store: list accounts scan: %w", err)
 		}
 		a.Attributes, _ = unmarshalAttrs(attrsRaw)
@@ -91,12 +92,12 @@ ORDER BY created_at DESC`
 // GetAccount fetches a single account by id. ErrAccountNotFound on miss.
 func GetAccount(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID) (Account, error) {
 	const q = `
-SELECT id, tenant_id, channel_type, provider, external_id, display_name, attributes, disabled_at, created_at
+SELECT id, tenant_id, channel_type, provider, external_id, display_name, attributes, disabled_at, created_at, rate_limit_per_second, rate_limit_scope
 FROM accounts
 WHERE id = $1`
 	var a Account
 	var attrsRaw []byte
-	err := pool.QueryRow(ctx, q, id).Scan(&a.ID, &a.TenantID, &a.ChannelType, &a.Provider, &a.ExternalID, &a.DisplayName, &attrsRaw, &a.DisabledAt, &a.CreatedAt)
+	err := scanAccount(pool.QueryRow(ctx, q, id), &a, &attrsRaw)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Account{}, ErrAccountNotFound
@@ -107,11 +108,72 @@ WHERE id = $1`
 	return a, nil
 }
 
+// UpdateAccount edits mutable operator-facing account fields.
+func UpdateAccount(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID, displayName, externalID string) (Account, error) {
+	const q = `
+UPDATE accounts
+SET display_name = COALESCE(NULLIF($2, ''), display_name),
+    external_id = COALESCE(NULLIF($3, ''), external_id)
+WHERE id = $1
+RETURNING id, tenant_id, channel_type, provider, external_id, display_name, attributes, disabled_at, created_at, rate_limit_per_second, rate_limit_scope`
+	var a Account
+	var attrsRaw []byte
+	err := scanAccount(pool.QueryRow(ctx, q, id, displayName, externalID), &a, &attrsRaw)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Account{}, ErrAccountNotFound
+		}
+		return Account{}, fmt.Errorf("store: update account: %w", err)
+	}
+	a.Attributes, _ = unmarshalAttrs(attrsRaw)
+	return a, nil
+}
+
+// SetAccountRateLimit updates the optional account-level send-rate override.
+func SetAccountRateLimit(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID, perSecond int32, scope string) (Account, error) {
+	const q = `
+UPDATE accounts
+SET rate_limit_per_second = NULLIF($2, 0),
+    rate_limit_scope = NULLIF($3, '')
+WHERE id = $1
+RETURNING id, tenant_id, channel_type, provider, external_id, display_name, attributes, disabled_at, created_at, rate_limit_per_second, rate_limit_scope`
+	var a Account
+	var attrsRaw []byte
+	err := scanAccount(pool.QueryRow(ctx, q, id, perSecond, scope), &a, &attrsRaw)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Account{}, ErrAccountNotFound
+		}
+		return Account{}, fmt.Errorf("store: set account rate limit: %w", err)
+	}
+	a.Attributes, _ = unmarshalAttrs(attrsRaw)
+	return a, nil
+}
+
 // DisableAccount soft-deletes an account (disabled_at = NOW()). Idempotent.
 func DisableAccount(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID) error {
 	const q = `UPDATE accounts SET disabled_at = NOW() WHERE id = $1 AND disabled_at IS NULL`
 	if _, err := pool.Exec(ctx, q, id); err != nil {
 		return fmt.Errorf("store: disable account: %w", err)
+	}
+	return nil
+}
+
+type accountScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanAccount(row accountScanner, a *Account, attrsRaw *[]byte) error {
+	var rateLimit *int32
+	var rateLimitScope *string
+	if err := row.Scan(&a.ID, &a.TenantID, &a.ChannelType, &a.Provider, &a.ExternalID, &a.DisplayName, attrsRaw, &a.DisabledAt, &a.CreatedAt, &rateLimit, &rateLimitScope); err != nil {
+		return err
+	}
+	if rateLimit != nil {
+		a.RateLimitPerSecond = *rateLimit
+	}
+	if rateLimitScope != nil {
+		a.RateLimitScope = *rateLimitScope
 	}
 	return nil
 }

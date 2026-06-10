@@ -89,7 +89,7 @@ func (a *stubAdapter) ChannelType() string                      { return stubCha
 func (a *stubAdapter) MaxDeliver() int                          { return 5 }
 func (a *stubAdapter) RateLimitKey(_ *miov1.SendCommand) string { return "" }
 func (a *stubAdapter) Inbound() channels.InboundAdapter         { return nil }
-func (a *stubAdapter) Credentials() channels.CredentialAdapter    { return a.creds }
+func (a *stubAdapter) Credentials() channels.CredentialAdapter  { return a.creds }
 func (a *stubAdapter) Capabilities() *miov1.ChannelCapabilities {
 	return &miov1.ChannelCapabilities{AuthKind: "oauth2_refresh"}
 }
@@ -503,6 +503,70 @@ func TestAdminServer_DisableAccount_Idempotent(t *testing.T) {
 	if _, err := rig.client.DisableAccount(ctx,
 		connect.NewRequest(&adminv1.DisableAccountRequest{AccountId: aID.String()})); err != nil {
 		t.Fatalf("DisableAccount idempotent: %v", err)
+	}
+}
+
+func TestAdminServer_AccountMutationRPCsAndCredentialMetadata(t *testing.T) {
+	rig, cleanup := newTestRig(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	tID := uuid.New()
+	if _, err := store.EnsureTenant(ctx, rig.pool, tID,
+		"acct-rpc-"+tID.String()[:8], ""); err != nil {
+		t.Fatalf("seed tenant: %v", err)
+	}
+	aID := uuid.New()
+	if _, err := store.CreateAccount(ctx, rig.pool, aID, tID, stubChannelType,
+		"default", "ext-before", "Before", nil); err != nil {
+		t.Fatalf("seed account: %v", err)
+	}
+	if err := store.PutCredential(ctx, rig.pool, crypto.NewNoopCipher("dev"),
+		aID, "oauth2_refresh", store.CredentialPayload{AccessToken: "plaintext-token"}); err != nil {
+		t.Fatalf("seed credential: %v", err)
+	}
+
+	got, err := rig.client.GetAccount(ctx,
+		connect.NewRequest(&adminv1.GetAccountRequest{AccountId: aID.String()}))
+	if err != nil {
+		t.Fatalf("GetAccount: %v", err)
+	}
+	if got.Msg.GetAccount().GetExternalId() != "ext-before" {
+		t.Fatalf("account shape: %+v", got.Msg.GetAccount())
+	}
+
+	updated, err := rig.client.UpdateAccount(ctx,
+		connect.NewRequest(&adminv1.UpdateAccountRequest{
+			AccountId:   aID.String(),
+			DisplayName: "After",
+			ExternalId:  "ext-after",
+		}))
+	if err != nil {
+		t.Fatalf("UpdateAccount: %v", err)
+	}
+	if updated.Msg.GetAccount().GetDisplayName() != "After" || updated.Msg.GetAccount().GetExternalId() != "ext-after" {
+		t.Fatalf("updated account: %+v", updated.Msg.GetAccount())
+	}
+
+	limited, err := rig.client.SetRateLimit(ctx,
+		connect.NewRequest(&adminv1.SetRateLimitRequest{
+			AccountId:          aID.String(),
+			RateLimitPerSecond: 9,
+		}))
+	if err != nil {
+		t.Fatalf("SetRateLimit: %v", err)
+	}
+	if limited.Msg.GetAccount().GetRateLimitPerSecond() != 9 || limited.Msg.GetAccount().GetRateLimitScope() != "account" {
+		t.Fatalf("rate limit account: %+v", limited.Msg.GetAccount())
+	}
+
+	meta, err := rig.client.GetCredentialMetadata(ctx,
+		connect.NewRequest(&adminv1.GetCredentialMetadataRequest{AccountId: aID.String()}))
+	if err != nil {
+		t.Fatalf("GetCredentialMetadata: %v", err)
+	}
+	if !meta.Msg.GetHasCredential() || meta.Msg.GetAuthKind() != "oauth2_refresh" {
+		t.Fatalf("metadata: %+v", meta.Msg)
 	}
 }
 

@@ -24,6 +24,10 @@ service AdminService {
   rpc StartInstall(StartInstallRequest)       returns (StartInstallResponse);
   rpc CompleteInstall(CompleteInstallRequest) returns (CompleteInstallResponse);
 
+  rpc GetAccount(GetAccountRequest)             returns (GetAccountResponse);
+  rpc UpdateAccount(UpdateAccountRequest)       returns (UpdateAccountResponse);
+  rpc SetRateLimit(SetRateLimitRequest)         returns (SetRateLimitResponse);
+  rpc GetCredentialMetadata(GetCredentialMetadataRequest) returns (GetCredentialMetadataResponse);
   rpc ListAccounts(ListAccountsRequest)     returns (ListAccountsResponse);
   rpc DisableAccount(DisableAccountRequest) returns (DisableAccountResponse);
   rpc RotateCredential(RotateCredentialRequest) returns (RotateCredentialResponse);
@@ -78,6 +82,8 @@ message Account {
   string                    display_name = 6;
   google.protobuf.Timestamp created_at   = 7;
   google.protobuf.Timestamp disabled_at  = 8;
+  int32                     rate_limit_per_second = 9;
+  string                    rate_limit_scope = 10;
 }
 
 message StartInstallRequest {
@@ -94,6 +100,33 @@ message StartInstallResponse {
 
 message CompleteInstallRequest  { string install_id = 1; }
 message CompleteInstallResponse { Account account   = 1; }
+
+message GetAccountRequest  { string account_id = 1; }
+message GetAccountResponse { Account account = 1; }
+
+message UpdateAccountRequest {
+  string account_id    = 1;
+  string display_name  = 2;
+  string external_id   = 3;
+}
+message UpdateAccountResponse { Account account = 1; }
+
+message SetRateLimitRequest {
+  string account_id = 1;
+  int32  rate_limit_per_second = 2;
+  string rate_limit_scope = 3;
+}
+message SetRateLimitResponse { Account account = 1; }
+
+message GetCredentialMetadataRequest { string account_id = 1; }
+message GetCredentialMetadataResponse {
+  string                    account_id     = 1;
+  bool                      has_credential = 2;
+  string                    auth_kind      = 3;
+  int32                     key_version    = 4;
+  google.protobuf.Timestamp expires_at     = 5;
+  google.protobuf.Timestamp rotated_at     = 6;
+}
 
 message ListAccountsRequest    { string tenant_id = 1; }
 message ListAccountsResponse   { repeated Account accounts = 1; }

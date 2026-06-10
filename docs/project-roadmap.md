@@ -24,7 +24,7 @@
 | **P9.5** | ✅ | Admin control plane + TUI scaffold | Admin server (connect-rpc), TUI (bubbletea, read-only v1), embedded NATS option | Recent |
 | **P10** | 🚧 | BigQuery sink / lakehouse | External tables + native warehouse table, loader pipeline | `.work/plans/260510-1102-bq-sink-lakehouse/` |
 | **P11** | 🚧 | Channel registry control plane | Additive admin RPCs for account detail/update, rate limits, and credential metadata | `.work/plans/260513-0351-channel-management-control-plane/` |
-| **P12** | 🚧 | Operator web admin | `ui/web` Go BFF + embedded React SPA for internal operators | `.work/plans/260610-1352-issue-31-web-admin-phase0-reconcile/` |
+| **P12** | 🚧 | Operator web admin | `ui/web` Go BFF + embedded React SPA with role-gated audited mutations | `.work/plans/260610-1352-issue-31-web-admin-phase0-reconcile/` |
 | **—** | — | Second channel adapter (Slack) | Webhook inbound, API outbound, per-channel rate limits | open |
 | **—** | — | ELT pipeline (Airflow DAG) | Scheduled Cloud Run Job for BigQuery loader | `.work/plans/260510-2333-elt-mio-airflow-dag/` |
 | **—** | — | Cliq OAuth refresh hardening | Token refresh retry/backoff, credential rotation | `.work/plans/260510-0152-cliq-oauth-token-refresh/` |

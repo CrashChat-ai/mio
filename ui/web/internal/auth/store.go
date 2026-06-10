@@ -21,6 +21,7 @@ type Operator struct {
 	Email     string    `json:"email"`
 	Name      string    `json:"name"`
 	AvatarURL string    `json:"avatarUrl"`
+	Role      Role      `json:"role"`
 	ExpiresAt time.Time `json:"expiresAt"`
 }
 
@@ -30,7 +31,7 @@ type Session struct {
 }
 
 type Store interface {
-	Create(ctx context.Context, identity Identity, ttl time.Duration) (rawToken string, session Session, err error)
+	Create(ctx context.Context, identity Identity, role Role, ttl time.Duration) (rawToken string, session Session, err error)
 	Get(ctx context.Context, rawToken string) (Session, error)
 	Delete(ctx context.Context, rawToken string) error
 }
@@ -44,7 +45,7 @@ func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{sessions: map[string]Session{}}
 }
 
-func (m *MemoryStore) Create(_ context.Context, identity Identity, ttl time.Duration) (string, Session, error) {
+func (m *MemoryStore) Create(_ context.Context, identity Identity, role Role, ttl time.Duration) (string, Session, error) {
 	raw, hash, err := newSessionToken()
 	if err != nil {
 		return "", Session{}, err
@@ -55,6 +56,7 @@ func (m *MemoryStore) Create(_ context.Context, identity Identity, ttl time.Dura
 			Email:     identity.Email,
 			Name:      identity.Name,
 			AvatarURL: identity.AvatarURL,
+			Role:      role,
 			ExpiresAt: time.Now().UTC().Add(ttl),
 		},
 	}
@@ -103,10 +105,24 @@ func (p *PostgresStore) CheckSchema(ctx context.Context) error {
 	if table == nil || *table == "" {
 		return errors.New("auth: web_operator_sessions table missing; run gateway migrations")
 	}
+	var hasRole bool
+	if err := p.pool.QueryRow(ctx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name = 'web_operator_sessions'
+    AND column_name = 'operator_role'
+)`).Scan(&hasRole); err != nil {
+		return fmt.Errorf("auth: check web session role column: %w", err)
+	}
+	if !hasRole {
+		return errors.New("auth: web_operator_sessions.operator_role column missing; run gateway migrations")
+	}
 	return nil
 }
 
-func (p *PostgresStore) Create(ctx context.Context, identity Identity, ttl time.Duration) (string, Session, error) {
+func (p *PostgresStore) Create(ctx context.Context, identity Identity, role Role, ttl time.Duration) (string, Session, error) {
 	raw, hash, err := newSessionToken()
 	if err != nil {
 		return "", Session{}, err
@@ -114,9 +130,9 @@ func (p *PostgresStore) Create(ctx context.Context, identity Identity, ttl time.
 	expiresAt := p.now().Add(ttl)
 	_, err = p.pool.Exec(ctx, `
 INSERT INTO web_operator_sessions (
-  id_hash, operator_email, operator_name, operator_avatar_url, expires_at
-) VALUES ($1, $2, $3, $4, $5)`,
-		hash, identity.Email, identity.Name, identity.AvatarURL, expiresAt)
+  id_hash, operator_email, operator_name, operator_avatar_url, operator_role, expires_at
+) VALUES ($1, $2, $3, $4, $5, $6)`,
+		hash, identity.Email, identity.Name, identity.AvatarURL, role, expiresAt)
 	if err != nil {
 		return "", Session{}, fmt.Errorf("auth: create session: %w", err)
 	}
@@ -126,6 +142,7 @@ INSERT INTO web_operator_sessions (
 			Email:     identity.Email,
 			Name:      identity.Name,
 			AvatarURL: identity.AvatarURL,
+			Role:      role,
 			ExpiresAt: expiresAt,
 		},
 	}, nil
@@ -136,12 +153,13 @@ func (p *PostgresStore) Get(ctx context.Context, rawToken string) (Session, erro
 	var session Session
 	session.TokenHash = hash
 	err := p.pool.QueryRow(ctx, `
-SELECT operator_email, operator_name, operator_avatar_url, expires_at
+SELECT operator_email, operator_name, operator_avatar_url, operator_role, expires_at
 FROM web_operator_sessions
 WHERE id_hash = $1 AND expires_at > NOW()`, hash).Scan(
 		&session.Operator.Email,
 		&session.Operator.Name,
 		&session.Operator.AvatarURL,
+		&session.Operator.Role,
 		&session.Operator.ExpiresAt,
 	)
 	if err != nil {

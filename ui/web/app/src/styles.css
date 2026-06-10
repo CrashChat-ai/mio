@@ -48,6 +48,11 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.dangerAction {
+  border-color: #f3a8a0;
+  color: #b42318;
+}
+
 input,
 select {
   padding: 0.42rem 0.55rem;
@@ -168,6 +173,15 @@ h2 {
 .operatorStrip span {
   color: #475467;
   font-size: 0.9rem;
+}
+
+.rolePill {
+  background: #eef6f5;
+  border: 1px solid #b7dfcf;
+  border-radius: 999px;
+  color: #0f766e;
+  font-weight: 700;
+  padding: 0.22rem 0.55rem;
 }
 
 .eyebrow {
@@ -331,11 +345,63 @@ h2 {
 }
 
 .toolbar,
-.tailControls {
+.tailControls,
+.formStack,
+.credentialBody {
   border-bottom: 1px solid #edf0f4;
   display: grid;
   gap: 0.6rem;
   padding: 0.85rem 1rem;
+}
+
+.formStack,
+.credentialBody {
+  border-bottom: 0;
+}
+
+.fieldGrid {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+}
+
+.installResult {
+  background: #f7f9fc;
+  border: 1px solid #d9dee7;
+  border-radius: 6px;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.7rem;
+}
+
+.installResult strong,
+.installResult small {
+  overflow-wrap: anywhere;
+}
+
+.installResult a {
+  color: #0f766e;
+  font-weight: 700;
+}
+
+.credentialBody {
+  grid-template-columns: auto auto minmax(0, 1fr);
+}
+
+.credentialGrid {
+  display: grid;
+  gap: 0.45rem 0.75rem;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.credentialGrid span {
+  color: #667085;
+}
+
+.credentialGrid strong {
+  font-weight: 650;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .tailControls {
@@ -412,6 +478,11 @@ h2 {
 
   .tailControls {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .fieldGrid,
+  .credentialBody {
+    grid-template-columns: 1fr;
   }
 }
 

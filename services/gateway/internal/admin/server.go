@@ -18,9 +18,9 @@ import (
 	"github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1/adminv1connect"
 
 	"github.com/crashchat-ai/mio/pkg/channels"
+	sdk "github.com/crashchat-ai/mio/sdk-go"
 	"github.com/crashchat-ai/mio/services/gateway/internal/crypto"
 	"github.com/crashchat-ai/mio/services/gateway/store"
-	sdk "github.com/crashchat-ai/mio/sdk-go"
 )
 
 // AdminServer satisfies adminv1connect.AdminServiceHandler. Constructed
@@ -307,6 +307,92 @@ func (s *AdminServer) CompleteInstall(ctx context.Context, req *connect.Request[
 
 // ── Accounts ───────────────────────────────────────────────────────────────
 
+func (s *AdminServer) GetAccount(ctx context.Context, req *connect.Request[adminv1.GetAccountRequest]) (*connect.Response[adminv1.GetAccountResponse], error) {
+	id, err := uuid.Parse(req.Msg.GetAccountId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	acct, err := store.GetAccount(ctx, s.Pool, id)
+	if err != nil {
+		if errors.Is(err, store.ErrAccountNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&adminv1.GetAccountResponse{Account: accountToProto(acct)}), nil
+}
+
+func (s *AdminServer) UpdateAccount(ctx context.Context, req *connect.Request[adminv1.UpdateAccountRequest]) (*connect.Response[adminv1.UpdateAccountResponse], error) {
+	id, err := uuid.Parse(req.Msg.GetAccountId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	acct, err := store.UpdateAccount(ctx, s.Pool, id, req.Msg.GetDisplayName(), req.Msg.GetExternalId())
+	if err != nil {
+		if errors.Is(err, store.ErrAccountNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	s.Logger.Info("admin: account updated", "account_id", id, "tenant_id", acct.TenantID)
+	return connect.NewResponse(&adminv1.UpdateAccountResponse{Account: accountToProto(acct)}), nil
+}
+
+func (s *AdminServer) SetRateLimit(ctx context.Context, req *connect.Request[adminv1.SetRateLimitRequest]) (*connect.Response[adminv1.SetRateLimitResponse], error) {
+	id, err := uuid.Parse(req.Msg.GetAccountId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	if req.Msg.GetRateLimitPerSecond() < 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("rate_limit_per_second must be >= 0"))
+	}
+	scope := req.Msg.GetRateLimitScope()
+	if req.Msg.GetRateLimitPerSecond() > 0 && scope == "" {
+		scope = "account"
+	}
+	acct, err := store.SetAccountRateLimit(ctx, s.Pool, id, req.Msg.GetRateLimitPerSecond(), scope)
+	if err != nil {
+		if errors.Is(err, store.ErrAccountNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	s.Logger.Info("admin: account rate limit updated",
+		"account_id", id,
+		"tenant_id", acct.TenantID,
+		"rate_limit_per_second", acct.RateLimitPerSecond,
+		"rate_limit_scope", acct.RateLimitScope)
+	return connect.NewResponse(&adminv1.SetRateLimitResponse{Account: accountToProto(acct)}), nil
+}
+
+func (s *AdminServer) GetCredentialMetadata(ctx context.Context, req *connect.Request[adminv1.GetCredentialMetadataRequest]) (*connect.Response[adminv1.GetCredentialMetadataResponse], error) {
+	id, err := uuid.Parse(req.Msg.GetAccountId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	meta, err := store.GetCredentialMetadata(ctx, s.Pool, id)
+	if err != nil {
+		if errors.Is(err, store.ErrCredentialNotFound) {
+			return connect.NewResponse(&adminv1.GetCredentialMetadataResponse{
+				AccountId:     id.String(),
+				HasCredential: false,
+			}), nil
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	out := &adminv1.GetCredentialMetadataResponse{
+		AccountId:     meta.AccountID.String(),
+		HasCredential: true,
+		AuthKind:      meta.AuthKind,
+		KeyVersion:    meta.KeyVersion,
+		RotatedAt:     timestamppb.New(meta.RotatedAt),
+	}
+	if meta.ExpiresAt != nil {
+		out.ExpiresAt = timestamppb.New(*meta.ExpiresAt)
+	}
+	return connect.NewResponse(out), nil
+}
+
 func (s *AdminServer) ListAccounts(ctx context.Context, req *connect.Request[adminv1.ListAccountsRequest]) (*connect.Response[adminv1.ListAccountsResponse], error) {
 	tid, err := uuid.Parse(req.Msg.GetTenantId())
 	if err != nil {
@@ -480,13 +566,15 @@ func tenantToProto(t store.Tenant) *adminv1.Tenant {
 
 func accountToProto(a store.Account) *adminv1.Account {
 	out := &adminv1.Account{
-		Id:          a.ID.String(),
-		TenantId:    a.TenantID.String(),
-		ChannelType: a.ChannelType,
-		Provider:    a.Provider,
-		ExternalId:  a.ExternalID,
-		DisplayName: a.DisplayName,
-		CreatedAt:   timestamppb.New(a.CreatedAt),
+		Id:                 a.ID.String(),
+		TenantId:           a.TenantID.String(),
+		ChannelType:        a.ChannelType,
+		Provider:           a.Provider,
+		ExternalId:         a.ExternalID,
+		DisplayName:        a.DisplayName,
+		CreatedAt:          timestamppb.New(a.CreatedAt),
+		RateLimitPerSecond: a.RateLimitPerSecond,
+		RateLimitScope:     a.RateLimitScope,
 	}
 	if a.DisabledAt != nil {
 		out.DisabledAt = timestamppb.New(*a.DisabledAt)

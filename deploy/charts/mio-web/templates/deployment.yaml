@@ -40,11 +40,53 @@ spec:
           env:
             - name: MIO_WEB_ADDR
               value: ":8080"
+            - name: MIO_WEB_PUBLIC_URL
+              value: {{ .Values.web.publicUrl | quote }}
+            - name: MIO_WEB_AUTH_MODE
+              value: {{ .Values.web.authMode | quote }}
+            - name: MIO_WEB_COOKIE_SECURE
+              value: {{ .Values.web.cookieSecure | quote }}
+            - name: MIO_WEB_SESSION_TTL
+              value: {{ .Values.session.ttl | quote }}
+            - name: MIO_WEB_OPERATOR_EMAILS
+              value: {{ join "," .Values.operators.emails | quote }}
+            - name: MIO_WEB_OPERATOR_DOMAINS
+              value: {{ join "," .Values.operators.domains | quote }}
             - name: MIO_ADMIN_URL
               value: {{ .Values.admin.url | quote }}
-            {{- if .Values.admin.allowCIDRs }}
-            - name: MIO_ADMIN_ALLOW_CIDRS
-              value: {{ join "," .Values.admin.allowCIDRs | quote }}
+            {{- $redirectURL := .Values.google.redirectUrl }}
+            {{- if and (not $redirectURL) .Values.web.publicUrl }}
+            {{- $redirectURL = printf "%s/auth/callback" (trimSuffix "/" .Values.web.publicUrl) }}
+            {{- end }}
+            {{- if $redirectURL }}
+            - name: MIO_WEB_OIDC_REDIRECT_URL
+              value: {{ $redirectURL | quote }}
+            {{- end }}
+            {{- if .Values.session.databaseSecretName }}
+            - name: MIO_WEB_DATABASE_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.session.databaseSecretName | quote }}
+                  key: {{ .Values.session.databaseSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.google.existingSecret }}
+            - name: MIO_WEB_GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.google.existingSecret | quote }}
+                  key: {{ .Values.google.clientIDKey | quote }}
+            - name: MIO_WEB_GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.google.existingSecret | quote }}
+                  key: {{ .Values.google.clientSecretKey | quote }}
+            {{- end }}
+            {{- if .Values.stateSecret.existingSecret }}
+            - name: MIO_WEB_STATE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.stateSecret.existingSecret | quote }}
+                  key: {{ .Values.stateSecret.key | quote }}
             {{- end }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}

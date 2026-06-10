@@ -21,7 +21,7 @@ mio/
 │   └── media-vault/      # Attachment sidecar. Fetches within platform TTL, persists to GCS.
 ├── ui/                   # Human-facing operator surfaces.
 │   ├── tui/              # Terminal UI admin client (bubbletea). Read-only v1.
-│   └── web/              # Planned operator web admin BFF + embedded React SPA.
+│   └── web/              # Operator web admin BFF + embedded React SPA.
 ├── ee/                   # Commercial overlay (build-tag-gated, //go:build ee). OSS must compile without it.
 ├── sdks/                 # Distributable client libraries.
 │   ├── go/               # Go SDK (separate module: github.com/crashchat-ai/mio/sdk-go). Thin NATS wrapper for consumers.
@@ -32,7 +32,7 @@ mio/
 ├── tools/                # Code generation: genchanneltypes, proto-roundtrip.
 ├── deploy/
 │   ├── local/            # docker-compose stack (NATS 2.10, Postgres 16, MinIO, services).
-│   ├── charts/           # Helm charts (6: mio-nats, mio-jetstream-bootstrap, mio-gateway, mio-media-vault, mio-sink-gcs, mio-echo-consumer).
+│   ├── charts/           # Helm charts (7: mio-nats, mio-jetstream-bootstrap, mio-gateway, mio-web, mio-media-vault, mio-sink-gcs, mio-echo-consumer).
 │   ├── gke/              # GKE POC setup.sh
 │   ├── fluxcd/           # GitOps overlay (external infra repo reconciliation).
 │   └── appdata/          # Persistent storage for local dev (NATS, Postgres).

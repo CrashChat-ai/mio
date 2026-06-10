@@ -35,10 +35,81 @@ nodeSelector: {}
 tolerations: []
 affinity: {}
 
+web:
+  publicUrl: "https://mio-web.example.com"
+  authMode: "google"
+  cookieSecure: true
+
+operators:
+  emails: []
+  domains:
+    - "example.com"
+
+session:
+  ttl: "12h"
+  # Secret containing DATABASE_URL. Reuse the gateway DB secret unless an
+  # environment splits web sessions into a separate database/user.
+  databaseSecretName: "mio-gateway-secrets"
+  databaseSecretKey: "DATABASE_URL"
+
+google:
+  # Existing Secret with Google OAuth client credentials for operator login.
+  # This is intentionally separate from provider install OAuth secrets.
+  existingSecret: "mio-web-oauth"
+  clientIDKey: "GOOGLE_CLIENT_ID"
+  clientSecretKey: "GOOGLE_CLIENT_SECRET"
+  # Empty means MIO_WEB_PUBLIC_URL + /auth/callback.
+  redirectUrl: ""
+
+stateSecret:
+  # Existing Secret with a high-entropy value used to sign OAuth state cookies.
+  existingSecret: "mio-web-session"
+  key: "STATE_SECRET"
+
 admin:
   # Use a cluster DNS name or service mesh endpoint. Do not point this at
-  # localhost unless the AdminService runs in the same container.
+  # localhost unless AdminService runs in the same pod.
   url: "http://mio-admin:9090"
-  allowCIDRs: []
+
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-production"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: "mio-web.example.com"
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # tls:
+  #   - secretName: mio-web-tls
+  #     hosts:
+  #       - mio-web.example.com
+
+networkPolicy:
+  enabled: true
+  ingress:
+    # Override this to restrict browser ingress to an ingress controller,
+    # load balancer, service mesh gateway, or VPN namespace.
+    from: []
+  egress:
+    allowDNS: true
+    allowHTTPS: true
+    admin:
+      port: 9090
+      to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mio-admin
+    postgres:
+      port: 5432
+      to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgres
 
 env: []

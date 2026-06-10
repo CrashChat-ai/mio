@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/crashchat-ai/mio/pkg/channels"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -62,4 +63,30 @@ RETURNING id`
 		return uuid.Nil, false, fmt.Errorf("store: ensure_unique_message select after conflict: %w", err2)
 	}
 	return returnedID, false, nil
+}
+
+// FindMessageBySource resolves a previously captured platform message id into
+// mio's message id and effective thread root.
+func FindMessageBySource(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	accountID, sourceMessageID string,
+) (channels.MessageRef, bool, error) {
+	const q = `
+SELECT id, COALESCE(thread_root_message_id, id)
+FROM messages
+WHERE account_id = $1 AND source_message_id = $2`
+
+	var ref channels.MessageRef
+	err := pool.QueryRow(ctx, q, accountID, sourceMessageID).Scan(
+		&ref.ID,
+		&ref.ThreadRootMessageID,
+	)
+	if err == nil {
+		return ref, true, nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return channels.MessageRef{}, false, nil
+	}
+	return channels.MessageRef{}, false, fmt.Errorf("store: find_message_by_source: %w", err)
 }

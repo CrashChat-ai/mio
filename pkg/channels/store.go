@@ -12,6 +12,12 @@ type Conversation struct {
 	ID uuid.UUID
 }
 
+// MessageRef is the durable identity for a previously captured message.
+type MessageRef struct {
+	ID                  uuid.UUID
+	ThreadRootMessageID uuid.UUID
+}
+
 // Store captures the durable-state operations every inbound webhook adapter
 // needs: idempotent conversation upsert and idempotent message upsert.
 //
@@ -46,4 +52,12 @@ type Store interface {
 		sourceMessageID, senderExternalID, text string,
 		attributes map[string]string,
 	) (msgID uuid.UUID, fresh bool, err error)
+
+	// FindMessageBySource resolves a platform message id into mio's durable
+	// message id. ThreadRootMessageID is the root id to place on replies: the
+	// message's existing root when it is itself a reply, otherwise its own id.
+	FindMessageBySource(
+		ctx context.Context,
+		accountID, sourceMessageID string,
+	) (MessageRef, bool, error)
 }

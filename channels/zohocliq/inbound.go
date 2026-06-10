@@ -109,9 +109,7 @@ func (c *cliqInbound) Normalize(rawBody []byte) (*miov1.Message, error) {
 			Filename: a.Filename,
 		})
 	}
-	if nm.ParentExternalID != "" {
-		msg.ParentConversationId = nm.ParentExternalID
-	}
+	applyReplyFields(msg, nm.ParentExternalID, "", "")
 	return msg, nil
 }
 

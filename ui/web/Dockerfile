@@ -16,7 +16,7 @@ COPY buf.yaml buf.gen.yaml ./
 COPY proto/ ./proto/
 RUN buf generate proto
 
-FROM golang:1.25-bookworm AS go-builder
+FROM golang:1.26-bookworm AS go-builder
 WORKDIR /src
 
 COPY go.mod go.sum ./

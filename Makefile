@@ -1,4 +1,4 @@
-.PHONY: help up down proto proto-gen proto-lint proto-breaking proto-roundtrip sdk-go-test sdk-py-test sink-gcs-test sink-gcs-build-local sink-gcs-build lint docs-check test clean gateway-build gateway-build-local gateway-test gateway-migrate gateway-bench-outbound admin-build admin-run admin-test tui-build tui-run tui-test ui-web-install ui-web-build ui-web-test docker-mio-web echo-up echo-logs echo-consumer-test helm-lint helm-template kind-up kind-deploy kind-smoke kind-down
+.PHONY: help up down operator-web-up proto proto-gen proto-lint proto-breaking proto-roundtrip sdk-go-test sdk-py-test sink-gcs-test sink-gcs-build-local sink-gcs-build lint docs-check test clean gateway-build gateway-build-local gateway-test gateway-migrate gateway-bench-outbound admin-build admin-run admin-test tui-build tui-run tui-test ui-web-install ui-web-build ui-web-test docker-mio-web echo-up echo-logs echo-consumer-test helm-lint helm-template kind-up kind-deploy kind-smoke kind-down
 
 COMPOSE := docker compose -f deploy/local/docker-compose.yml
 BUILD_VERSION := $(shell git describe --always --dirty 2>/dev/null || echo dev)
@@ -13,6 +13,9 @@ up: ## Start local infra (NATS + Postgres + MinIO)
 
 down: ## Stop local infra
 	$(COMPOSE) down
+
+operator-web-up: ## Run gateway + admin + mio-web locally (operator profile)
+	$(COMPOSE) --profile operator up --build gateway admin mio-web
 
 proto: ## Run buf generate (outputs to proto/gen/)
 	buf generate

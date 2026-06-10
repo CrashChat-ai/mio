@@ -44,7 +44,7 @@ flowchart LR
     gw["mio-gateway<br/>(Go, stateless)<br/>+ embedded NATS option"]
     admin["mio-admin<br/>(connect-rpc<br/>loopback:9090)"]
     tui["mio-tui<br/>(bubbletea,<br/>read-only)"]
-    web["mio-web<br/>(operator admin,<br/>planned)"]
+    web["mio-web<br/>(operator admin)"]
     bus[("NATS JetStream<br/>3-replica cluster<br/>or embedded")]
     sink["mio-sink-gcs<br/>(Go consumer)"]
     dl["mio-media-vault<br/>(Go sidecar)"]
@@ -115,12 +115,12 @@ is the boundary that keeps "intelligence" and "transport" separable.
 - Inspect messages, list channels, view consumer lag
 - Write ops deferred to P6+
 
-**mio-web** (`ui/web`, planned): Internal operator console. Local development can
-front a loopback admin server, but cluster deploys must not rely on cross-pod
-loopback. The default cluster topology is a non-public AdminService listener behind
-an internal ClusterIP, with `MIO_ADMIN_ALLOW_CIDRS` and NetworkPolicy allowing only
-the web-admin pods to dial `:9090`. Customer-facing workspace onboarding remains in
-MIU.
+**mio-web** (`ui/web`): Internal read-only operator console with a Go BFF and
+embedded React SPA. Local development can front a loopback admin server, but
+cluster deploys must not rely on cross-pod loopback. The default cluster
+topology is a non-public AdminService listener behind an internal ClusterIP,
+with `MIO_ADMIN_ALLOW_CIDRS` and NetworkPolicy allowing only the web-admin pods
+to dial `:9090`. Customer-facing workspace onboarding remains in MIU.
 
 **Embedded NATS Option:** All-in-one binary (`cmd/all-in-one`) bundles gateway + NATS JetStream (memory or file-backed).
 - Laptop demos, single-host POC, development

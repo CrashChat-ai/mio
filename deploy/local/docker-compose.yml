@@ -76,12 +76,59 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/healthz"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
+    restart: unless-stopped
+
+  admin:
+    profiles: ["operator"]
+    build:
+      context: ../..
+      dockerfile: services/gateway/Dockerfile.admin
+    ports:
+      - "${ADMIN_PORT:-9090}:9090"
+    environment:
+      MIO_ENV: "dev"
+      MIO_ADMIN_ADDR: "0.0.0.0:9090"
+      MIO_ADMIN_PUBLIC_URL: "${MIO_ADMIN_PUBLIC_URL:-http://localhost:9090}"
+      MIO_ADMIN_ALLOW_CIDRS: "${MIO_ADMIN_ALLOW_CIDRS:-0.0.0.0/0,::/0}"
+      MIO_POSTGRES_DSN: "postgres://mio_app:dev_password@postgres:5432/mio?sslmode=disable"
+      MIO_NATS_URLS: "nats://nats:4222"
+    depends_on:
+      gateway:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mio-web:
+    profiles: ["operator"]
+    build:
+      context: ../..
+      dockerfile: ui/web/Dockerfile
+    ports:
+      - "${MIO_WEB_PORT:-8081}:8080"
+    environment:
+      MIO_WEB_ADDR: ":8080"
+      MIO_WEB_PUBLIC_URL: "${MIO_WEB_PUBLIC_URL:-http://localhost:8081}"
+      MIO_WEB_AUTH_MODE: "${MIO_WEB_AUTH_MODE:-dev}"
+      MIO_WEB_COOKIE_SECURE: "${MIO_WEB_COOKIE_SECURE:-false}"
+      MIO_WEB_OPERATOR_EMAILS: "${MIO_WEB_OPERATOR_EMAILS:-operator@localhost}"
+      MIO_WEB_OPERATOR_DOMAINS: "${MIO_WEB_OPERATOR_DOMAINS:-}"
+      MIO_WEB_DEV_OPERATOR_EMAIL: "${MIO_WEB_DEV_OPERATOR_EMAIL:-operator@localhost}"
+      MIO_WEB_DEV_OPERATOR_NAME: "${MIO_WEB_DEV_OPERATOR_NAME:-Local Operator}"
+      MIO_WEB_SESSION_TTL: "${MIO_WEB_SESSION_TTL:-12h}"
+      MIO_WEB_GOOGLE_CLIENT_ID: "${MIO_WEB_GOOGLE_CLIENT_ID:-}"
+      MIO_WEB_GOOGLE_CLIENT_SECRET: "${MIO_WEB_GOOGLE_CLIENT_SECRET:-}"
+      MIO_WEB_OIDC_REDIRECT_URL: "${MIO_WEB_OIDC_REDIRECT_URL:-}"
+      MIO_WEB_STATE_SECRET: "${MIO_WEB_STATE_SECRET:-local-dev-state-secret-change-me}"
+      MIO_WEB_DATABASE_DSN: "postgres://mio_app:dev_password@postgres:5432/mio?sslmode=disable"
+      MIO_ADMIN_URL: "http://admin:9090"
+    depends_on:
+      admin:
+        condition: service_started
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   sink-gcs:
@@ -112,5 +159,5 @@ services:
       nats:
         condition: service_healthy
       gateway:
-        condition: service_healthy
+        condition: service_started
     restart: on-failure

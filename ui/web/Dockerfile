@@ -10,6 +10,12 @@ RUN pnpm install --frozen-lockfile
 COPY ui/web/app/ ./
 RUN pnpm build
 
+FROM bufbuild/buf:1.69.0 AS proto
+WORKDIR /src
+COPY buf.yaml buf.gen.yaml ./
+COPY proto/ ./proto/
+RUN buf generate proto
+
 FROM golang:1.25-bookworm AS go-builder
 WORKDIR /src
 
@@ -20,6 +26,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     go mod download
 
 COPY . .
+COPY --from=proto /src/proto/gen/ ./proto/gen/
 RUN rm -rf ui/web/internal/embed/dist && mkdir -p ui/web/internal/embed/dist
 COPY --from=web /src/ui/web/app/dist/ ./ui/web/internal/embed/dist/
 RUN --mount=type=cache,target=/root/.cache/go-build \

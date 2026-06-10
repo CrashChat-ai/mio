@@ -150,6 +150,45 @@ func TestAccounts_ListByTenant(t *testing.T) {
 	}
 }
 
+func TestAccounts_UpdateAndRateLimit(t *testing.T) {
+	pool, cleanup := requirePool(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	tid, slug := newTenantID(t, "acct-update")
+	if _, err := EnsureTenant(ctx, pool, tid, slug, ""); err != nil {
+		t.Fatalf("tenant: %v", err)
+	}
+	aid := uuid.New()
+	if _, err := CreateAccount(ctx, pool, aid, tid, "zoho_cliq", "default", "ext-before", "Before", nil); err != nil {
+		t.Fatalf("acct: %v", err)
+	}
+
+	updated, err := UpdateAccount(ctx, pool, aid, "After", "ext-after")
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if updated.DisplayName != "After" || updated.ExternalID != "ext-after" {
+		t.Fatalf("updated account: %+v", updated)
+	}
+
+	limited, err := SetAccountRateLimit(ctx, pool, aid, 12, "account")
+	if err != nil {
+		t.Fatalf("rate limit: %v", err)
+	}
+	if limited.RateLimitPerSecond != 12 || limited.RateLimitScope != "account" {
+		t.Fatalf("rate limit account: %+v", limited)
+	}
+
+	cleared, err := SetAccountRateLimit(ctx, pool, aid, 0, "")
+	if err != nil {
+		t.Fatalf("clear rate limit: %v", err)
+	}
+	if cleared.RateLimitPerSecond != 0 || cleared.RateLimitScope != "" {
+		t.Fatalf("cleared rate limit: %+v", cleared)
+	}
+}
+
 func TestCredentials_RoundTrip(t *testing.T) {
 	pool, cleanup := requirePool(t)
 	defer cleanup()
@@ -190,6 +229,17 @@ func TestCredentials_RoundTrip(t *testing.T) {
 	}
 	if row.Plaintext.Extras["api_domain"] != "https://www.zohoapis.com" {
 		t.Errorf("extras: %+v", row.Plaintext.Extras)
+	}
+
+	meta, err := GetCredentialMetadata(ctx, pool, aid)
+	if err != nil {
+		t.Fatalf("metadata: %v", err)
+	}
+	if meta.AccountID != aid || meta.AuthKind != "oauth2_refresh" || meta.KeyVersion != int32(cipher.KeyVersion()) {
+		t.Fatalf("metadata shape: %+v", meta)
+	}
+	if meta.ExpiresAt == nil || meta.RotatedAt.IsZero() {
+		t.Fatalf("metadata timestamps: %+v", meta)
 	}
 }
 

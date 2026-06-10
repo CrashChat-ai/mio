@@ -30,8 +30,10 @@ the variables below; everything else lives in `services/gateway/internal/config`
 | `MIO_ADMIN_ALLOW_CIDRS` | _empty_ | Comma-separated CIDR list permitted to call admin RPCs. Loopback (`127.0.0.1`, `::1`) is always allowed; anything else returns 403. |
 | `MIO_WEB_PUBLIC_URL` | `http://localhost:8081` | Browser-facing URL for local `mio-web`; Google login redirects to `/auth/callback` under this URL. |
 | `MIO_WEB_AUTH_MODE` | `dev` in compose | `dev` signs in `MIO_WEB_DEV_OPERATOR_EMAIL`; deployed environments should use `google`. |
-| `MIO_WEB_OPERATOR_EMAILS` / `MIO_WEB_OPERATOR_DOMAINS` | `operator@localhost` / _empty_ | Operator allowlist enforced before read-only admin routes are served. |
-| `MIO_WEB_DATABASE_DSN` | local Postgres DSN | Postgres-backed operator sessions. |
+| `MIO_WEB_OPERATOR_EMAILS` / `MIO_WEB_OPERATOR_DOMAINS` | `operator@localhost` / _empty_ | Operator allowlist enforced before admin routes are served. |
+| `MIO_WEB_OPERATOR_DEFAULT_ROLE` / `MIO_WEB_OPERATOR_ROLES` | `viewer` / `operator@localhost=credential-admin` | Role assignments for allowed operators. |
+| `MIO_WEB_DEV_OPERATOR_ROLE` | `credential-admin` | Role used by local dev-auth sessions. |
+| `MIO_WEB_DATABASE_DSN` | local Postgres DSN | Postgres-backed operator sessions and mutation audit logs. |
 | `CLIQ_CLIENT_ID` / `CLIQ_CLIENT_SECRET` / `CLIQ_REFRESH_TOKEN` | _empty_ | Zoho Cliq OAuth credentials. The refresh token is provisioned once via the admin's OAuth dance (`StartInstall` → `/oauth/callback` → `CompleteInstall`). |
 | `CLIQ_REDIRECT_URI` | _empty_ | The redirect URI registered with Zoho; consumed by `tokenCredentials.AuthorizeURL`. Must match `MIO_ADMIN_PUBLIC_URL + /oauth/callback` for the admin-driven install flow. |
 | `CLIQ_OAUTH_SCOPE` | `ZohoCliq.Webhooks.CREATE,ZohoCliq.messages.CREATE` | Override the default OAuth scope; rarely needed. |

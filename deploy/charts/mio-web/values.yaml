@@ -44,6 +44,10 @@ operators:
   emails: []
   domains:
     - "example.com"
+  defaultRole: "viewer"
+  # Entries accept email=role or domain=role. Supported roles are:
+  # viewer, operator, credential-admin.
+  roles: []
 
 session:
   ttl: "12h"

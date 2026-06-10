@@ -4,6 +4,7 @@ type Operator = {
   email: string;
   name: string;
   avatarUrl: string;
+  role: "viewer" | "operator" | "credential-admin";
   expiresAt: string;
 };
 
@@ -29,6 +30,8 @@ type Account = {
   provider: string;
   externalId: string;
   displayName: string;
+  rateLimitPerSecond: number;
+  rateLimitScope: string;
   createdAt: string;
   disabledAt?: string;
 };
@@ -57,14 +60,34 @@ type TailMessage = {
   receivedAt: string;
 };
 
+type CredentialMetadata = {
+  accountId: string;
+  hasCredential: boolean;
+  authKind?: string;
+  keyVersion?: number;
+  expiresAt?: string;
+  rotatedAt?: string;
+};
+
 type LoadState = "idle" | "loading" | "ready" | "error";
 
-async function api<T>(url: string): Promise<T> {
-  const response = await fetch(url, { credentials: "same-origin" });
+async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(url, { credentials: "same-origin", ...init });
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}`);
   }
+  if (response.status === 204) {
+    return undefined as T;
+  }
   return (await response.json()) as T;
+}
+
+function jsonRequest(method: "POST" | "PATCH", body: unknown): RequestInit {
+  return {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  };
 }
 
 function App() {
@@ -81,6 +104,18 @@ function App() {
   const [accountsState, setAccountsState] = useState<LoadState>("idle");
   const [tailState, setTailState] = useState<"idle" | "connecting" | "open" | "closed">("idle");
   const [error, setError] = useState("");
+  const [mutationState, setMutationState] = useState<LoadState>("idle");
+  const [tenantForm, setTenantForm] = useState({ slug: "", displayName: "" });
+  const [installForm, setInstallForm] = useState({ tenantId: "", channelType: "", provider: "default" });
+  const [completeInstallID, setCompleteInstallID] = useState("");
+  const [lastInstall, setLastInstall] = useState<{ installId: string; oauthUrl: string; redirectUri: string } | null>(null);
+  const [accountForm, setAccountForm] = useState({
+    displayName: "",
+    externalId: "",
+    rateLimitPerSecond: "0",
+    rateLimitScope: "",
+  });
+  const [credential, setCredential] = useState<CredentialMetadata | null>(null);
   const tailRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
@@ -102,6 +137,7 @@ function App() {
   useEffect(() => {
     if (selectedTenantID !== "") {
       void loadAccounts(selectedTenantID);
+      setInstallForm((current) => ({ ...current, tenantId: selectedTenantID }));
     } else {
       setAccounts([]);
       setSelectedAccountID("");
@@ -119,14 +155,32 @@ function App() {
 
   useEffect(() => () => closeTail(), []);
 
-  const selectedTenant = useMemo(
-    () => tenants.find((tenant) => tenant.id === selectedTenantID),
-    [tenants, selectedTenantID],
-  );
   const selectedAccount = useMemo(
     () => accounts.find((account) => account.id === selectedAccountID),
     [accounts, selectedAccountID],
   );
+
+  useEffect(() => {
+    if (selectedAccount) {
+      setAccountForm({
+        displayName: selectedAccount.displayName,
+        externalId: selectedAccount.externalId,
+        rateLimitPerSecond: String(selectedAccount.rateLimitPerSecond || 0),
+        rateLimitScope: selectedAccount.rateLimitScope,
+      });
+      setCredential(null);
+    }
+  }, [selectedAccount]);
+
+  useEffect(() => {
+    if (channels.length > 0 && installForm.channelType === "") {
+      setInstallForm((current) => ({ ...current, channelType: channels[0].slug }));
+    }
+  }, [channels, installForm.channelType]);
+
+  const operatorRole = session?.operator?.role ?? "viewer";
+  const canMutate = roleAllows(operatorRole, "operator");
+  const canRotateCredential = roleAllows(operatorRole, "credential-admin");
 
   async function loadSession() {
     setSessionState("loading");
@@ -169,6 +223,119 @@ function App() {
       setError(err instanceof Error ? err.message : "accounts failed");
       setAccountsState("error");
     }
+  }
+
+  async function runMutation(action: () => Promise<void>) {
+    setMutationState("loading");
+    setError("");
+    try {
+      await action();
+      setMutationState("ready");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "mutation failed");
+      setMutationState("error");
+    }
+  }
+
+  async function createTenant() {
+    await runMutation(async () => {
+      await api<{ tenant: Tenant }>("/api/admin/tenants", jsonRequest("POST", tenantForm));
+      setTenantForm({ slug: "", displayName: "" });
+      await loadDashboard();
+    });
+  }
+
+  async function startInstall() {
+    await runMutation(async () => {
+      const response = await api<{ installId: string; oauthUrl: string; redirectUri: string }>(
+        "/api/admin/installs/start",
+        jsonRequest("POST", installForm),
+      );
+      setLastInstall(response);
+      setCompleteInstallID(response.installId);
+    });
+  }
+
+  async function completeInstall() {
+    await runMutation(async () => {
+      const response = await api<{ account: Account }>("/api/admin/installs/complete", jsonRequest("POST", {
+        installId: completeInstallID,
+      }));
+      setSelectedAccountID(response.account.id);
+      if (selectedTenantID) {
+        await loadAccounts(selectedTenantID);
+      }
+    });
+  }
+
+  async function updateAccount() {
+    if (!selectedAccountID) {
+      return;
+    }
+    await runMutation(async () => {
+      const response = await api<{ account: Account }>("/api/admin/accounts", jsonRequest("PATCH", {
+        accountId: selectedAccountID,
+        displayName: accountForm.displayName,
+        externalId: accountForm.externalId,
+      }));
+      setSelectedAccountID(response.account.id);
+      if (selectedTenantID) {
+        await loadAccounts(selectedTenantID);
+      }
+    });
+  }
+
+  async function setRateLimit() {
+    if (!selectedAccountID) {
+      return;
+    }
+    await runMutation(async () => {
+      await api<{ account: Account }>("/api/admin/accounts/rate-limit", jsonRequest("POST", {
+        accountId: selectedAccountID,
+        rateLimitPerSecond: Number(accountForm.rateLimitPerSecond || 0),
+        rateLimitScope: accountForm.rateLimitScope,
+      }));
+      if (selectedTenantID) {
+        await loadAccounts(selectedTenantID);
+      }
+    });
+  }
+
+  async function disableAccount() {
+    if (!selectedAccountID) {
+      return;
+    }
+    await runMutation(async () => {
+      await api<void>("/api/admin/accounts/disable", jsonRequest("POST", { accountId: selectedAccountID }));
+      if (selectedTenantID) {
+        await loadAccounts(selectedTenantID);
+      }
+    });
+  }
+
+  async function loadCredentialMetadata() {
+    if (!selectedAccountID) {
+      return;
+    }
+    setError("");
+    try {
+      const response = await api<{ credential: CredentialMetadata }>(
+        `/api/admin/accounts/credential-metadata?account_id=${encodeURIComponent(selectedAccountID)}`,
+      );
+      setCredential(response.credential);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "credential metadata failed");
+    }
+  }
+
+  async function rotateCredential() {
+    if (!selectedAccountID) {
+      return;
+    }
+    await runMutation(async () => {
+      await api<void>("/api/admin/accounts/rotate-credential", jsonRequest("POST", { accountId: selectedAccountID }));
+      await loadCredentialMetadata();
+    });
   }
 
   function openTail() {
@@ -242,6 +409,8 @@ function App() {
         <nav>
           <a href="#tenants" aria-current="page">Tenants</a>
           <a href="#accounts">Accounts</a>
+          {canMutate && <a href="#manage">Manage</a>}
+          <a href="#credentials">Credentials</a>
           <a href="#channels">Channels</a>
           <a href="#tail">Live tail</a>
         </nav>
@@ -255,6 +424,7 @@ function App() {
           </div>
           <div className="operatorStrip">
             <span>{session.operator?.email}</span>
+            <span className="rolePill">{operatorRole}</span>
             <button type="button" onClick={() => void loadDashboard()}>Refresh</button>
             <button type="button" onClick={() => void logout()}>Sign out</button>
           </div>
@@ -334,6 +504,163 @@ function App() {
                   <span className="rowMeta">{account.disabledAt ? "disabled" : "active"}</span>
                 </button>
               ))}
+            </div>
+          </section>
+        </section>
+
+        {canMutate && (
+          <section className="grid" id="manage">
+            <section className="panel">
+              <div className="panelHeader">
+                <h2>Tenant and install</h2>
+                <span className={`pill ${mutationState}`}>{mutationState}</span>
+              </div>
+              <div className="formStack">
+                <div className="fieldGrid">
+                  <input
+                    value={tenantForm.slug}
+                    onChange={(event) => setTenantForm((current) => ({ ...current, slug: event.target.value }))}
+                    placeholder="tenant-slug"
+                    aria-label="Tenant slug"
+                  />
+                  <input
+                    value={tenantForm.displayName}
+                    onChange={(event) => setTenantForm((current) => ({ ...current, displayName: event.target.value }))}
+                    placeholder="Display name"
+                    aria-label="Tenant display name"
+                  />
+                  <button type="button" onClick={() => void createTenant()} disabled={mutationState === "loading" || !tenantForm.slug.trim()}>
+                    Create tenant
+                  </button>
+                </div>
+                <div className="fieldGrid">
+                  <select
+                    value={installForm.tenantId}
+                    onChange={(event) => setInstallForm((current) => ({ ...current, tenantId: event.target.value }))}
+                    aria-label="Install tenant"
+                  >
+                    {tenants.map((tenant) => (
+                      <option key={tenant.id} value={tenant.id}>
+                        {tenant.displayName || tenant.slug}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={installForm.channelType}
+                    onChange={(event) => setInstallForm((current) => ({ ...current, channelType: event.target.value }))}
+                    aria-label="Install channel type"
+                  >
+                    {channels.map((channel) => (
+                      <option key={channel.slug} value={channel.slug}>
+                        {channel.slug}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    value={installForm.provider}
+                    onChange={(event) => setInstallForm((current) => ({ ...current, provider: event.target.value }))}
+                    placeholder="provider"
+                    aria-label="Install provider"
+                  />
+                  <button type="button" onClick={() => void startInstall()} disabled={mutationState === "loading" || !installForm.tenantId || !installForm.channelType}>
+                    Start install
+                  </button>
+                </div>
+                {lastInstall && (
+                  <div className="installResult">
+                    <strong>{lastInstall.installId}</strong>
+                    <a href={lastInstall.oauthUrl || "#"} target="_blank" rel="noreferrer">Open OAuth</a>
+                    <small>{lastInstall.redirectUri}</small>
+                  </div>
+                )}
+                <div className="fieldGrid">
+                  <input
+                    value={completeInstallID}
+                    onChange={(event) => setCompleteInstallID(event.target.value)}
+                    placeholder="install_id"
+                    aria-label="Install ID"
+                  />
+                  <button type="button" onClick={() => void completeInstall()} disabled={mutationState === "loading" || !completeInstallID.trim()}>
+                    Complete install
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section className="panel">
+              <div className="panelHeader">
+                <h2>Account controls</h2>
+                <span>{selectedAccount?.displayName || selectedAccount?.externalId || selectedAccount?.id || "none"}</span>
+              </div>
+              <div className="formStack">
+                <div className="fieldGrid">
+                  <input
+                    value={accountForm.displayName}
+                    onChange={(event) => setAccountForm((current) => ({ ...current, displayName: event.target.value }))}
+                    placeholder="Display name"
+                    aria-label="Account display name"
+                  />
+                  <input
+                    value={accountForm.externalId}
+                    onChange={(event) => setAccountForm((current) => ({ ...current, externalId: event.target.value }))}
+                    placeholder="External ID"
+                    aria-label="Account external ID"
+                  />
+                  <button type="button" onClick={() => void updateAccount()} disabled={mutationState === "loading" || !selectedAccount}>
+                    Update account
+                  </button>
+                </div>
+                <div className="fieldGrid">
+                  <input
+                    value={accountForm.rateLimitPerSecond}
+                    onChange={(event) => setAccountForm((current) => ({ ...current, rateLimitPerSecond: event.target.value }))}
+                    placeholder="0"
+                    inputMode="numeric"
+                    aria-label="Rate limit per second"
+                  />
+                  <input
+                    value={accountForm.rateLimitScope}
+                    onChange={(event) => setAccountForm((current) => ({ ...current, rateLimitScope: event.target.value }))}
+                    placeholder="account"
+                    aria-label="Rate limit scope"
+                  />
+                  <button type="button" onClick={() => void setRateLimit()} disabled={mutationState === "loading" || !selectedAccount}>
+                    Set rate
+                  </button>
+                  <button type="button" className="dangerAction" onClick={() => void disableAccount()} disabled={mutationState === "loading" || !selectedAccount || Boolean(selectedAccount.disabledAt)}>
+                    Disable
+                  </button>
+                </div>
+              </div>
+            </section>
+          </section>
+        )}
+
+        <section className="grid">
+          <section className="panel" id="credentials">
+            <div className="panelHeader">
+              <h2>Credentials</h2>
+              <span>{credential?.hasCredential ? credential.authKind : "metadata"}</span>
+            </div>
+            <div className="credentialBody">
+              <button type="button" onClick={() => void loadCredentialMetadata()} disabled={!selectedAccount}>
+                Load metadata
+              </button>
+              <button type="button" onClick={() => void rotateCredential()} disabled={!selectedAccount || !canRotateCredential || mutationState === "loading"}>
+                Rotate credential
+              </button>
+              {credential && (
+                <div className="credentialGrid">
+                  <span>Account</span>
+                  <strong>{credential.accountId}</strong>
+                  <span>Status</span>
+                  <strong>{credential.hasCredential ? "stored" : "missing"}</strong>
+                  <span>Key</span>
+                  <strong>{credential.keyVersion || 0}</strong>
+                  <span>Rotated</span>
+                  <strong>{credential.rotatedAt ? formatDateTime(credential.rotatedAt) : ""}</strong>
+                </div>
+              )}
             </div>
           </section>
         </section>
@@ -430,6 +757,32 @@ function formatTime(value: string): string {
     minute: "2-digit",
     second: "2-digit",
   }).format(new Date(value));
+}
+
+function formatDateTime(value: string): string {
+  if (!value) {
+    return "";
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function roleAllows(actual: Operator["role"], required: Operator["role"]): boolean {
+  return roleRank(actual) >= roleRank(required);
+}
+
+function roleRank(role: Operator["role"]): number {
+  if (role === "credential-admin") {
+    return 3;
+  }
+  if (role === "operator") {
+    return 2;
+  }
+  return 1;
 }
 
 export default App;

@@ -38,8 +38,32 @@ type CredentialRow struct {
 	Plaintext  CredentialPayload
 }
 
+type CredentialMetadata struct {
+	AccountID  uuid.UUID
+	AuthKind   string
+	KeyVersion int32
+	ExpiresAt  *time.Time
+	RotatedAt  time.Time
+}
+
 // ErrCredentialNotFound is returned by GetCredential when no row exists.
 var ErrCredentialNotFound = errors.New("store: credential not found")
+
+func GetCredentialMetadata(ctx context.Context, pool *pgxpool.Pool, accountID uuid.UUID) (CredentialMetadata, error) {
+	const q = `
+SELECT account_id, auth_kind, key_version, expires_at, rotated_at
+FROM credentials
+WHERE account_id = $1`
+	var meta CredentialMetadata
+	err := pool.QueryRow(ctx, q, accountID).Scan(&meta.AccountID, &meta.AuthKind, &meta.KeyVersion, &meta.ExpiresAt, &meta.RotatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return CredentialMetadata{}, ErrCredentialNotFound
+		}
+		return CredentialMetadata{}, fmt.Errorf("store: get credential metadata: %w", err)
+	}
+	return meta, nil
+}
 
 // PutCredential encrypts payload via cipher and upserts into credentials.
 // key_version is written from cipher.KeyVersion() verbatim so rotation

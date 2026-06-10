@@ -36,7 +36,7 @@ func TestAllowlist(t *testing.T) {
 
 func TestMemoryStoreLifecycle(t *testing.T) {
 	store := NewMemoryStore()
-	raw, session, err := store.Create(context.Background(), Identity{Email: "a@example.com"}, time.Hour)
+	raw, session, err := store.Create(context.Background(), Identity{Email: "a@example.com"}, RoleOperator, time.Hour)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -50,6 +50,9 @@ func TestMemoryStoreLifecycle(t *testing.T) {
 	if got.Operator.Email != "a@example.com" {
 		t.Fatalf("email: %q", got.Operator.Email)
 	}
+	if got.Operator.Role != RoleOperator {
+		t.Fatalf("role: %q", got.Operator.Role)
+	}
 	if err := store.Delete(context.Background(), raw); err != nil {
 		t.Fatalf("Delete: %v", err)
 	}
@@ -58,11 +61,31 @@ func TestMemoryStoreLifecycle(t *testing.T) {
 	}
 }
 
+func TestRoleAssignments(t *testing.T) {
+	roles, err := ParseRoleAssignments("admin@example.com=credential-admin,@ops.example.com=operator", RoleViewer)
+	if err != nil {
+		t.Fatalf("ParseRoleAssignments: %v", err)
+	}
+	if got := roles.RoleForEmail("admin@example.com"); got != RoleCredentialAdmin {
+		t.Fatalf("admin role: %q", got)
+	}
+	if got := roles.RoleForEmail("case@ops.example.com"); got != RoleOperator {
+		t.Fatalf("domain role: %q", got)
+	}
+	if got := roles.RoleForEmail("viewer@example.com"); got != RoleViewer {
+		t.Fatalf("default role: %q", got)
+	}
+	if !RoleAllows(RoleCredentialAdmin, RoleOperator) || RoleAllows(RoleViewer, RoleOperator) {
+		t.Fatalf("role ordering is wrong")
+	}
+}
+
 func TestManagerDevLoginRequiresAllowlist(t *testing.T) {
 	manager, err := NewManager(Config{
 		Mode:        ModeDev,
 		Store:       NewMemoryStore(),
 		Allowlist:   ParseAllowlist("operator@example.com", ""),
+		DevRole:     RoleOperator,
 		DevIdentity: Identity{Email: "operator@example.com", Name: "Operator"},
 		StateSecret: []byte("test-secret-test-secret-test-secret"),
 	})

@@ -33,8 +33,10 @@ and Google HTTPS token/userinfo endpoints.
 |---|---|
 | `MIO_WEB_PUBLIC_URL` | Browser-facing URL, for example `https://mio-web.example.com`. |
 | `MIO_WEB_AUTH_MODE` | `google` in deployed environments; `dev` only for local compose. |
-| `MIO_WEB_OPERATOR_EMAILS` / `MIO_WEB_OPERATOR_DOMAINS` | Allowlist checked before any read route is served. |
-| `MIO_WEB_DATABASE_DSN` | Postgres DSN for operator sessions. The gateway migration creates `web_operator_sessions`. |
+| `MIO_WEB_OPERATOR_EMAILS` / `MIO_WEB_OPERATOR_DOMAINS` | Allowlist checked before any admin route is served. |
+| `MIO_WEB_OPERATOR_DEFAULT_ROLE` | Role for allowed operators without an explicit assignment. Defaults to `viewer`. |
+| `MIO_WEB_OPERATOR_ROLES` | Comma-separated `email=role` or `domain=role` entries. Roles: `viewer`, `operator`, `credential-admin`. |
+| `MIO_WEB_DATABASE_DSN` | Postgres DSN for operator sessions and mutation audit logs. Gateway migrations create `web_operator_sessions` and `web_operator_audit`. |
 | `MIO_WEB_GOOGLE_CLIENT_ID` / `MIO_WEB_GOOGLE_CLIENT_SECRET` | Google OAuth client for operator login. |
 | `MIO_WEB_STATE_SECRET` | High-entropy secret for signing OAuth state cookies. |
 | `MIO_ADMIN_URL` | Internal AdminService URL. Use service DNS, not cross-pod loopback. |
@@ -48,6 +50,7 @@ helm upgrade --install mio-web deploy/charts/mio-web \
   --set ingress.enabled=true \
   --set ingress.hosts[0].host=mio-web.example.com \
   --set admin.url=http://mio-admin:9090 \
+  --set operators.roles[0]=you@example.com=credential-admin \
   --set session.databaseSecretName=mio-gateway-secrets \
   --set google.existingSecret=mio-web-oauth \
   --set stateSecret.existingSecret=mio-web-session
@@ -87,6 +90,7 @@ Defaults:
 - AdminService: http://localhost:9090
 - Auth mode: `dev`
 - Allowed operator: `operator@localhost`
+- Dev role: `credential-admin`
 
 For a local Google login test, override:
 
@@ -95,6 +99,7 @@ MIO_WEB_AUTH_MODE=google \
 MIO_WEB_PUBLIC_URL=http://localhost:8081 \
 MIO_WEB_COOKIE_SECURE=false \
 MIO_WEB_OPERATOR_EMAILS=you@example.com \
+MIO_WEB_OPERATOR_ROLES=you@example.com=operator \
 MIO_WEB_GOOGLE_CLIENT_ID=... \
 MIO_WEB_GOOGLE_CLIENT_SECRET=... \
 MIO_WEB_STATE_SECRET="$(openssl rand -base64 32)" \

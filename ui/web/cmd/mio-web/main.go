@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/crashchat-ai/mio/ui/web/internal/adminclient"
+	"github.com/crashchat-ai/mio/ui/web/internal/audit"
 	"github.com/crashchat-ai/mio/ui/web/internal/auth"
 	webembed "github.com/crashchat-ai/mio/ui/web/internal/embed"
 	"github.com/crashchat-ai/mio/ui/web/internal/rest"
@@ -33,6 +34,7 @@ func main() {
 	handler := rest.New(rest.Config{
 		Admin:  adminclient.New(cfg.AdminURL),
 		Auth:   cfg.Auth,
+		Audit:  cfg.Audit,
 		Assets: webembed.Handler(),
 		Logger: logger,
 	})
@@ -79,6 +81,7 @@ type appConfig struct {
 	Addr         string
 	AdminURL     string
 	Auth         *auth.Manager
+	Audit        audit.Logger
 	SessionStore string
 }
 
@@ -89,8 +92,20 @@ func configFromEnv(ctx context.Context, logger *slog.Logger) (appConfig, func(),
 	publicURL := strings.TrimRight(os.Getenv("MIO_WEB_PUBLIC_URL"), "/")
 	cookieSecure := envBool("MIO_WEB_COOKIE_SECURE", strings.HasPrefix(publicURL, "https://"))
 	allowlist := auth.ParseAllowlist(os.Getenv("MIO_WEB_OPERATOR_EMAILS"), os.Getenv("MIO_WEB_OPERATOR_DOMAINS"))
+	defaultRole, err := auth.ParseRole(os.Getenv("MIO_WEB_OPERATOR_DEFAULT_ROLE"))
+	if err != nil {
+		return appConfig{}, nil, err
+	}
+	roles, err := auth.ParseRoleAssignments(os.Getenv("MIO_WEB_OPERATOR_ROLES"), defaultRole)
+	if err != nil {
+		return appConfig{}, nil, err
+	}
+	devRole, err := auth.ParseRole(os.Getenv("MIO_WEB_DEV_OPERATOR_ROLE"))
+	if err != nil {
+		return appConfig{}, nil, err
+	}
 
-	store, storeName, cleanup, err := sessionStoreFromEnv(ctx)
+	store, auditLogger, storeName, cleanup, err := storesFromEnv(ctx)
 	if err != nil {
 		return appConfig{}, nil, err
 	}
@@ -121,6 +136,8 @@ func configFromEnv(ctx context.Context, logger *slog.Logger) (appConfig, func(),
 		Provider:     provider,
 		Store:        store,
 		Allowlist:    allowlist,
+		Roles:        roles,
+		DevRole:      devRole,
 		DevIdentity:  auth.Identity{Email: os.Getenv("MIO_WEB_DEV_OPERATOR_EMAIL"), Name: os.Getenv("MIO_WEB_DEV_OPERATOR_NAME")},
 		SessionTTL:   envDuration("MIO_WEB_SESSION_TTL", 12*time.Hour),
 		CookieSecure: cookieSecure,
@@ -136,25 +153,31 @@ func configFromEnv(ctx context.Context, logger *slog.Logger) (appConfig, func(),
 		Addr:         addr,
 		AdminURL:     adminURL,
 		Auth:         manager,
+		Audit:        auditLogger,
 		SessionStore: storeName,
 	}, cleanup, nil
 }
 
-func sessionStoreFromEnv(ctx context.Context) (auth.Store, string, func(), error) {
+func storesFromEnv(ctx context.Context) (auth.Store, audit.Logger, string, func(), error) {
 	dsn := os.Getenv("MIO_WEB_DATABASE_DSN")
 	if dsn == "" {
-		return auth.NewMemoryStore(), "memory", func() {}, nil
+		return auth.NewMemoryStore(), audit.NewMemoryLogger(), "memory", func() {}, nil
 	}
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("mio-web postgres sessions: %w", err)
+		return nil, nil, "", nil, fmt.Errorf("mio-web postgres stores: %w", err)
 	}
 	store := auth.NewPostgresStore(pool)
 	if err := store.CheckSchema(ctx); err != nil {
 		pool.Close()
-		return nil, "", nil, err
+		return nil, nil, "", nil, err
 	}
-	return store, "postgres", pool.Close, nil
+	auditLogger := audit.NewPostgresLogger(pool)
+	if err := auditLogger.CheckSchema(ctx); err != nil {
+		pool.Close()
+		return nil, nil, "", nil, err
+	}
+	return store, auditLogger, "postgres", pool.Close, nil
 }
 
 func env(key, fallback string) string {

@@ -52,6 +52,10 @@ spec:
               value: {{ join "," .Values.operators.emails | quote }}
             - name: MIO_WEB_OPERATOR_DOMAINS
               value: {{ join "," .Values.operators.domains | quote }}
+            - name: MIO_WEB_OPERATOR_DEFAULT_ROLE
+              value: {{ .Values.operators.defaultRole | quote }}
+            - name: MIO_WEB_OPERATOR_ROLES
+              value: {{ join "," .Values.operators.roles | quote }}
             - name: MIO_ADMIN_URL
               value: {{ .Values.admin.url | quote }}
             {{- $redirectURL := .Values.google.redirectUrl }}

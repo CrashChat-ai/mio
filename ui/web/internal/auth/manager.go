@@ -64,6 +64,8 @@ type Config struct {
 	Provider          Provider
 	Store             Store
 	Allowlist         Allowlist
+	Roles             RoleAssignments
+	DevRole           Role
 	DevIdentity       Identity
 	SessionTTL        time.Duration
 	SessionCookieName string
@@ -78,6 +80,8 @@ type Manager struct {
 	provider          Provider
 	store             Store
 	allowlist         Allowlist
+	roles             RoleAssignments
+	devRole           Role
 	devIdentity       Identity
 	sessionTTL        time.Duration
 	sessionCookieName string
@@ -116,11 +120,19 @@ func NewManager(cfg Config) (*Manager, error) {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
+	if cfg.Roles.Default == "" {
+		cfg.Roles.Default = RoleViewer
+	}
+	if cfg.DevRole == "" {
+		cfg.DevRole = cfg.Roles.Default
+	}
 	return &Manager{
 		mode:              cfg.Mode,
 		provider:          cfg.Provider,
 		store:             cfg.Store,
 		allowlist:         cfg.Allowlist,
+		roles:             cfg.Roles,
+		devRole:           cfg.DevRole,
 		devIdentity:       cfg.DevIdentity,
 		sessionTTL:        cfg.SessionTTL,
 		sessionCookieName: cfg.SessionCookieName,
@@ -146,6 +158,20 @@ func (m *Manager) Require(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), sessionContextKey{}, session)))
 	})
+}
+
+func (m *Manager) RequireRole(required Role, next http.Handler) http.Handler {
+	return m.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, _ := SessionFromContext(r.Context())
+		if !RoleAllows(session.Operator.Role, required) {
+			writeAuthJSON(w, http.StatusForbidden, map[string]any{
+				"error":         "insufficient_role",
+				"required_role": required,
+			})
+			return
+		}
+		next.ServeHTTP(w, r)
+	}))
 }
 
 func (m *Manager) CurrentSession(ctx context.Context, r *http.Request) (Session, error) {
@@ -191,7 +217,7 @@ func (m *Manager) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		if identity.Name == "" {
 			identity.Name = identity.Email
 		}
-		if err := m.createSession(w, r, identity); err != nil {
+		if err := m.createSession(w, r, identity, m.devRole); err != nil {
 			m.logger.Warn("mio-web dev login rejected", "email", identity.Email, "error", err)
 			writeAuthJSON(w, http.StatusForbidden, map[string]any{"error": "operator_not_allowed"})
 			return
@@ -270,7 +296,7 @@ func (m *Manager) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		writeAuthJSON(w, http.StatusUnauthorized, map[string]any{"error": "login_failed"})
 		return
 	}
-	if err := m.createSession(w, r, identity); err != nil {
+	if err := m.createSession(w, r, identity, ""); err != nil {
 		m.clearStateCookie(w)
 		m.logger.Warn("mio-web operator rejected", "email", identity.Email, "error", err)
 		writeAuthJSON(w, http.StatusForbidden, map[string]any{"error": "operator_not_allowed"})
@@ -295,12 +321,16 @@ func (m *Manager) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (m *Manager) createSession(w http.ResponseWriter, r *http.Request, identity Identity) error {
+func (m *Manager) createSession(w http.ResponseWriter, r *http.Request, identity Identity, roleOverride Role) error {
 	identity.Email = strings.ToLower(strings.TrimSpace(identity.Email))
 	if !m.allowlist.Allows(identity.Email) {
 		return fmt.Errorf("email %q not in operator allowlist", identity.Email)
 	}
-	raw, session, err := m.store.Create(r.Context(), identity, m.sessionTTL)
+	role := roleOverride
+	if role == "" {
+		role = m.roles.RoleForEmail(identity.Email)
+	}
+	raw, session, err := m.store.Create(r.Context(), identity, role, m.sessionTTL)
 	if err != nil {
 		return err
 	}

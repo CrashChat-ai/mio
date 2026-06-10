@@ -120,13 +120,38 @@ func Handler(deps HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		// Step 6: idempotent message upsert.
+		// Step 6: resolve reply target before idempotent message upsert.
+		threadRootMessageID := ""
+		relationTargetMessageID := ""
+		if nm.ParentExternalID != "" {
+			parentMsg, found, err := deps.Store.FindMessageBySource(ctx, deps.AccountID, nm.ParentExternalID)
+			if err != nil {
+				deps.Logger.Error("cliq: resolve replied message", "err", err,
+					"source_message_id", nm.SourceMessageID,
+					"parent_external_id", nm.ParentExternalID)
+				writeErr(w, http.StatusInternalServerError, "db error")
+				deps.IncInbound("inbound", "db_error")
+				deps.ObserveLatency("inbound", "db_error", time.Since(start).Seconds())
+				return
+			}
+			if found {
+				relationTargetMessageID = parentMsg.ID.String()
+				threadRootMessageID = parentMsg.ThreadRootMessageID.String()
+			} else {
+				deps.Logger.Warn("cliq: replied message parent not found",
+					"source_message_id", nm.SourceMessageID,
+					"parent_external_id", nm.ParentExternalID,
+					"account_id", deps.AccountID)
+			}
+		}
+
+		// Step 7: idempotent message upsert.
 		msgID := uuid.New()
 		dbMsgID, fresh, err := deps.Store.EnsureUniqueMessage(ctx,
 			msgID,
 			deps.TenantID, deps.AccountID,
 			conv.ID.String(),
-			nil, // thread_root_message_id: resolved in P5+
+			stringPtrIfNotEmpty(threadRootMessageID),
 			nm.SourceMessageID,
 			nm.SenderExternalID,
 			nm.Text,
@@ -152,43 +177,16 @@ func Handler(deps HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		// Step 7: publish to MESSAGES_INBOUND (before 200 response, inside deadline).
-		convKindEnum := kindStringToEnum(nm.ConversationKind)
-		protoMsg := &miov1.Message{
-			Id:                     dbMsgID.String(),
-			SchemaVersion:          1,
-			TenantId:               deps.TenantID,
-			AccountId:              deps.AccountID,
-			ChannelType:            channelType,
-			ConversationId:         conv.ID.String(),
-			ConversationExternalId: nm.ConversationExternalID,
-			ConversationKind:       convKindEnum,
-			SourceMessageId:        nm.SourceMessageID,
-			Sender: &miov1.Sender{
-				ExternalId:  nm.SenderExternalID,
-				DisplayName: nm.SenderDisplayName,
-				IsBot:       nm.SenderIsBot,
-			},
-			Text:       nm.Text,
-			ReceivedAt: timestamppb.Now(),
-			Attributes: nm.Attributes,
-		}
-		// Convert normalized attachments to proto Attachments so the P9
-		// media-vault sidecar can persist bytes and rewrite urls.
-		for _, a := range nm.Attachments {
-			protoMsg.Attachments = append(protoMsg.Attachments, &miov1.Attachment{
-				Kind:     attachmentKindFromMime(a.MIME),
-				Url:      a.URL,
-				Mime:     a.MIME,
-				Filename: a.Filename,
-			})
-		}
-		// Cliq bot adapter (sender.go) needs the channel unique_name (lowercase
-		// API slug, e.g. "ducdev"), NOT the chat title ("#DucDev"). Normalize
-		// stashes it via attributes["cliq_channel_unique_name"].
-		if nm.ParentExternalID != "" {
-			protoMsg.ParentConversationId = nm.ParentExternalID // external id as proxy until UUID resolved
-		}
+		// Step 8: publish to MESSAGES_INBOUND (before 200 response, inside deadline).
+		protoMsg := buildInboundProtoMessage(
+			nm,
+			dbMsgID,
+			deps.TenantID,
+			deps.AccountID,
+			conv.ID,
+			threadRootMessageID,
+			relationTargetMessageID,
+		)
 
 		if err := deps.SDK.PublishInbound(ctx, protoMsg); err != nil {
 			deps.Logger.Error("cliq: publish inbound", "err", err,
@@ -199,7 +197,7 @@ func Handler(deps HandlerDeps) http.HandlerFunc {
 			return
 		}
 
-		// Step 8: respond 200 to Cliq (inside deadline).
+		// Step 9: respond 200 to Cliq (inside deadline).
 		writeOK(w)
 		deps.IncInbound("inbound", "success")
 		deps.ObserveLatency("inbound", "success", time.Since(start).Seconds())
@@ -213,6 +211,73 @@ func Handler(deps HandlerDeps) http.HandlerFunc {
 			"latency_ms", fmt.Sprintf("%.1f", time.Since(start).Seconds()*1000),
 		)
 	}
+}
+
+func buildInboundProtoMessage(
+	nm *NormalizedMessage,
+	dbMsgID uuid.UUID,
+	tenantID, accountID string,
+	convID uuid.UUID,
+	threadRootMessageID, relationTargetMessageID string,
+) *miov1.Message {
+	protoMsg := &miov1.Message{
+		Id:                     dbMsgID.String(),
+		SchemaVersion:          1,
+		TenantId:               tenantID,
+		AccountId:              accountID,
+		ChannelType:            channelType,
+		ConversationId:         convID.String(),
+		ConversationExternalId: nm.ConversationExternalID,
+		ConversationKind:       kindStringToEnum(nm.ConversationKind),
+		SourceMessageId:        nm.SourceMessageID,
+		Sender: &miov1.Sender{
+			ExternalId:  nm.SenderExternalID,
+			DisplayName: nm.SenderDisplayName,
+			IsBot:       nm.SenderIsBot,
+		},
+		Text:       nm.Text,
+		ReceivedAt: timestamppb.Now(),
+		Attributes: nm.Attributes,
+	}
+
+	// Convert normalized attachments to proto Attachments so the P9
+	// media-vault sidecar can persist bytes and rewrite urls.
+	for _, a := range nm.Attachments {
+		protoMsg.Attachments = append(protoMsg.Attachments, &miov1.Attachment{
+			Kind:     attachmentKindFromMime(a.MIME),
+			Url:      a.URL,
+			Mime:     a.MIME,
+			Filename: a.Filename,
+		})
+	}
+
+	applyReplyFields(protoMsg, nm.ParentExternalID, threadRootMessageID, relationTargetMessageID)
+
+	return protoMsg
+}
+
+func applyReplyFields(
+	msg *miov1.Message,
+	parentExternalID, threadRootMessageID, relationTargetMessageID string,
+) {
+	if parentExternalID == "" {
+		return
+	}
+
+	msg.ParentConversationId = parentExternalID // external id as proxy until UUID resolved
+	msg.ThreadRootMessageId = threadRootMessageID
+	msg.Relation = &miov1.MessageRelation{
+		Kind:             miov1.MessageRelation_KIND_REPLY,
+		TargetMessageId:  relationTargetMessageID,
+		TargetExternalId: parentExternalID,
+	}
+}
+
+func stringPtrIfNotEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func writeOK(w http.ResponseWriter) {

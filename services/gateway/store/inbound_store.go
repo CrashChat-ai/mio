@@ -57,3 +57,11 @@ func (s *InboundStore) EnsureUniqueMessage(
 		threadRootMessageID, sourceMessageID, senderExternalID, text, attributes,
 	)
 }
+
+// FindMessageBySource delegates to the package-level FindMessageBySource.
+func (s *InboundStore) FindMessageBySource(
+	ctx context.Context,
+	accountID, sourceMessageID string,
+) (channels.MessageRef, bool, error) {
+	return FindMessageBySource(ctx, s.pool, accountID, sourceMessageID)
+}

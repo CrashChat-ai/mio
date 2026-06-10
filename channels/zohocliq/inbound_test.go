@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 )
 
 // signedHeaders builds a valid X-Webhook-Signature header for the given
@@ -114,6 +116,34 @@ func TestCliqInbound_Normalize_ChannelText(t *testing.T) {
 	}
 	if msg.GetReceivedAt() == nil {
 		t.Error("received_at not stamped")
+	}
+}
+
+func TestCliqInbound_Normalize_ThreadReplyRelation(t *testing.T) {
+	t.Parallel()
+
+	body := loadFixture(t, "2026-05-07T22-06-22-channel-thread-reply.json")
+	inbound := &cliqInbound{}
+	msg, err := inbound.Normalize(body)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+
+	if msg.GetThreadRootMessageId() != "" {
+		t.Fatalf("thread_root_message_id = %q, want empty before handler DB resolution", msg.GetThreadRootMessageId())
+	}
+	relation := msg.GetRelation()
+	if relation == nil {
+		t.Fatal("relation is nil")
+	}
+	if relation.GetKind() != miov1.MessageRelation_KIND_REPLY {
+		t.Errorf("relation.kind = %s, want KIND_REPLY", relation.GetKind())
+	}
+	if relation.GetTargetExternalId() == "" {
+		t.Error("relation.target_external_id must be set for replied message")
+	}
+	if relation.GetTargetMessageId() != "" {
+		t.Errorf("relation.target_message_id = %q, want empty before handler DB resolution", relation.GetTargetMessageId())
 	}
 }
 

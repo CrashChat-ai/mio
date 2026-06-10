@@ -1,6 +1,6 @@
 :root {
   color: #18212f;
-  background: #f6f7f9;
+  background: #f5f7fa;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -23,13 +23,80 @@ a {
   text-decoration: none;
 }
 
-button {
+button,
+select,
+input {
   border: 1px solid #aeb7c4;
   border-radius: 6px;
-  background: #ffffff;
   color: #18212f;
-  cursor: pointer;
   font: inherit;
+  min-height: 36px;
+}
+
+button,
+select {
+  background: #ffffff;
+}
+
+button {
+  cursor: pointer;
+  padding: 0.45rem 0.7rem;
+}
+
+button:disabled {
+  color: #8a94a6;
+  cursor: not-allowed;
+}
+
+input,
+select {
+  padding: 0.42rem 0.55rem;
+  width: 100%;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.7rem;
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: 1rem;
+}
+
+.centerStage,
+.loginPage {
+  align-items: center;
+  display: flex;
+  min-height: 100vh;
+  justify-content: center;
+}
+
+.loginPanel {
+  background: #ffffff;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  display: grid;
+  gap: 1rem;
+  min-width: min(420px, calc(100vw - 2rem));
+  padding: 1.25rem;
+}
+
+.primaryAction {
+  align-items: center;
+  background: #0f766e;
+  border-radius: 6px;
+  color: #ffffff;
+  display: inline-flex;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 40px;
   padding: 0.55rem 0.85rem;
 }
 
@@ -48,12 +115,12 @@ button {
   padding: 1.25rem;
 }
 
-.brand {
+.brandMark {
   align-items: center;
   border: 1px solid #5b6677;
   border-radius: 6px;
   display: inline-flex;
-  font-weight: 700;
+  font-weight: 800;
   height: 42px;
   justify-content: center;
   width: 64px;
@@ -77,6 +144,7 @@ button {
 }
 
 .workspace {
+  align-content: start;
   display: grid;
   gap: 1.25rem;
   padding: 1.5rem;
@@ -89,6 +157,19 @@ button {
   justify-content: space-between;
 }
 
+.operatorStrip {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.operatorStrip span {
+  color: #475467;
+  font-size: 0.9rem;
+}
+
 .eyebrow {
   color: #667085;
   font-size: 0.78rem;
@@ -97,51 +178,30 @@ button {
   text-transform: uppercase;
 }
 
-h1,
-h2,
-h3,
-p {
-  margin: 0;
+.alert,
+.errorText {
+  color: #b42318;
 }
 
-h1 {
-  font-size: 1.8rem;
-  line-height: 1.2;
+.alert {
+  background: #fff3f0;
+  border: 1px solid #ffcdc7;
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
 }
 
-h2 {
-  font-size: 1.05rem;
-}
-
-h3 {
-  font-size: 1rem;
-}
-
-.status {
-  align-items: center;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  border-radius: 6px;
-  color: #9a3412;
-  display: inline-flex;
-  gap: 0.45rem;
-  min-height: 36px;
-  padding: 0.45rem 0.7rem;
-  white-space: nowrap;
-}
-
-.status span {
-  background: #f97316;
-  border-radius: 999px;
-  display: inline-flex;
-  height: 8px;
-  width: 8px;
+.summary,
+.grid {
+  display: grid;
+  gap: 1rem;
 }
 
 .summary {
-  display: grid;
-  gap: 1rem;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .summary article,
@@ -154,7 +214,7 @@ h3 {
 .summary article {
   display: grid;
   gap: 0.35rem;
-  min-height: 108px;
+  min-height: 96px;
   padding: 1rem;
 }
 
@@ -166,12 +226,15 @@ h3 {
 }
 
 .summary p,
-.flowItem p {
+.emptyState,
+.messageItem small,
+.messageItem time,
+.rowButton small {
   color: #5b6677;
-  line-height: 1.45;
 }
 
 .panel {
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -181,34 +244,175 @@ h3 {
   display: flex;
   gap: 1rem;
   justify-content: space-between;
-  padding: 1rem;
+  min-height: 58px;
+  padding: 0.85rem 1rem;
 }
 
-.flowList {
+.pill {
+  border: 1px solid #d9dee7;
+  border-radius: 999px;
+  color: #475467;
+  font-size: 0.78rem;
+  min-width: 68px;
+  padding: 0.22rem 0.55rem;
+  text-align: center;
+}
+
+.pill.ready,
+.pill.open {
+  background: #e7f5ef;
+  border-color: #b7dfcf;
+  color: #166534;
+}
+
+.pill.loading,
+.pill.connecting {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #9a3412;
+}
+
+.pill.error,
+.pill.closed {
+  background: #fff3f0;
+  border-color: #ffcdc7;
+  color: #b42318;
+}
+
+.list {
   display: grid;
+  max-height: 360px;
+  overflow: auto;
 }
 
-.flowItem {
+.list.compact {
+  max-height: 284px;
+}
+
+.rowButton {
   align-items: center;
+  border: 0;
+  border-bottom: 1px solid #edf0f4;
+  border-radius: 0;
   display: flex;
   gap: 1rem;
   justify-content: space-between;
-  min-height: 84px;
-  padding: 1rem;
+  min-height: 70px;
+  padding: 0.85rem 1rem;
+  text-align: left;
+  width: 100%;
 }
 
-.flowItem + .flowItem {
+.rowButton:hover,
+.rowButton.selected {
+  background: #eef6f5;
+}
+
+.rowButton span:first-child {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.rowButton strong,
+.rowButton small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowMeta {
+  background: #f1f4f8;
+  border-radius: 999px;
+  color: #344054;
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  padding: 0.18rem 0.5rem;
+}
+
+.toolbar,
+.tailControls {
+  border-bottom: 1px solid #edf0f4;
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+}
+
+.tailControls {
+  grid-template-columns: 1.5fr 1.2fr auto auto;
+}
+
+.table {
+  display: grid;
+  overflow: auto;
+}
+
+.tableHead,
+.tableRow {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1.2fr 1fr 1fr 1.3fr;
+  min-width: 620px;
+  padding: 0.75rem 1rem;
+}
+
+.tableHead {
+  background: #f7f9fc;
+  color: #667085;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.tableRow + .tableRow {
   border-top: 1px solid #edf0f4;
 }
 
-.flowItem span {
-  background: #e7f5ef;
-  border: 1px solid #b7dfcf;
-  border-radius: 999px;
-  color: #166534;
-  flex: 0 0 auto;
-  font-size: 0.82rem;
-  padding: 0.25rem 0.55rem;
+.messageList {
+  display: grid;
+  max-height: 360px;
+  min-height: 220px;
+  overflow: auto;
+}
+
+.messageItem {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+}
+
+.messageItem + .messageItem {
+  border-top: 1px solid #edf0f4;
+}
+
+.messageItem div {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.messageItem p {
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.emptyState {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 220px;
+}
+
+@media (max-width: 980px) {
+  .grid,
+  .summary {
+    grid-template-columns: 1fr;
+  }
+
+  .tailControls {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 760px) {
@@ -224,17 +428,16 @@ h3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .topbar,
-  .flowItem {
+  .topbar {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .status {
-    white-space: normal;
+  .operatorStrip {
+    justify-content: flex-start;
   }
 
-  .summary {
+  .tailControls {
     grid-template-columns: 1fr;
   }
 }

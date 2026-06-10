@@ -99,6 +99,9 @@ jobs:
       - name: Build web app
         run: pnpm --dir ui/web/app build
 
+      - name: buf generate
+        run: buf generate proto
+
       - name: Test mio-web
         run: go test ./ui/web/... -count=1
 

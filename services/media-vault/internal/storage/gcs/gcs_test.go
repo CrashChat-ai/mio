@@ -3,6 +3,7 @@ package gcs
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"google.golang.org/api/googleapi"
 
@@ -68,5 +69,38 @@ func TestLifecycleEqualDetectsDiff(t *testing.T) {
 	}}
 	if lifecycleEqual(a, b) {
 		t.Fatal("expected non-equal AgeInDays")
+	}
+}
+
+func TestAttrsToObjectPreservesCorrelationMetadata(t *testing.T) {
+	attrs := &gcs.ObjectAttrs{
+		Name:        "mio/attachments/object.png",
+		Size:        123,
+		ContentType: "image/png",
+		Updated:     time.Date(2026, 5, 9, 0, 0, 0, 0, time.UTC),
+		Metadata: map[string]string{
+			storage.MetadataContentSHA256:          "abc123",
+			storage.MetadataTenantID:               "tenant-1",
+			storage.MetadataAccountID:              "account-1",
+			storage.MetadataConversationID:         "conversation-1",
+			storage.MetadataSourceMessageID:        "source-1",
+			storage.MetadataMessageID:              "message-1",
+			storage.MetadataAttachmentIndex:        "0",
+			storage.MetadataStorageKey:             "gs://bucket/mio/attachments/object.png",
+			storage.MetadataConversationExternalID: "conversation-ext-1",
+		},
+	}
+
+	object := attrsToObject(attrs.Name, attrs)
+
+	if object.SHA256Hex != "abc123" {
+		t.Fatalf("SHA256Hex = %q; want abc123", object.SHA256Hex)
+	}
+	if object.TenantID != "tenant-1" || object.AccountID != "account-1" ||
+		object.ConversationID != "conversation-1" || object.SourceMessageID != "source-1" {
+		t.Fatalf("typed owner metadata not populated: %+v", object)
+	}
+	if got := object.Metadata[storage.MetadataStorageKey]; got != "gs://bucket/mio/attachments/object.png" {
+		t.Fatalf("metadata storage_key = %q", got)
 	}
 }

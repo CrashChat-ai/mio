@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
@@ -44,15 +45,22 @@ func (p *EnrichingProcessor) Process(ctx context.Context, msg *miov1.Message) er
 		receivedAt = ts.AsTime().UTC()
 	}
 
-	for _, att := range msg.GetAttachments() {
+	for idx, att := range msg.GetAttachments() {
 		if att.GetStorageKey() != "" {
 			continue
 		}
-		p.processAttachment(ctx, channelType, receivedAt, attachmentOwner{
-			TenantID:        msg.GetTenantId(),
-			AccountID:       msg.GetAccountId(),
-			ConversationID:  msg.GetConversationId(),
-			SourceMessageID: msg.GetSourceMessageId(),
+		p.processAttachment(ctx, attachmentSource{
+			MessageID:              msg.GetId(),
+			TenantID:               msg.GetTenantId(),
+			AccountID:              msg.GetAccountId(),
+			ChannelType:            channelType,
+			ConversationID:         msg.GetConversationId(),
+			ConversationExternalID: msg.GetConversationExternalId(),
+			SourceMessageID:        msg.GetSourceMessageId(),
+			ThreadRootMessageID:    msg.GetThreadRootMessageId(),
+			Relation:               msg.GetRelation(),
+			AttachmentIndex:        idx,
+			ReceivedAt:             receivedAt,
 		}, att)
 	}
 
@@ -64,30 +72,35 @@ func (p *EnrichingProcessor) Process(ctx context.Context, msg *miov1.Message) er
 	return nil
 }
 
-type attachmentOwner struct {
-	TenantID        string
-	AccountID       string
-	ConversationID  string
-	SourceMessageID string
+type attachmentSource struct {
+	MessageID              string
+	TenantID               string
+	AccountID              string
+	ChannelType            string
+	ConversationID         string
+	ConversationExternalID string
+	SourceMessageID        string
+	ThreadRootMessageID    string
+	Relation               *miov1.MessageRelation
+	AttachmentIndex        int
+	ReceivedAt             time.Time
 }
 
 func (p *EnrichingProcessor) processAttachment(
 	ctx context.Context,
-	channelType string,
-	receivedAt time.Time,
-	owner attachmentOwner,
+	source attachmentSource,
 	att *miov1.Attachment,
 ) {
 	start := time.Now()
 	outcome := "ok"
 	defer func() {
-		metrics.DownloadDuration.WithLabelValues(channelType, outcome).Observe(time.Since(start).Seconds())
-		metrics.DownloadedTotal.WithLabelValues(channelType, outcome).Inc()
+		metrics.DownloadDuration.WithLabelValues(source.ChannelType, outcome).Observe(time.Since(start).Seconds())
+		metrics.DownloadedTotal.WithLabelValues(source.ChannelType, outcome).Inc()
 	}()
 
-	f := fetcher.Lookup(channelType)
+	f := fetcher.Lookup(source.ChannelType)
 	if f == nil {
-		p.Log.Warn("processor: no fetcher for channel", "channel_type", channelType)
+		p.Log.Warn("processor: no fetcher for channel", "channel_type", source.ChannelType)
 		att.ErrorCode = miov1.Attachment_ERROR_CODE_FORBIDDEN
 		outcome = "no_fetcher"
 		return
@@ -111,22 +124,31 @@ func (p *EnrichingProcessor) processAttachment(
 		// — so we surface the failure to downstream consumers via
 		// ERROR_CODE_TIMEOUT and let the message flow. Downstream AI consumer
 		// soft-handles missing bytes (the design contract).
-		p.Log.Error("processor: fetch transient error", "err", err, "channel_type", channelType)
+		p.Log.Error("processor: fetch transient error", "err", err, "channel_type", source.ChannelType)
 		att.ErrorCode = miov1.Attachment_ERROR_CODE_TIMEOUT
 		return
 	}
 
-	key := keygen.Build(p.StoragePrefix, channelType, res.SHA256Hex, res.ContentType, att.GetFilename(), receivedAt)
+	key := keygen.Build(
+		p.StoragePrefix,
+		source.ChannelType,
+		res.SHA256Hex,
+		res.ContentType,
+		att.GetFilename(),
+		source.ReceivedAt,
+	)
+	storageKey := p.objectStorageKey(key)
 
 	storeStart := time.Now()
 	dr, err := dedup.PersistIfAbsent(ctx, p.Storage, key, func() error {
 		return p.Storage.Put(ctx, key, bytes.NewReader(buf.Bytes()), res.Bytes, storage.PutOptions{
 			ContentType:     res.ContentType,
 			SHA256Hex:       res.SHA256Hex,
-			TenantID:        owner.TenantID,
-			AccountID:       owner.AccountID,
-			ConversationID:  owner.ConversationID,
-			SourceMessageID: owner.SourceMessageID,
+			TenantID:        source.TenantID,
+			AccountID:       source.AccountID,
+			ConversationID:  source.ConversationID,
+			SourceMessageID: source.SourceMessageID,
+			Metadata:        p.sourceMetadata(source, att, key, storageKey, res),
 			IfNotExists:     true,
 		})
 	})
@@ -138,9 +160,9 @@ func (p *EnrichingProcessor) processAttachment(
 		return
 	}
 	if dr.AlreadyExisted || dr.CollisionResolved {
-		metrics.DedupHits.WithLabelValues(channelType).Inc()
+		metrics.DedupHits.WithLabelValues(source.ChannelType).Inc()
 	} else {
-		metrics.BytesTotal.WithLabelValues(channelType).Add(float64(res.Bytes))
+		metrics.BytesTotal.WithLabelValues(source.ChannelType).Add(float64(res.Bytes))
 	}
 
 	// storage_key is the full gs:// URI so downstream consumers have a
@@ -148,10 +170,6 @@ func (p *EnrichingProcessor) processAttachment(
 	// att.Url is left untouched to preserve the original platform URL (Cliq,
 	// etc.). Signed GCS URLs expire in ~1 h and are useless in long-lived
 	// storage like BigQuery — callers can sign on demand from storage_key.
-	storageKey := key
-	if p.StorageBucket != "" {
-		storageKey = "gs://" + p.StorageBucket + "/" + key
-	}
 	att.StorageKey = storageKey
 	att.ContentSha256 = res.SHA256Hex
 	att.Bytes = res.Bytes
@@ -159,6 +177,62 @@ func (p *EnrichingProcessor) processAttachment(
 		att.Mime = res.ContentType
 	}
 	att.ErrorCode = miov1.Attachment_ERROR_CODE_OK
+}
+
+func (p *EnrichingProcessor) objectStorageKey(key string) string {
+	if p.StorageBucket == "" {
+		return key
+	}
+	return "gs://" + p.StorageBucket + "/" + key
+}
+
+func (p *EnrichingProcessor) sourceMetadata(
+	source attachmentSource,
+	att *miov1.Attachment,
+	objectKey string,
+	storageKey string,
+	res fetcher.Result,
+) map[string]string {
+	metadata := map[string]string{
+		storage.MetadataSchemaVersion:   "1",
+		storage.MetadataAttachmentIndex: strconv.Itoa(source.AttachmentIndex),
+		storage.MetadataStorageKey:      storageKey,
+		storage.MetadataObjectKey:       objectKey,
+		storage.MetadataBytes:           strconv.FormatInt(res.Bytes, 10),
+		storage.MetadataContentSHA256:   res.SHA256Hex,
+		storage.MetadataErrorCode:       miov1.Attachment_ERROR_CODE_OK.String(),
+		storage.MetadataReceivedAt:      source.ReceivedAt.Format(time.RFC3339Nano),
+	}
+
+	addMetadata(metadata, storage.MetadataMessageID, source.MessageID)
+	addMetadata(metadata, storage.MetadataSourceMessageID, source.SourceMessageID)
+	addMetadata(metadata, storage.MetadataTenantID, source.TenantID)
+	addMetadata(metadata, storage.MetadataAccountID, source.AccountID)
+	addMetadata(metadata, storage.MetadataChannelType, source.ChannelType)
+	addMetadata(metadata, storage.MetadataConversationID, source.ConversationID)
+	addMetadata(metadata, storage.MetadataConversationExternalID, source.ConversationExternalID)
+	addMetadata(metadata, storage.MetadataThreadRootMessageID, source.ThreadRootMessageID)
+	addMetadata(metadata, storage.MetadataFilename, att.GetFilename())
+	mime := res.ContentType
+	if mime == "" {
+		mime = att.GetMime()
+	}
+	addMetadata(metadata, storage.MetadataMIME, mime)
+
+	if source.Relation != nil {
+		addMetadata(metadata, storage.MetadataRelationKind, source.Relation.GetKind().String())
+		addMetadata(metadata, storage.MetadataRelationTargetMessageID, source.Relation.GetTargetMessageId())
+		addMetadata(metadata, storage.MetadataRelationTargetExternalID, source.Relation.GetTargetExternalId())
+	}
+
+	return metadata
+}
+
+func addMetadata(metadata map[string]string, key string, value string) {
+	if value == "" {
+		return
+	}
+	metadata[key] = value
 }
 
 func errCodeToLabel(c miov1.Attachment_ErrorCode) string {

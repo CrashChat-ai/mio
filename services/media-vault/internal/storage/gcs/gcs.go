@@ -54,7 +54,7 @@ func (b *Backend) Put(ctx context.Context, key string, body io.Reader, size int6
 	if opts.ContentType != "" {
 		w.ContentType = opts.ContentType
 	}
-	meta := map[string]string{}
+	meta := cloneMetadata(opts.Metadata)
 	if opts.SHA256Hex != "" {
 		meta["sha256"] = opts.SHA256Hex
 	}
@@ -266,16 +266,32 @@ func attrsToObject(key string, attrs *gcs.ObjectAttrs) *storage.Object {
 		Key:         key,
 		Size:        attrs.Size,
 		ContentType: attrs.ContentType,
+		Metadata:    map[string]string{},
 		ModifiedAt:  attrs.Updated,
 	}
 	if m := attrs.Metadata; m != nil {
+		o.Metadata = cloneMetadata(m)
 		o.SHA256Hex = m["sha256"]
+		if o.SHA256Hex == "" {
+			o.SHA256Hex = m[storage.MetadataContentSHA256]
+		}
 		o.TenantID = m["tenant_id"]
 		o.AccountID = m["account_id"]
 		o.ConversationID = m["conversation_id"]
 		o.SourceMessageID = m["source_message_id"]
 	}
 	return o
+}
+
+func cloneMetadata(in map[string]string) map[string]string {
+	out := map[string]string{}
+	for key, value := range in {
+		if key == "" || value == "" {
+			continue
+		}
+		out[key] = value
+	}
+	return out
 }
 
 // mapErr translates concrete GCS errors into storage sentinel errors.

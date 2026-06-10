@@ -15,11 +15,13 @@ mio/
 │   └── all/all.go        # Barrel: blank-imports all adapters for compilation
 ├── pkg/                  # Shared libraries (minimal: no utils/common/helpers rule).
 │   └── channels/         # Public adapter contract (adapter.go, inbound_adapter.go, credential_adapter.go, registry.go, store.go, delivery_error.go)
-├── services/             # Long-running binaries (Go).
+├── services/             # Long-running headless/data-plane binaries (Go).
 │   ├── gateway/          # Main API service. Inbound webhook handler + outbound sender pool + admin control plane + embedded NATS option.
 │   ├── sink-gcs/         # GCS archiver consumer. Cold storage + analytics substrate.
-│   ├── media-vault/      # Attachment sidecar. Fetches within platform TTL, persists to GCS.
-│   └── tui/              # Terminal UI admin client (bubbletea). Read-only v1.
+│   └── media-vault/      # Attachment sidecar. Fetches within platform TTL, persists to GCS.
+├── ui/                   # Human-facing operator surfaces.
+│   ├── tui/              # Terminal UI admin client (bubbletea). Read-only v1.
+│   └── web/              # Planned operator web admin BFF + embedded React SPA.
 ├── ee/                   # Commercial overlay (build-tag-gated, //go:build ee). OSS must compile without it.
 ├── sdks/                 # Distributable client libraries.
 │   ├── go/               # Go SDK (separate module: github.com/crashchat-ai/mio/sdk-go). Thin NATS wrapper for consumers.
@@ -64,15 +66,15 @@ mio/
 **Binaries:**
 - `cmd/gateway` — Production inbound/outbound server (HTTP + gRPC health). Connects to external NATS cluster + Postgres.
 - `cmd/all-in-one` — Demo binary with embedded NATS JetStream (memory or file-backed). Single-binary for laptop demos.
-- `cmd/admin` — Control-plane gRPC server (connect-go on loopback:9090 by default). Read-only v1.
+- `cmd/admin` — Control-plane gRPC server (connect-go on loopback:9090 by default).
 
 **Admin Control Plane** (`internal/admin/`):
 - **RPCs** (connect-go, loopback-only by default, CIDR allowlist via auth.go):
-  - `ListTenants` — enumerate registered tenants
-  - `CreateAccount` — provision new workspace
-  - `ListAccounts` — enumerate accounts per tenant
-  - `GetCredentials` — read encrypted OAuth tokens (admin inspection only)
-  - `ChannelCapabilities` — get per-channel feature flags (reactions, threads, edits)
+  - `CreateTenant`, `ListTenants`, `GetTenant` — tenant lifecycle and lookup
+  - `ListChannelTypes` — registered channel adapters and capabilities
+  - `StartInstall`, `CompleteInstall` — operator-driven OAuth install dance
+  - `ListAccounts` — account enumeration per tenant
+  - `DisableAccount`, `RotateCredential` — existing write operations
   - `TailMessages` — streaming tail of inbound messages (debugging)
   - `install_stash` OAuth flow with `purgeExpired` ticker — clean up old credentials
 - **Observability:** Prometheus instruments wired on all admin RPCs (request duration, error rates)
@@ -254,7 +256,7 @@ mio-media-cli signed-url gs://bucket/mio/attachments/... --ttl=1h
 mio-media-cli gdpr-delete --account-id=abc123
 ```
 
-### `services/tui/` — Terminal UI Admin Client
+### `ui/tui/` — Terminal UI Admin Client
 
 **Status:** Just-scaffolded bubbletea TUI.
 
@@ -292,7 +294,7 @@ mio-media-cli gdpr-delete --account-id=abc123
 - `mio/v1/relation.proto` — MessageRelation (replies, edits, reactions, pins)
 - `mio/v1/presence.proto` — Typing/online state (not on streams yet)
 - `mio/v1/capabilities.proto` — ChannelCapabilities (reactions, threads, edits flags)
-- `mio/admin/v1/admin.proto` — AdminService RPC (CreateTenant, ListChannelTypes, ListAccounts, GetCredentials, TailMessages)
+- `mio/admin/v1/admin.proto` — AdminService RPC (tenants, channel installs, accounts, credential rotation, TailMessages)
 
 **Conventions:**
 - Fields 1–15: single-byte tags (hot path)

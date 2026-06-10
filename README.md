@@ -27,15 +27,16 @@ the receiver.
 
 ## Components
 
-The repo is organised by role (services / sdks / channels / shared libs).
-Migration history: see `plans/260513-0833-repo-layout-option-b/`.
+The repo is organised by role (services / ui / sdks / channels / shared libs).
+Migration history: see `.work/plans/260513-0833-repo-layout-option-b/`.
 
 | Component | Lang | Role |
 |---|---|---|
 | `services/gateway/` | Go | Stateless ingress/egress. Per-channel handler + consumer pool, per-workspace rate limits. |
 | `services/media-vault/` | Go | Attachment ingestion within platform TTL → GCS, message enrichment. |
 | `services/sink-gcs/` | Go | Raw-payload sink for cold storage + analytics substrate. |
-| `services/tui/` | Go | Admin terminal UI (bubbletea), read-only v1. Connect-RPC client to admin server. |
+| `ui/tui/` | Go | Admin terminal UI (bubbletea), read-only v1. Connect-RPC client to admin server. |
+| `ui/web/` | Go/TS | Reserved for the operator web admin BFF + embedded React SPA. |
 | `sdks/go/` | Go | Thin NATS wrapper. Idempotency, OTel, Prometheus, schema-version checks. Importable as `github.com/crashchat-ai/mio/sdk-go` (module path preserved despite directory move). |
 | `sdks/python/` | Python | Async-only NATS wrapper for AI service integration (LangGraph-compatible). |
 | `channels/` | Go | In-tree channel adapters (Cliq today; Slack, Telegram, … planned). Each adapter registers via `init()`; barrel package `channels/all` blank-imports them. |

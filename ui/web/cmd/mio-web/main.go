@@ -3,30 +3,46 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/crashchat-ai/mio/ui/web/internal/adminclient"
+	"github.com/crashchat-ai/mio/ui/web/internal/auth"
 	webembed "github.com/crashchat-ai/mio/ui/web/internal/embed"
 	"github.com/crashchat-ai/mio/ui/web/internal/rest"
 )
 
 func main() {
-	addr := env("MIO_WEB_ADDR", ":8080")
+	logger := slog.Default()
+	cfg, cleanup, err := configFromEnv(context.Background(), logger)
+	if err != nil {
+		logger.Error("mio-web configuration failed", "error", err)
+		os.Exit(1)
+	}
+	defer cleanup()
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", rest.Health)
-	mux.Handle("/", webembed.Handler())
+	handler := rest.New(rest.Config{
+		Admin:  adminclient.New(cfg.AdminURL),
+		Auth:   cfg.Auth,
+		Assets: webembed.Handler(),
+		Logger: logger,
+	})
 
 	server := &http.Server{
-		Addr:              addr,
-		Handler:           mux,
+		Addr:              cfg.Addr,
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      15 * time.Second,
+		WriteTimeout:      0,
 		IdleTimeout:       60 * time.Second,
 	}
 
@@ -35,7 +51,11 @@ func main() {
 
 	errCh := make(chan error, 1)
 	go func() {
-		slog.Info("starting mio-web", "addr", addr)
+		logger.Info("starting mio-web",
+			"addr", cfg.Addr,
+			"admin_url", cfg.AdminURL,
+			"auth_mode", cfg.Auth.Mode(),
+			"session_store", cfg.SessionStore)
 		errCh <- server.ListenAndServe()
 	}()
 
@@ -44,15 +64,97 @@ func main() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil {
-			slog.Error("failed to shut down mio-web", "error", err)
+			logger.Error("failed to shut down mio-web", "error", err)
 			os.Exit(1)
 		}
 	case err := <-errCh:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("mio-web exited", "error", err)
+			logger.Error("mio-web exited", "error", err)
 			os.Exit(1)
 		}
 	}
+}
+
+type appConfig struct {
+	Addr         string
+	AdminURL     string
+	Auth         *auth.Manager
+	SessionStore string
+}
+
+func configFromEnv(ctx context.Context, logger *slog.Logger) (appConfig, func(), error) {
+	addr := env("MIO_WEB_ADDR", ":8080")
+	adminURL := env("MIO_ADMIN_URL", "http://127.0.0.1:9090")
+	authMode := env("MIO_WEB_AUTH_MODE", auth.ModeGoogle)
+	publicURL := strings.TrimRight(os.Getenv("MIO_WEB_PUBLIC_URL"), "/")
+	cookieSecure := envBool("MIO_WEB_COOKIE_SECURE", strings.HasPrefix(publicURL, "https://"))
+	allowlist := auth.ParseAllowlist(os.Getenv("MIO_WEB_OPERATOR_EMAILS"), os.Getenv("MIO_WEB_OPERATOR_DOMAINS"))
+
+	store, storeName, cleanup, err := sessionStoreFromEnv(ctx)
+	if err != nil {
+		return appConfig{}, nil, err
+	}
+
+	var provider auth.Provider
+	if authMode == auth.ModeGoogle {
+		redirectURL := os.Getenv("MIO_WEB_OIDC_REDIRECT_URL")
+		if redirectURL == "" && publicURL != "" {
+			redirectURL = publicURL + "/auth/callback"
+		}
+		if os.Getenv("MIO_WEB_GOOGLE_CLIENT_ID") != "" ||
+			os.Getenv("MIO_WEB_GOOGLE_CLIENT_SECRET") != "" ||
+			redirectURL != "" {
+			provider, err = auth.NewGoogleProvider(auth.GoogleConfig{
+				ClientID:     os.Getenv("MIO_WEB_GOOGLE_CLIENT_ID"),
+				ClientSecret: os.Getenv("MIO_WEB_GOOGLE_CLIENT_SECRET"),
+				RedirectURL:  redirectURL,
+			})
+			if err != nil {
+				cleanup()
+				return appConfig{}, nil, err
+			}
+		}
+	}
+
+	manager, err := auth.NewManager(auth.Config{
+		Mode:         authMode,
+		Provider:     provider,
+		Store:        store,
+		Allowlist:    allowlist,
+		DevIdentity:  auth.Identity{Email: os.Getenv("MIO_WEB_DEV_OPERATOR_EMAIL"), Name: os.Getenv("MIO_WEB_DEV_OPERATOR_NAME")},
+		SessionTTL:   envDuration("MIO_WEB_SESSION_TTL", 12*time.Hour),
+		CookieSecure: cookieSecure,
+		StateSecret:  []byte(os.Getenv("MIO_WEB_STATE_SECRET")),
+		Logger:       logger,
+	})
+	if err != nil {
+		cleanup()
+		return appConfig{}, nil, err
+	}
+
+	return appConfig{
+		Addr:         addr,
+		AdminURL:     adminURL,
+		Auth:         manager,
+		SessionStore: storeName,
+	}, cleanup, nil
+}
+
+func sessionStoreFromEnv(ctx context.Context) (auth.Store, string, func(), error) {
+	dsn := os.Getenv("MIO_WEB_DATABASE_DSN")
+	if dsn == "" {
+		return auth.NewMemoryStore(), "memory", func() {}, nil
+	}
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		return nil, "", nil, fmt.Errorf("mio-web postgres sessions: %w", err)
+	}
+	store := auth.NewPostgresStore(pool)
+	if err := store.CheckSchema(ctx); err != nil {
+		pool.Close()
+		return nil, "", nil, err
+	}
+	return store, "postgres", pool.Close, nil
 }
 
 func env(key, fallback string) string {
@@ -61,4 +163,28 @@ func env(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func envBool(key string, fallback bool) bool {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func envDuration(key string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }

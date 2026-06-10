@@ -2,6 +2,7 @@
 
 COMPOSE := docker compose -f deploy/local/docker-compose.yml
 BUILD_VERSION := $(shell git describe --always --dirty 2>/dev/null || echo dev)
+BUF ?= buf
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -104,10 +105,12 @@ ui-web-install: ## Install web admin app dependencies
 	pnpm --dir ui/web/app install --frozen-lockfile
 
 ui-web-build: ui-web-install ## Build the web admin shell and mio-web binary
+	$(BUF) generate proto
 	pnpm --dir ui/web/app build
 	go build -o ./bin/mio-web ./ui/web/cmd/mio-web
 
 ui-web-test: ui-web-install ## Run web admin shell tests
+	$(BUF) generate proto
 	go test ./ui/web/... -v -count=1
 	pnpm --dir ui/web/app build
 

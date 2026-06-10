@@ -26,9 +26,9 @@ selecting an account in the accounts view sets the filter for the tail view.
 
 ## Modules + workspace
 
-`tui/` is a separate Go module that lives in the workspace (`go.work`). It
-consumes the in-repo generated proto packages via a single `replace` directive
-pointing at the root module — same pattern as `gateway/go.mod`.
+`ui/tui/` lives in the root Go module. It consumes the in-repo generated proto
+packages directly and stays alongside other human-facing operator surfaces under
+`ui/`.
 
 ## What's missing
 

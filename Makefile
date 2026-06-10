@@ -1,4 +1,4 @@
-.PHONY: help up down proto proto-gen proto-lint proto-breaking proto-roundtrip sdk-go-test sdk-py-test sink-gcs-test sink-gcs-build-local sink-gcs-build lint test clean gateway-build gateway-build-local gateway-test gateway-migrate gateway-bench-outbound echo-up echo-logs echo-consumer-test helm-lint helm-template kind-up kind-deploy kind-smoke kind-down
+.PHONY: help up down proto proto-gen proto-lint proto-breaking proto-roundtrip sdk-go-test sdk-py-test sink-gcs-test sink-gcs-build-local sink-gcs-build lint docs-check test clean gateway-build gateway-build-local gateway-test gateway-migrate gateway-bench-outbound admin-build admin-run admin-test tui-build tui-run tui-test ui-web-install ui-web-build ui-web-test docker-mio-web echo-up echo-logs echo-consumer-test helm-lint helm-template kind-up kind-deploy kind-smoke kind-down
 
 COMPOSE := docker compose -f deploy/local/docker-compose.yml
 BUILD_VERSION := $(shell git describe --always --dirty 2>/dev/null || echo dev)
@@ -41,6 +41,9 @@ proto-roundtrip: ## Run Go+Python proto round-trip test (pipes bytes; both must 
 lint: ## Run buf lint + go vet
 	buf lint
 	go vet ./...
+
+docs-check: ## Check docs/plans for stale paths and admin-surface drift
+	./scripts/check-planning-drift.sh
 
 test: ## Run go tests
 	go test ./...
@@ -89,13 +92,27 @@ run-laptop-persist: ## Run mio-all-in-one with embedded NATS (file storage, ./va
 	go run ./services/gateway/cmd/all-in-one --storage file --store-dir ./var/jetstream
 
 tui-build: ## Build the mio-tui binary
-	go build -o ./bin/mio-tui ./services/tui/cmd/mio-tui
+	go build -o ./bin/mio-tui ./ui/tui/cmd/mio-tui
 
 tui-run: ## Run the TUI against ADMIN_URL (default http://127.0.0.1:9090)
-	go run ./services/tui/cmd/mio-tui
+	go run ./ui/tui/cmd/mio-tui
 
 tui-test: ## Run TUI unit tests
-	go test ./services/tui/... -v -count=1
+	go test ./ui/tui/... -v -count=1
+
+ui-web-install: ## Install web admin app dependencies
+	pnpm --dir ui/web/app install --frozen-lockfile
+
+ui-web-build: ui-web-install ## Build the web admin shell and mio-web binary
+	pnpm --dir ui/web/app build
+	go build -o ./bin/mio-web ./ui/web/cmd/mio-web
+
+ui-web-test: ui-web-install ## Run web admin shell tests
+	go test ./ui/web/... -v -count=1
+	pnpm --dir ui/web/app build
+
+docker-mio-web: ## Build mio-web Docker image locally (no push)
+	docker build -f ui/web/Dockerfile -t mio/web:dev .
 
 sink-gcs-test: ## Run sink-gcs unit tests (no live NATS/MinIO needed)
 	go test ./services/sink-gcs/internal/... -v
@@ -125,6 +142,7 @@ helm-lint: ## Lint all Helm charts (helm lint + helm template render check)
 	helm lint deploy/charts/mio-nats
 	helm lint deploy/charts/mio-jetstream-bootstrap
 	helm lint deploy/charts/mio-gateway
+	helm lint deploy/charts/mio-web
 	helm lint deploy/charts/mio-sink-gcs
 
 helm-template: ## Render all charts with helm template and print to stdout
@@ -136,6 +154,8 @@ helm-template: ## Render all charts with helm template and print to stdout
 	@echo "==> mio-gateway"
 	helm template test-gateway deploy/charts/mio-gateway \
 		--set secrets.existingSecret=mio-gateway-secrets
+	@echo "==> mio-web"
+	helm template test-web deploy/charts/mio-web
 	@echo "==> mio-sink-gcs"
 	helm template test-sink-gcs deploy/charts/mio-sink-gcs
 

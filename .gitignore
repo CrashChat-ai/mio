@@ -10,6 +10,8 @@ secrets.env
 # Go
 bin/
 dist/
+!ui/web/internal/embed/dist/
+!ui/web/internal/embed/dist/index.html
 vendor/
 *.test
 *.out
@@ -27,6 +29,8 @@ venv/
 
 # Node (sdk-py docs builds, generated stuff later)
 node_modules/
+ui/web/app/node_modules/
+ui/web/app/dist/
 
 # generated proto (we'll commit the .proto sources, not the gen output, by default)
 proto/gen/

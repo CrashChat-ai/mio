@@ -3,7 +3,7 @@
 **Last updated:** 2026-05-13  
 **Current phase:** P9.5 ✅ (admin control plane + TUI scaffold shipped)  
 **Shipped in recent commits:** Admin server (connect-rpc loopback), TUI (bubbletea read-only v1), embedded NATS option, pkg/channels adapter contract, role-based monorepo layout  
-**Next focus:** P10–P11 (BigQuery sink, channel registry control plane write ops)
+**Next focus:** P10–P12 (BigQuery sink, channel registry control plane write ops, operator web admin)
 
 ---
 
@@ -23,7 +23,8 @@
 | **P9** | ✅ | Attachment persistence | Media-vault sidecar, content-addressed storage, 7-day TTL | `.work/plans/260509-2328-attachment-persistence/` |
 | **P9.5** | ✅ | Admin control plane + TUI scaffold | Admin server (connect-rpc), TUI (bubbletea, read-only v1), embedded NATS option | Recent |
 | **P10** | 🚧 | BigQuery sink / lakehouse | External tables + native warehouse table, loader pipeline | `.work/plans/260510-1102-bq-sink-lakehouse/` |
-| **P11** | 🚧 | Channel registry control plane | Admin RPCs (credentials, tenants, capabilities), TUI write operations | `.work/plans/260513-0351-channel-management-control-plane/` |
+| **P11** | 🚧 | Channel registry control plane | Additive admin RPCs for account detail/update, rate limits, and credential metadata | `.work/plans/260513-0351-channel-management-control-plane/` |
+| **P12** | 🚧 | Operator web admin | `ui/web` Go BFF + embedded React SPA for internal operators | `.work/plans/260610-1352-issue-31-web-admin-phase0-reconcile/` |
 | **—** | — | Second channel adapter (Slack) | Webhook inbound, API outbound, per-channel rate limits | open |
 | **—** | — | ELT pipeline (Airflow DAG) | Scheduled Cloud Run Job for BigQuery loader | `.work/plans/260510-2333-elt-mio-airflow-dag/` |
 | **—** | — | Cliq OAuth refresh hardening | Token refresh retry/backoff, credential rotation | `.work/plans/260510-0152-cliq-oauth-token-refresh/` |
@@ -39,27 +40,29 @@
 **Date shipped:** 2026-05-13  
 **Key features:**
 - Admin server (`cmd/admin`): Connect-RPC on loopback:9090, CIDR allowlist
-- TUI client (`services/tui`): bubbletea, read-only v1 (inspect messages, channels, consumer lag)
+- TUI client (`ui/tui`): bubbletea, read-only v1 (inspect messages, channels, consumer lag)
 - Embedded NATS option: `cmd/all-in-one` with JetStream (memory or file-backed)
 - Role-based monorepo layout: `channels/`, `pkg/`, `services/`, `ee/`, `sdks/` with clear ownership boundaries
 - Public adapter contract: `pkg/channels/` interfaces (Adapter, InboundAdapter, CredentialAdapter, DeliveryError)
 
-**Admin RPCs** (read-only for now):
-- `ListTenants`, `CreateAccount`, `ListAccounts` — tenant/account enumeration
-- `GetCredentials` — inspect encrypted OAuth tokens
-- `ChannelCapabilities` — get per-channel feature flags (reactions, threads, edits)
+**Admin RPCs:**
+- `CreateTenant`, `ListTenants`, `GetTenant` — tenant lifecycle and lookup
+- `ListChannelTypes` — registered channel adapters and capabilities
+- `StartInstall`, `CompleteInstall` — operator-driven OAuth install dance
+- `ListAccounts` — account enumeration per tenant
+- `DisableAccount`, `RotateCredential` — existing write operations
 - `TailMessages` — streaming tail of inbound messages (debugging)
 - `install_stash` OAuth flow with `purgeExpired` ticker
 
 **Codebase changes:**
 - `services/gateway/internal/admin/` — control plane server + CIDR auth
-- `services/tui/` — bubbletea TUI client
+- `ui/tui/` — bubbletea TUI client
 - `pkg/channels/` — public adapter contract (extracted from gateway internals)
 - `channels/` — in-tree adapters (zohocliq today)
 - `ee/` — commercial overlay placeholder (build-tag-gated)
 - `deploy/charts/` — 6 charts (mio-nats, mio-jetstream-bootstrap, mio-gateway, mio-media-vault, mio-sink-gcs, mio-echo-consumer)
 
-**Code:** `services/gateway/internal/admin/`, `services/tui/`, `pkg/channels/`, `channels/`
+**Code:** `services/gateway/internal/admin/`, `ui/tui/`, `pkg/channels/`, `channels/`
 
 ### P9: Attachment Persistence
 
@@ -129,20 +132,15 @@
 
 **Components:**
 - `cmd/admin` control-plane server (connect-go RPC on loopback:9090 + CIDR allowlist)
-- `AdminService` RPC:
-  - `CreateTenant(name, owner_email)` → tenant_id
-  - `ListChannelTypes()` → {name, status, capabilities}
-  - `CreateChannelInstall(tenant_id, channel_type, config)` → account_id
-  - `ListChannelInstalls(tenant_id)` → {account_id, channel_type, status}
-  - `GetCredentials(account_id)` → encrypted credential summary
-  - `RefreshCredentials(account_id)` → trigger OAuth refresh
-  - `TailMessages(account_id, conversation_id?)` → stream of messages (read-only)
-  - `StartInstall(channel_type, redirect_uri)` → oauth_url
-  - `CompleteInstall(code, state)` → account_id, refresh_token
+- `AdminService` RPC gaps:
+  - `GetAccount(account_id)` → account detail
+  - `UpdateAccount(account_id, ...)` → editable account metadata
+  - `SetRateLimit(account_id, ...)` → per-account rate-limit changes
+  - `GetCredentialMetadata(account_id)` → credential expiry/version metadata without plaintext tokens
 
 **TUI integration:** bubbletea UI (read-only v1 → read-write v2)
 
-**Code:** `services/gateway/internal/admin/`, `services/tui/`
+**Code:** `services/gateway/internal/admin/`, `ui/tui/`
 
 **Plan:** `.work/plans/260513-0351-channel-management-control-plane/`
 

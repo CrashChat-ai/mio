@@ -17,6 +17,8 @@ proto/gen/
 hack/
 plans/
 docs/
+.work/
+.claude/
 
 # Environment / secrets
 .env*
@@ -32,6 +34,7 @@ venv/
 
 # Node
 node_modules/
+ui/web/app/dist/
 
 # IDE / OS
 .idea/

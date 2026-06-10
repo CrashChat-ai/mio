@@ -98,9 +98,10 @@ make tui-run    # Connects to admin server (default ADMIN_URL=http://127.0.0.1:9
 ```
 
 **Admin server RPCs** (loopback-only by default):
-- `ListTenants`, `CreateAccount`, `ListAccounts` — tenant/account management
-- `GetCredentials` — inspect encrypted OAuth tokens
-- `ChannelCapabilities` — get per-channel feature flags
+- `CreateTenant`, `ListTenants`, `GetTenant` — tenant lifecycle and lookup
+- `ListChannelTypes` — registered channel adapters and capabilities
+- `StartInstall`, `CompleteInstall` — operator-driven OAuth install dance
+- `ListAccounts`, `DisableAccount`, `RotateCredential` — account operations
 - `TailMessages` — streaming tail of inbound messages (debugging)
 
 **TUI v1 features:**

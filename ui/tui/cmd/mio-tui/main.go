@@ -9,8 +9,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/crashchat-ai/mio/services/tui/internal/client"
-	"github.com/crashchat-ai/mio/services/tui/internal/views"
+	"github.com/crashchat-ai/mio/ui/tui/internal/client"
+	"github.com/crashchat-ai/mio/ui/tui/internal/views"
 )
 
 type viewKind int

@@ -44,6 +44,7 @@ flowchart LR
     gw["mio-gateway<br/>(Go, stateless)<br/>+ embedded NATS option"]
     admin["mio-admin<br/>(connect-rpc<br/>loopback:9090)"]
     tui["mio-tui<br/>(bubbletea,<br/>read-only)"]
+    web["mio-web<br/>(operator admin,<br/>planned)"]
     bus[("NATS JetStream<br/>3-replica cluster<br/>or embedded")]
     sink["mio-sink-gcs<br/>(Go consumer)"]
     dl["mio-media-vault<br/>(Go sidecar)"]
@@ -67,6 +68,7 @@ flowchart LR
   gw -- "publish<br/>MESSAGES_INBOUND" --> bus
   admin -.-> gw
   tui --> admin
+  web --> admin
   bus -- "consume<br/>(gcs-archiver)" --> sink
   sink --> gcs
   bus -- "consume<br/>(media-vault)" --> dl
@@ -100,18 +102,25 @@ is the boundary that keeps "intelligence" and "transport" separable.
 **mio-admin** (`cmd/admin`): Connect-RPC server (loopback:9090 by default, CIDR allowlist).
 
 **RPCs:**
-- `ListTenants` — enumerate registered tenants
-- `CreateAccount` — provision new workspace + OAuth flow setup
+- `CreateTenant`, `ListTenants`, `GetTenant` — tenant lifecycle and lookup
+- `ListChannelTypes` — registered channel adapters and capabilities
+- `StartInstall`, `CompleteInstall` — operator-driven OAuth install dance
 - `ListAccounts` — enumerate accounts per tenant
-- `GetCredentials` — inspect encrypted OAuth tokens (admin eyes only)
-- `ChannelCapabilities` — get per-channel feature flags (reactions, threads, edits)
+- `DisableAccount`, `RotateCredential` — existing write operations
 - `TailMessages` — streaming tail of inbound messages (debugging)
-- `install_stash` OAuth flow with `purgeExpired` ticker — rotate old credentials
+- `install_stash` OAuth flow with `purgeExpired` ticker — clean up stale install state
 
-**mio-tui** (`services/tui`, bubbletea): Read-only v1 terminal client.
+**mio-tui** (`ui/tui`, bubbletea): Read-only v1 terminal client.
 - Connects to admin server over HTTP (default `ADMIN_URL=http://127.0.0.1:9090`)
 - Inspect messages, list channels, view consumer lag
 - Write ops deferred to P6+
+
+**mio-web** (`ui/web`, planned): Internal operator console. Local development can
+front a loopback admin server, but cluster deploys must not rely on cross-pod
+loopback. The default cluster topology is a non-public AdminService listener behind
+an internal ClusterIP, with `MIO_ADMIN_ALLOW_CIDRS` and NetworkPolicy allowing only
+the web-admin pods to dial `:9090`. Customer-facing workspace onboarding remains in
+MIU.
 
 **Embedded NATS Option:** All-in-one binary (`cmd/all-in-one`) bundles gateway + NATS JetStream (memory or file-backed).
 - Laptop demos, single-host POC, development
@@ -467,7 +476,7 @@ are acceptable; see P5.
 
 ## 12. Non-goals (explicit)
 
-- **No UI in MIO.** Workspace OAuth onboarding lives in MIU's admin console.
+- **No customer UI in MIO.** Internal operator UI is in scope under `ui/`; customer-facing workspace onboarding lives in MIU.
 - **No staging cluster.** Solo dev scale; feature flags + fast rollback.
 - **No multiple channel adapters on day one.** Cliq POC first, generalize after.
 - **No AI agent code in this repo.** Agents live in MIU.

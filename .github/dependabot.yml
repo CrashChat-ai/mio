@@ -80,3 +80,18 @@ updates:
     directory: /sink-gcs
     schedule:
       interval: weekly
+
+  # Web admin shell
+  - package-ecosystem: npm
+    directory: /ui/web/app
+    schedule:
+      interval: weekly
+    groups:
+      web-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: docker
+    directory: /ui/web
+    schedule:
+      interval: weekly

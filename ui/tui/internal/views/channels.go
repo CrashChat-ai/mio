@@ -12,8 +12,8 @@ import (
 
 	adminv1 "github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1"
 
-	"github.com/crashchat-ai/mio/services/tui/internal/client"
-	"github.com/crashchat-ai/mio/services/tui/internal/styles"
+	"github.com/crashchat-ai/mio/ui/tui/internal/client"
+	"github.com/crashchat-ai/mio/ui/tui/internal/styles"
 )
 
 // ChannelsLoadedMsg is dispatched into the bubbletea event loop once the

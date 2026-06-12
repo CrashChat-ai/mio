@@ -458,6 +458,39 @@ deployment overlays.
 For this contract to be valid, the enriched stream must also keep
 `MaxAge>=600s`; the default MIO enriched stream keeps 7 days.
 
+### Source Reconciliation
+
+Run `services/gateway/cmd/source-reconciler` as a separate Job/CronJob/worker
+when a provider's webhooks are not a complete source of truth. The process
+reads one account/conversation history window, dedupes through Postgres, and
+publishes fresh rows to `MESSAGES_INBOUND`; media-vault and downstream
+consumers continue unchanged. If `MIO_RECONCILE_CURSOR` is unset, it resumes
+from `source_reconcile_cursors.cursor`; successful runs advance that cursor and
+failed runs record `last_error`/`last_error_at`.
+
+Required env:
+
+```bash
+MIO_POSTGRES_DSN=postgres://...
+MIO_NATS_URLS=nats://mio-nats:4222
+MIO_ACCOUNT_ID=<account-uuid>
+MIO_RECONCILE_CONVERSATION_EXTERNAL_ID=<provider-chat-id>
+```
+
+Useful optional env:
+
+```bash
+MIO_RECONCILE_CLIQ_CHANNEL_NAME=tobytimedev
+MIO_RECONCILE_CURSOR=1781194520799
+MIO_RECONCILE_SINCE=2026-06-11T00:00:00Z
+MIO_RECONCILE_UNTIL=2026-06-12T00:00:00Z
+MIO_RECONCILE_LIMIT=100
+```
+
+For Cliq, new OAuth installs request `ZohoCliq.Messages.READ`. Existing
+write-only installs fail clearly with `scope_missing` and must be re-consented
+before history reconciliation can backfill bot/API-authored messages.
+
 ### Object Storage Layout
 
 ```

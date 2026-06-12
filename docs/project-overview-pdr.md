@@ -64,6 +64,7 @@ LLM-driven responses take 2–30 seconds. Coupling the webhook ack to an LLM cal
 - [x] Silently 200 OK on duplicate to prevent channel retry loops
 - [x] Support attachments with platform-TTL-aware fetching
 - [x] Enrich attachment URLs with persistent storage references
+- [x] Reconcile provider history gaps outside the webhook hot path
 
 ### Outbound Path
 

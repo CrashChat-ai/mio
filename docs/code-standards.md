@@ -238,12 +238,19 @@ type CredentialAdapter interface {
     RefreshToken(ctx context.Context, accountID, channelType string) error
 }
 
+type HistoryAdapter interface {
+    FetchHistory(ctx context.Context, req HistoryRequest) (HistoryPage, error)
+}
+
 type DeliveryError interface {
     error
     IsRetryable() bool
     IsRateLimited() bool
 }
 ```
+
+`HistoryAdapter` is optional. It belongs to source reconciliation/backfill
+workers and must not be called from webhook handlers.
 
 **Registry pattern** (`pkg/channels/registry.go`):
 - Adapters self-register at `init()` via `channels.Register(slug, impl)`

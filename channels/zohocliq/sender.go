@@ -55,9 +55,13 @@ type Adapter struct {
 // Called from init.go — panics are acceptable on partial config (startup failure
 // signals broken deploy explicitly, instead of waiting for the first 401).
 //
-// Required for production:
+// Required for env-backed sender credentials:
 //   - CLIQ_BOT_NAME: bot unique name (channelsbyname endpoint)
 //   - CLIQ_CLIENT_ID, CLIQ_CLIENT_SECRET, CLIQ_REFRESH_TOKEN: Zoho OAuth creds
+//
+// Stored-credential flows such as admin OAuth refresh and source-reconciler may
+// set only CLIQ_CLIENT_ID + CLIQ_CLIENT_SECRET; the per-account refresh token
+// comes from encrypted storage.
 //
 // Optional:
 //   - CLIQ_API_BASE_URL: override Cliq base URL for tests
@@ -71,19 +75,25 @@ func NewAdapter() *Adapter {
 	refreshToken := os.Getenv("CLIQ_REFRESH_TOKEN")
 	botName := os.Getenv("CLIQ_BOT_NAME")
 
-	// Partial-config detection: any one set means the operator intended OAuth
-	// but mis-typed the secret keys. Fail fast with a clear message.
+	// Partial-config detection: either all three vars are present for the
+	// legacy env-backed sender token source, or only client_id/client_secret are
+	// present for admin/reconciler flows that refresh per-account stored tokens.
+	// Any other partial set is almost certainly a mis-typed secret key.
 	setCount := 0
 	for _, v := range []string{clientID, clientSecret, refreshToken} {
 		if v != "" {
 			setCount++
 		}
 	}
-	if setCount != 0 && setCount != 3 {
-		panic(fmt.Sprintf("zohocliq: partial OAuth config — CLIQ_CLIENT_ID/CLIQ_CLIENT_SECRET/CLIQ_REFRESH_TOKEN must all be set or all empty (got %d/3)", setCount))
+	clientPairOnly := clientID != "" && clientSecret != "" && refreshToken == ""
+	if setCount != 0 && setCount != 3 && !clientPairOnly {
+		panic(fmt.Sprintf("zohocliq: partial OAuth config — CLIQ_CLIENT_ID/CLIQ_CLIENT_SECRET/CLIQ_REFRESH_TOKEN must be all set, all empty, or client id/secret only for stored credentials (got %d/3)", setCount))
 	}
 
-	tokens := newTokenSource(clientID, clientSecret, refreshToken)
+	var tokens *tokenSource
+	if setCount == 3 {
+		tokens = newTokenSource(clientID, clientSecret, refreshToken)
+	}
 
 	baseURL := os.Getenv("CLIQ_API_BASE_URL")
 	if baseURL == "" {

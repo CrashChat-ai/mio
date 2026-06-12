@@ -415,15 +415,16 @@ func TestSend_RefreshFailureSurfacesAsRefreshFailed(t *testing.T) {
 }
 
 // TestNewAdapter_PanicsOnPartialOAuthConfig verifies the fail-fast behavior:
-// if 1 or 2 of the 3 OAuth env vars are set (typo / partial deploy), the
-// constructor panics rather than booting into a 401 storm.
+// malformed partial OAuth env sets still panic rather than booting into a 401
+// storm. client_id+client_secret without refresh_token is valid because
+// admin/reconciler flows refresh per-account stored credentials.
 func TestNewAdapter_PanicsOnPartialOAuthConfig(t *testing.T) {
 	cases := []struct {
 		name string
 		envs map[string]string
 	}{
 		{"only client_id", map[string]string{"CLIQ_CLIENT_ID": "x"}},
-		{"client_id + secret", map[string]string{"CLIQ_CLIENT_ID": "x", "CLIQ_CLIENT_SECRET": "y"}},
+		{"client_id + refresh_token", map[string]string{"CLIQ_CLIENT_ID": "x", "CLIQ_REFRESH_TOKEN": "z"}},
 		{"only refresh_token", map[string]string{"CLIQ_REFRESH_TOKEN": "z"}},
 	}
 	for _, tc := range cases {
@@ -442,6 +443,20 @@ func TestNewAdapter_PanicsOnPartialOAuthConfig(t *testing.T) {
 			}()
 			_ = NewAdapter()
 		})
+	}
+}
+
+func TestNewAdapter_ClientPairOnlySupportsStoredCredentialFlows(t *testing.T) {
+	t.Setenv("CLIQ_CLIENT_ID", "client-id")
+	t.Setenv("CLIQ_CLIENT_SECRET", "client-secret")
+	t.Setenv("CLIQ_REFRESH_TOKEN", "")
+
+	a := NewAdapter()
+	if a.tokens != nil {
+		t.Fatal("expected tokens=nil when only client id/secret are configured")
+	}
+	if a.Credentials() == nil {
+		t.Fatal("expected credential adapter")
 	}
 }
 

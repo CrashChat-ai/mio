@@ -186,6 +186,14 @@ Latency budget on the gateway path: **target p99 < 500ms**, hard ceiling
 the channel deadline. Anything that doesn't fit (signature verify,
 Postgres upsert, NATS publish) is moved off-path or pre-warmed.
 
+Some providers do not echo API/bot-authored messages back through webhooks.
+Those gaps are handled by `source-reconciler`, a separate process that calls an
+optional `pkg/channels.HistoryAdapter`, upserts through the same
+`(account_id, source_message_id)` idempotency path, and publishes fresh history
+rows to `MESSAGES_INBOUND`. Cursor/status state lives in
+`source_reconcile_cursors` per account/conversation. It never runs inside the
+webhook request path.
+
 ---
 
 ## 5. Outbound data flow
@@ -242,7 +250,7 @@ Three streams, all file-backed, all `mio.v1` envelope.
 
 | Stream | Subject pattern | Retention | Max age | Purpose |
 |---|---|---|---|---|
-| `MESSAGES_INBOUND` | `mio.inbound.>` | `limits` | 7d | Raw inbound. Gateway publisher. Attachment-downloader + sink-gcs consumers. (Old AI consumer deprecated.) |
+| `MESSAGES_INBOUND` | `mio.inbound.>` | `limits` | 7d | Raw inbound. Gateway and source-reconciler publishers. Attachment-downloader + sink-gcs consumers. (Old AI consumer deprecated.) |
 | `MESSAGES_INBOUND_ENRICHED` | `mio.inbound_enriched.>` | `limits` | 7d | Enriched with persistent attachment URLs. Attachment-downloader publisher. AI consumer + future analytics subscribers. |
 | `MESSAGES_OUTBOUND` | `mio.outbound.>` | `workqueue` | 24h | Drain semantics. Sender-pool is the only consumer. |
 
@@ -286,6 +294,13 @@ Why these dimensions live in the subject:
 | `gcs-archiver` | `MESSAGES_INBOUND` | Pull, durable | 64 | Long-tail consumer; falls behind without affecting attachment or AI path. Archives raw inbound. |
 | `ai-consumer-enriched` | `MESSAGES_INBOUND_ENRICHED` | Pull, durable | **1** | Single-flight. Per-thread ordering enforced globally for now; partition by subject when throughput demands. |
 | `sender-pool` | `MESSAGES_OUTBOUND` | Pull, durable | **32** | Workqueue drain. One pool per channel adapter eventually. |
+
+`source-reconciler` is a publisher, not a JetStream consumer. It reads provider
+history using stored account credentials, stores only fresh rows, and publishes
+canonical `mio.v1.Message` records to `MESSAGES_INBOUND`; media-vault then
+continues the normal enrichment path. Successful runs advance
+`source_reconcile_cursors.cursor`; failures record `last_error`/`last_error_at`
+without advancing the cursor.
 
 External consumers should use the same subject grammar and declare their
 consumer policy in deployment values, not in channel-specific core code. For

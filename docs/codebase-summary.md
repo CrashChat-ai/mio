@@ -108,6 +108,10 @@ mio/
   - `/health` liveness/readiness
   - `/webhooks/{channel-slug}` inbound POST (signed)
 - `internal/ratelimit/` — Per-account token bucket
+- `internal/reconciler/` — Channel-agnostic history reconciliation runner
+  - Calls `pkg/channels.HistoryAdapter`
+  - Reuses `channels.Store` idempotency and publishes fresh rows to `MESSAGES_INBOUND`
+  - Persists cursor/status in `source_reconcile_cursors`
 
 **Key types:**
 - `Adapter` interface — `Send(context, SendCommand) error` + `Capabilities()`
@@ -130,6 +134,7 @@ mio/
 - Outbound sender: SendCommand → platform API call
 - Capability flags: reactions, threads, edits, etc.
 - OAuth flow: token fetch, refresh, storage (via pkg/channels contract)
+- Optional history adapter: provider API history → normalized messages
 
 **Pattern:** Adapters are NOT packages; they're top-level `services/gateway/internal/channels/{name}/` during POC. After P5 generalization, they graduate to `channels/{name}/` as public in-tree packages (no separate module—stays in root module).
 
@@ -152,6 +157,10 @@ type CredentialAdapter interface {
   StoreCredential(account_id, channel_type, value) error
   GetCredential(account_id, channel_type) (value, error)
   RefreshToken(account_id) error
+}
+
+type HistoryAdapter interface {
+  FetchHistory(context.Context, HistoryRequest) (HistoryPage, error)
 }
 
 type DeliveryError interface {
@@ -366,17 +375,22 @@ mio-media-cli gdpr-delete --account-id=abc123
    - Readiness: `/health` gate
    - Metrics: ServiceMonitor for Prometheus scrape
 
-4. **mio-media-vault** — Attachment persistence sidecar (1 replica POC)
+4. **mio-source-reconciler** — History/backfill publisher (optional)
+   - Binary: `services/gateway/cmd/source-reconciler`
+   - Env: Postgres DSN, NATS URL, account id, conversation external id, optional cursor/window
+   - Flow: provider history API → store dedupe → publish fresh `MESSAGES_INBOUND` → cursor/status update
+
+5. **mio-media-vault** — Attachment persistence sidecar (1 replica POC)
    - Deployment, ServiceAccount, lifecycle init Job
    - Env: GCS bucket (Workload Identity), NATS cluster URL
    - Flow: consume MESSAGES_INBOUND → fetch platform attachments → enrich → publish MESSAGES_INBOUND_ENRICHED
 
-5. **mio-sink-gcs** — Cold storage archiver (1 replica)
+6. **mio-sink-gcs** — Cold storage archiver (1 replica)
    - Deployment, ServiceAccount (Workload Identity to GCP SA), ServiceMonitor
    - Env: GCS bucket path, NATS cluster URL
    - Flow: consume MESSAGES_INBOUND → batch NDJSON → flush to GCS
 
-6. **mio-echo-consumer** — Example Python consumer (1 replica, reference only)
+7. **mio-echo-consumer** — Example Python consumer (1 replica, reference only)
    - Deployment, ServiceAccount
    - Env: NATS cluster URL, optional dry-run flag
 

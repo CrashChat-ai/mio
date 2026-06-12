@@ -1,12 +1,12 @@
 // Package store — JetStream stream provisioning.
 //
-// Gateway startup is the SINGLE SOURCE OF TRUTH for stream provisioning.
-// EnsureStreams is called once at boot before the HTTP server starts.
-// Failure causes the gateway to exit(1) — never serve without streams.
+// Gateway startup is the SINGLE SOURCE OF TRUTH for gateway-owned stream
+// provisioning. EnsureStreams is called once at boot before the HTTP server
+// starts. Failure causes the gateway to exit(1) — never serve without streams.
 //
 // The P7 mio-jetstream-bootstrap Job is VERIFICATION-ONLY: it asserts
-// streams exist with locked config and exits non-zero otherwise. It
-// NEVER creates or mutates streams. This prevents two-writer races.
+// JetStream resources exist with locked config and exits non-zero otherwise.
+// It NEVER creates or mutates streams. This prevents two-writer races.
 //
 // Single-replica constraint: AddOrUpdateStream is idempotent on identical
 // config, but two replicas booting with disagreeing config could ping-pong.

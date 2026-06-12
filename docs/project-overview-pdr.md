@@ -64,6 +64,7 @@ LLM-driven responses take 2–30 seconds. Coupling the webhook ack to an LLM cal
 - [x] Silently 200 OK on duplicate to prevent channel retry loops
 - [x] Support attachments with platform-TTL-aware fetching
 - [x] Enrich attachment URLs with persistent storage references
+- [x] Reconcile provider history gaps outside the webhook hot path
 
 ### Outbound Path
 
@@ -73,6 +74,8 @@ LLM-driven responses take 2–30 seconds. Coupling the webhook ack to an LLM cal
 - [x] Retry transient errors (5xx, network timeout) with exponential backoff
 - [x] Terminal-error dead-letter on permanent failures (4xx)
 - [x] Support message edits via `edit_of_external_id` reference
+- [x] Support channel-agnostic rich outbound content (`SendCommand.rich_content`)
+- [x] Render URL-backed outbound attachments in supported adapters
 
 ### Multi-tenancy & Fairness
 

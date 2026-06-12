@@ -4,6 +4,7 @@ package mio.v1;
 
 import "mio/v1/attachment.proto";
 import "mio/v1/relation.proto";
+import "mio/v1/rich_content.proto";
 
 option go_package = "github.com/crashchat-ai/mio/proto/gen/go/mio/v1;miov1";
 
@@ -46,4 +47,8 @@ message SendCommand {
   // MessageRelation drives outbound edit / reaction / delete / pin operations.
   // Empty for plain Send; populated for linked outbound commands.
   MessageRelation relation = 15;
+
+  // Portable rich content. Channel adapters render this to native platform
+  // constructs and fall back to text when unsupported.
+  RichContent rich_content = 16;
 }

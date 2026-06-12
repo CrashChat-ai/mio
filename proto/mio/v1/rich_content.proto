@@ -1,0 +1,103 @@
+syntax = "proto3";
+
+package mio.v1;
+
+option go_package = "github.com/crashchat-ai/mio/proto/gen/go/mio/v1;miov1";
+
+// RichContent is a channel-agnostic outbound payload model.
+// Channel adapters map these blocks to native platform affordances such as
+// Cliq cards/slides/buttons, Slack Block Kit, or Discord embeds/components.
+message RichContent {
+  RichCard card = 1;
+  repeated RichBlock blocks = 2;
+  repeated RichButton buttons = 3;
+}
+
+// RichCard carries high-level message framing.
+message RichCard {
+  string title = 1;
+  string subtitle = 2;
+  string thumbnail_url = 3;
+  string theme = 4;
+}
+
+// RichBlock is one portable content section.
+message RichBlock {
+  oneof content {
+    RichTextBlock text = 1;
+    RichListBlock list = 2;
+    RichTableBlock table = 3;
+    RichLabelBlock label = 4;
+    RichImagesBlock images = 5;
+  }
+}
+
+message RichTextBlock {
+  string title = 1;
+  string text = 2;
+}
+
+message RichListBlock {
+  string title = 1;
+  repeated string items = 2;
+}
+
+message RichTableBlock {
+  string title = 1;
+  repeated string headers = 2;
+  repeated RichTableRow rows = 3;
+}
+
+message RichTableRow {
+  repeated string cells = 1;
+}
+
+message RichLabelBlock {
+  string title = 1;
+  repeated RichLabel labels = 2;
+}
+
+message RichLabel {
+  string key = 1;
+  string value = 2;
+}
+
+message RichImagesBlock {
+  string title = 1;
+  repeated string urls = 2;
+}
+
+message RichButton {
+  enum Style {
+    STYLE_UNSPECIFIED = 0;
+    STYLE_PRIMARY = 1;
+    STYLE_DANGER = 2;
+    STYLE_NEUTRAL = 3;
+  }
+
+  string label = 1;
+  Style style = 2;
+  string key = 3;
+  string hint = 4;
+  RichButtonAction action = 5;
+}
+
+message RichButtonAction {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_OPEN_URL = 1;
+    KIND_PREVIEW_URL = 2;
+    KIND_COPY = 3;
+    KIND_INVOKE_FUNCTION = 4;
+  }
+
+  Kind kind = 1;
+
+  // url is used by KIND_OPEN_URL and KIND_PREVIEW_URL.
+  string url = 2;
+  // text is used by KIND_COPY.
+  string text = 3;
+  // function_name and function_owner are used by KIND_INVOKE_FUNCTION.
+  string function_name = 4;
+  string function_owner = 5;
+}

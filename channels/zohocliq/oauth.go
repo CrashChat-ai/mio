@@ -30,10 +30,10 @@ const errBodyCap = 512
 // Override via withAuthorizeURL in tests.
 const authorizeDefaultURL = "https://accounts.zoho.com/oauth/v2/auth"
 
-// cliqOAuthScope is the OAuth scope required for the bot endpoints
-// (channelsbyname send + token refresh). One scope, comma-joined in env
-// per Zoho convention.
-const cliqOAuthScope = "ZohoCliq.Webhooks.CREATE,ZohoCliq.messages.CREATE"
+// cliqOAuthScope is the OAuth scope required for bot sends plus history
+// reconciliation. Operators can override it with CLIQ_OAUTH_SCOPE when they
+// intentionally want write-only installs.
+const cliqOAuthScope = "ZohoCliq.Webhooks.CREATE,ZohoCliq.Channels.READ,ZohoCliq.Messages.CREATE,ZohoCliq.Messages.READ"
 
 // tokenCredentials wraps *Adapter to satisfy channels.CredentialAdapter.
 // Reuses tokenSource for the refresh path; AuthorizeURL + ExchangeCode are

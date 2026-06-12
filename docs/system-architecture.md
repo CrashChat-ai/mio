@@ -186,6 +186,14 @@ Latency budget on the gateway path: **target p99 < 500ms**, hard ceiling
 the channel deadline. Anything that doesn't fit (signature verify,
 Postgres upsert, NATS publish) is moved off-path or pre-warmed.
 
+Some providers do not echo API/bot-authored messages back through webhooks.
+Those gaps are handled by `source-reconciler`, a separate process that calls an
+optional `pkg/channels.HistoryAdapter`, upserts through the same
+`(account_id, source_message_id)` idempotency path, and publishes fresh history
+rows to `MESSAGES_INBOUND`. Cursor/status state lives in
+`source_reconcile_cursors` per account/conversation. It never runs inside the
+webhook request path.
+
 ---
 
 ## 5. Outbound data flow
@@ -226,6 +234,14 @@ Two-step UX rule: for any LLM run > 1s, the AI service emits a "thinking…"
 `channel_message_id` once the real answer is ready. The user never sees
 a blank thread.
 
+`SendCommand.rich_content` is the portable rich outbound model. Producers can
+send card metadata, text/list/table/label/image blocks, and buttons without
+importing any channel SDK. Adapters render that model to native platform
+constructs, for example Cliq `card`, `slides`, and `buttons`; unsupported
+adapters keep using `text` as the fallback. URL-backed `SendCommand.attachments`
+are also rendered by adapters that support them. Storage-key-only attachments
+need a signed URL provider before an external chat platform can fetch them.
+
 ---
 
 ## 6. Streams and subjects
@@ -234,9 +250,9 @@ Three streams, all file-backed, all `mio.v1` envelope.
 
 | Stream | Subject pattern | Retention | Max age | Purpose |
 |---|---|---|---|---|
-| `MESSAGES_INBOUND` | `mio.inbound.>` | `limits` | 7d | Raw inbound. Gateway publisher. Attachment-downloader + sink-gcs consumers. (Old AI consumer deprecated.) |
+| `MESSAGES_INBOUND` | `mio.inbound.>` | `limits` | 7d | Raw inbound. Gateway and source-reconciler publishers. Attachment-downloader + sink-gcs consumers. (Old AI consumer deprecated.) |
 | `MESSAGES_INBOUND_ENRICHED` | `mio.inbound_enriched.>` | `limits` | 7d | Enriched with persistent attachment URLs. Attachment-downloader publisher. AI consumer + future analytics subscribers. |
-| `MESSAGES_OUTBOUND` | `mio.outbound.>` | `workqueue` | 23h | Drain semantics. Sender-pool is the only consumer. |
+| `MESSAGES_OUTBOUND` | `mio.outbound.>` | `workqueue` | 24h | Drain semantics. Sender-pool is the only consumer. |
 
 ### Subject grammar
 
@@ -278,6 +294,21 @@ Why these dimensions live in the subject:
 | `gcs-archiver` | `MESSAGES_INBOUND` | Pull, durable | 64 | Long-tail consumer; falls behind without affecting attachment or AI path. Archives raw inbound. |
 | `ai-consumer-enriched` | `MESSAGES_INBOUND_ENRICHED` | Pull, durable | **1** | Single-flight. Per-thread ordering enforced globally for now; partition by subject when throughput demands. |
 | `sender-pool` | `MESSAGES_OUTBOUND` | Pull, durable | **32** | Workqueue drain. One pool per channel adapter eventually. |
+
+`source-reconciler` is a publisher, not a JetStream consumer. It reads provider
+history using stored account credentials, stores only fresh rows, and publishes
+canonical `mio.v1.Message` records to `MESSAGES_INBOUND`; media-vault then
+continues the normal enrichment path. Successful runs advance
+`source_reconcile_cursors.cursor`; failures record `last_error`/`last_error_at`
+without advancing the cursor.
+
+External consumers should use the same subject grammar and declare their
+consumer policy in deployment values, not in channel-specific core code. For
+example, Channel Pulse can bind `channel-pulse` to
+`MESSAGES_INBOUND_ENRICHED` with `filterSubject=mio.inbound_enriched.>`,
+`AckPolicy=explicit`, `DeliverPolicy=new` or `by_start_sequence`, and
+`AckWait>=600s`; `mio-jetstream-bootstrap.externalExpectedConsumers` verifies
+that contract after the consumer has created its durable cursor.
 
 *Deprecated:* `ai-consumer` on `MESSAGES_INBOUND` — remove after successful
 enriched-stream cutover via `nats consumer rm MESSAGES_INBOUND ai-consumer`.

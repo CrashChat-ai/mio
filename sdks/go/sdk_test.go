@@ -7,6 +7,7 @@ import (
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"google.golang.org/protobuf/proto"
 )
 
 // --- Subject builder tests ---
@@ -228,6 +229,65 @@ func TestBuildOutboundMsgID(t *testing.T) {
 	want := "out:01HV4ABCDEF01234567890"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestSendCommand_RichContentRoundTrip(t *testing.T) {
+	cmd := &miov1.SendCommand{
+		Id:             "cmd-rich",
+		SchemaVersion:  SchemaVersion,
+		TenantId:       "tenant-01",
+		AccountId:      "acct-01",
+		ChannelType:    "zoho_cliq",
+		ConversationId: "conv-01",
+		Text:           "Daily digest",
+		RichContent: &miov1.RichContent{
+			Card: &miov1.RichCard{
+				Title: "Digest",
+				Theme: "modern-inline",
+			},
+			Blocks: []*miov1.RichBlock{
+				{
+					Content: &miov1.RichBlock_Table{Table: &miov1.RichTableBlock{
+						Title:   "Contributors",
+						Headers: []string{"Name", "Score"},
+						Rows: []*miov1.RichTableRow{
+							{Cells: []string{"Alice", "42"}},
+						},
+					}},
+				},
+			},
+			Buttons: []*miov1.RichButton{
+				{
+					Label: "View dashboard",
+					Style: miov1.RichButton_STYLE_PRIMARY,
+					Action: &miov1.RichButtonAction{
+						Kind: miov1.RichButtonAction_KIND_OPEN_URL,
+						Url:  "https://example.com/dashboard",
+					},
+				},
+			},
+		},
+	}
+	if err := VerifyCommand(cmd); err != nil {
+		t.Fatalf("verify command: %v", err)
+	}
+	data, err := proto.Marshal(cmd)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded miov1.SendCommand
+	if err := proto.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got := decoded.GetRichContent().GetCard().GetTitle(); got != "Digest" {
+		t.Fatalf("decoded card title = %q", got)
+	}
+	if got := decoded.GetRichContent().GetBlocks()[0].GetTable().GetRows()[0].GetCells()[1]; got != "42" {
+		t.Fatalf("decoded table score = %q", got)
+	}
+	if got := decoded.GetRichContent().GetButtons()[0].GetAction().GetUrl(); got != "https://example.com/dashboard" {
+		t.Fatalf("decoded button url = %q", got)
 	}
 }
 

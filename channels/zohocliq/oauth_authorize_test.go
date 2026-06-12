@@ -68,6 +68,12 @@ func TestAuthorizeURL_RedirectURI(t *testing.T) {
 	if got := u.Query().Get("response_type"); got != "code" {
 		t.Errorf("response_type: got %q, want code", got)
 	}
+	scope := u.Query().Get("scope")
+	for _, want := range []string{"ZohoCliq.Messages.CREATE", "ZohoCliq.Messages.READ"} {
+		if !strings.Contains(scope, want) {
+			t.Errorf("scope %q missing %s", scope, want)
+		}
+	}
 }
 
 func TestAuthorizeURL_MissingConfigYieldsEmpty(t *testing.T) {

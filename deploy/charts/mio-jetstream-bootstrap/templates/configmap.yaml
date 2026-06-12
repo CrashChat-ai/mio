@@ -11,7 +11,7 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation
 data:
   # Source of truth for expected JetStream state (audit/diff artifact).
-  # Provisioning is done by gateway startup (AddOrUpdateStream in P3).
+  # Provisioning is done by the owning services during startup.
   # This Job only VERIFIES — it never calls nats stream add / nats consumer add.
   expected-streams.yaml: |
     streams:
@@ -20,10 +20,25 @@ data:
         subjects: {{ .subjects | toJson }}
         replicas: {{ .replicas }}
         retention: {{ .retention }}
+        {{ with .minMaxAgeSeconds }}
+        minMaxAgeSeconds: {{ . }}
+        {{ end }}
     {{- end }}
   expected-consumers.yaml: |
     consumers:
-    {{- range .Values.expectedConsumers }}
+    {{- range concat .Values.expectedConsumers .Values.externalExpectedConsumers }}
       - stream: {{ .stream }}
         durable: {{ .durable }}
+        {{ with .filterSubject }}
+        filterSubject: {{ . | quote }}
+        {{ end }}
+        {{ with .ackPolicy }}
+        ackPolicy: {{ . | quote }}
+        {{ end }}
+        {{ with .deliverPolicy }}
+        deliverPolicy: {{ . | quote }}
+        {{ end }}
+        {{ with .minAckWaitSeconds }}
+        minAckWaitSeconds: {{ . }}
+        {{ end }}
     {{- end }}

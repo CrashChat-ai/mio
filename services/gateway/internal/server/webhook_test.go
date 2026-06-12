@@ -11,6 +11,7 @@ import (
 
 	"github.com/crashchat-ai/mio/pkg/channels"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
+	"github.com/crashchat-ai/mio/services/gateway/store"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"log/slog"
@@ -254,6 +255,81 @@ func TestWebhookPipeline_ReplyUnresolvedParent(t *testing.T) {
 	}
 	if pub.published.GetRelation().GetTargetExternalId() != "parent-ext-1" {
 		t.Error("external target must survive for downstream resolution")
+	}
+}
+
+type fakeResolver struct {
+	res        store.ResolvedAccount
+	ok         bool
+	gotKey     string
+	gotChannel string
+}
+
+func (f *fakeResolver) Resolve(_ context.Context, channelType, workspaceKey string) (store.ResolvedAccount, bool) {
+	f.gotChannel = channelType
+	f.gotKey = workspaceKey
+	return f.res, f.ok
+}
+
+type keyedInbound struct {
+	fakeInbound
+	key string
+}
+
+func (k *keyedInbound) WorkspaceKey(*miov1.Message) string { return k.key }
+
+func TestWebhookPipeline_ResolverWins_EnvNeverUsed(t *testing.T) {
+	st := &fakeStore{msgFresh: true}
+	pub := &fakePub{}
+	res := &fakeResolver{res: store.ResolvedAccount{TenantID: "tenant-db", AccountID: "acct-db"}, ok: true}
+	inb := &keyedInbound{fakeInbound: fakeInbound{normalizeMsg: basicMsg()}, key: "org-42"}
+	p := newPipeline(inb, st, pub)
+	p.accounts = res
+
+	rec := post(t, p)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d", rec.Code)
+	}
+	if pub.published.TenantId != "tenant-db" || pub.published.AccountId != "acct-db" {
+		t.Errorf("resolved identity must win over env: got %s/%s",
+			pub.published.TenantId, pub.published.AccountId)
+	}
+	if res.gotKey != "org-42" || res.gotChannel != "fake_chan" {
+		t.Errorf("resolver inputs: key=%q channel=%q", res.gotKey, res.gotChannel)
+	}
+}
+
+func TestWebhookPipeline_EnvFallbackWhenUnresolved(t *testing.T) {
+	st := &fakeStore{msgFresh: true}
+	pub := &fakePub{}
+	p := newPipeline(&fakeInbound{normalizeMsg: basicMsg()}, st, pub)
+	p.accounts = &fakeResolver{ok: false}
+
+	rec := post(t, p)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d", rec.Code)
+	}
+	if pub.published.TenantId != "tenant-1" || pub.published.AccountId != "acct-1" {
+		t.Errorf("env fallback expected: got %s/%s", pub.published.TenantId, pub.published.AccountId)
+	}
+}
+
+func TestWebhookPipeline_Unroutable200NoPublish(t *testing.T) {
+	st := &fakeStore{msgFresh: true}
+	pub := &fakePub{}
+	p := newPipeline(&fakeInbound{normalizeMsg: basicMsg()}, st, pub)
+	p.accounts = &fakeResolver{ok: false}
+	p.tenantID, p.accountID = "", ""
+
+	rec := post(t, p)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unroutable must 200 (platform must not retry), got %d", rec.Code)
+	}
+	if pub.published != nil {
+		t.Error("unroutable webhook must not publish")
+	}
+	if st.gotKind != "" {
+		t.Error("unroutable webhook must not touch the store")
 	}
 }
 

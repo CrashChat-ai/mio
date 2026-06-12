@@ -139,6 +139,16 @@ func RunGateway(logger *slog.Logger, version string) error {
 	}()
 	logger.Info("sender: pool started", "workers", senderWorkers)
 
+	if cfg.TenantID == "" {
+		hasAccounts, err := store.HasEnabledAccounts(ctx, pg)
+		if err != nil {
+			return fmt.Errorf("accounts: %w", err)
+		}
+		if !hasAccounts {
+			return fmt.Errorf("identity: set MIO_TENANT_ID/MIO_ACCOUNT_ID or create an account (admin CreateAccount)")
+		}
+	}
+
 	webhookSecrets := make(map[string][]byte, len(cfg.WebhookSecrets))
 	for channelType, secret := range cfg.WebhookSecrets {
 		webhookSecrets[channelType] = []byte(secret)
@@ -146,6 +156,7 @@ func RunGateway(logger *slog.Logger, version string) error {
 	serverCfg := server.Config{
 		TenantID:       cfg.TenantID,
 		AccountID:      cfg.AccountID,
+		Accounts:       store.NewAccountResolver(pg, logger),
 		WebhookSecrets: webhookSecrets,
 		Logger:         logger,
 	}

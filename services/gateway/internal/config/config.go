@@ -83,12 +83,10 @@ func Load() (*Config, error) {
 	}
 	cfg.WebhookSecrets = secrets
 
-	// Validate required fields.
-	if cfg.TenantID == "" {
-		return nil, fmt.Errorf("config: MIO_TENANT_ID is required")
-	}
-	if cfg.AccountID == "" {
-		return nil, fmt.Errorf("config: MIO_ACCOUNT_ID is required")
+	// Validate required fields. Tenant/account identity is optional here:
+	// the runtime enforces "env identity OR at least one enabled account".
+	if (cfg.TenantID == "") != (cfg.AccountID == "") {
+		return nil, fmt.Errorf("config: MIO_TENANT_ID and MIO_ACCOUNT_ID must be set together")
 	}
 	if cfg.PostgresDSN == "" {
 		return nil, fmt.Errorf("config: MIO_POSTGRES_DSN is required")

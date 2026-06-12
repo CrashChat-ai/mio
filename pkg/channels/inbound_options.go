@@ -3,6 +3,8 @@ package channels
 import (
 	"errors"
 	"strings"
+
+	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 )
 
 // AttrConversationDisplayName is the attribute key adapters set on a
@@ -37,6 +39,14 @@ type SecretNamer interface {
 // router (e.g. Cliq's /cliq).
 type RouteAliaser interface {
 	RouteAliases() []string
+}
+
+// WorkspaceKeyer lets an inbound adapter expose the platform-side workspace
+// identity of a normalized message (Cliq org id, Slack team id) so the
+// gateway can route one webhook endpoint to the right account when several
+// accounts of the same channel_type are installed. Empty = unknown.
+type WorkspaceKeyer interface {
+	WorkspaceKey(msg *miov1.Message) string
 }
 
 // DefaultWebhookSecretName maps a registry slug to its conventional secret

@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/crashchat-ai/mio/services/gateway/store/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -14,6 +15,7 @@ func durableTestPool(t *testing.T) *pgxpool.Pool {
 	if dsn == "" {
 		t.Skip("MIO_TEST_DSN not set; skipping durable outbound-state integration tests")
 	}
+	MigrationsFS = migrations.FS
 	if err := MigrateUp(dsn); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}

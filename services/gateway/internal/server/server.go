@@ -21,8 +21,12 @@ import (
 
 // Config holds runtime knobs for the HTTP server layer.
 type Config struct {
+	// TenantID/AccountID are the env-identity fallback used when DB
+	// resolution finds no account. Optional once accounts exist.
 	TenantID  string
 	AccountID string
+	// Accounts resolves webhooks to installed accounts; nil = env-only.
+	Accounts AccountResolver
 	// WebhookSecrets maps channel_type → file-mounted signing secret.
 	// Missing/empty entry = dev mode for that channel (no sig verify).
 	WebhookSecrets map[string][]byte
@@ -117,6 +121,7 @@ func buildWebhookPipelines(
 			inbound:     inbound,
 			store:       inboundStore,
 			pub:         sdkClient,
+			accounts:    cfg.Accounts,
 			tenantID:    cfg.TenantID,
 			accountID:   cfg.AccountID,
 			metrics:     m,

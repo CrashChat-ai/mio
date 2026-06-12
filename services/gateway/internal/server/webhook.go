@@ -12,10 +12,12 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/crashchat-ai/mio/pkg/channels"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
+	"github.com/crashchat-ai/mio/services/gateway/store"
 	"github.com/google/uuid"
 	"log/slog"
 )
@@ -27,16 +29,25 @@ type inboundPublisher interface {
 	PublishInbound(ctx context.Context, msg *miov1.Message) error
 }
 
+// AccountResolver routes a webhook to an installed account. Satisfied by
+// store.AccountResolver; nil disables DB resolution (env identity only).
+type AccountResolver interface {
+	Resolve(ctx context.Context, channelType, workspaceKey string) (store.ResolvedAccount, bool)
+}
+
 // webhookPipeline handles inbound webhooks for one channel adapter.
 type webhookPipeline struct {
 	channelType string
 	inbound     channels.InboundAdapter
 	store       channels.Store
 	pub         inboundPublisher
+	accounts    AccountResolver
 	tenantID    string
 	accountID   string
 	metrics     *gatewayMetrics
 	logger      *slog.Logger
+
+	envFallbackWarn sync.Once
 }
 
 func (p *webhookPipeline) finish(w http.ResponseWriter, start time.Time, outcome string, status int, errMsg string) {
@@ -85,12 +96,22 @@ func (p *webhookPipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	msg.TenantId = p.tenantID
-	msg.AccountId = p.accountID
+	tenantID, accountID, routed := p.resolveAccount(ctx, msg)
+	if !routed {
+		p.logger.Warn("webhook: unroutable — no matching account, no env identity",
+			"channel", p.channelType,
+			"source_message_id", msg.GetSourceMessageId())
+		p.metrics.incUnroutable(p.channelType)
+		// 200 so the platform does not retry a webhook we will never route.
+		p.finish(w, start, "unroutable", http.StatusOK, "")
+		return
+	}
+	msg.TenantId = tenantID
+	msg.AccountId = accountID
 
 	conv, err := p.store.EnsureConversation(ctx,
 		uuid.New(),
-		p.tenantID, p.accountID, p.channelType,
+		tenantID, accountID, p.channelType,
 		msg.GetConversationKind().String(),
 		msg.GetConversationExternalId(),
 		nil,
@@ -109,7 +130,7 @@ func (p *webhookPipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Relation.TargetExternalId; the durable ids come from the store.
 	threadRootMessageID := ""
 	if target := msg.GetRelation().GetTargetExternalId(); target != "" {
-		parentMsg, found, err := p.store.FindMessageBySource(ctx, p.accountID, target)
+		parentMsg, found, err := p.store.FindMessageBySource(ctx, accountID, target)
 		if err != nil {
 			p.logger.Error("webhook: resolve replied message",
 				"channel", p.channelType, "err", err,
@@ -127,14 +148,14 @@ func (p *webhookPipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				"channel", p.channelType,
 				"source_message_id", msg.GetSourceMessageId(),
 				"parent_external_id", target,
-				"account_id", p.accountID)
+				"account_id", accountID)
 		}
 	}
 
 	msgID := uuid.New()
 	dbMsgID, fresh, err := p.store.EnsureUniqueMessage(ctx,
 		msgID,
-		p.tenantID, p.accountID,
+		tenantID, accountID,
 		conv.ID.String(),
 		stringPtrIfNotEmpty(threadRootMessageID),
 		msg.GetSourceMessageId(),
@@ -152,7 +173,7 @@ func (p *webhookPipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.logger.Info("webhook: duplicate message suppressed",
 			"channel", p.channelType,
 			"source_message_id", msg.GetSourceMessageId(),
-			"account_id", p.accountID)
+			"account_id", accountID)
 		p.metrics.incDedup(p.channelType)
 		p.finish(w, start, "dedup", http.StatusOK, "")
 		return
@@ -177,6 +198,29 @@ func (p *webhookPipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"sender", msg.GetSender().GetExternalId(),
 		"latency_ms", time.Since(start).Milliseconds(),
 	)
+}
+
+// resolveAccount picks the routing identity: DB resolution first (workspace
+// key from the adapter), env identity as compat fallback. Isolation rule:
+// once DB resolution succeeds the env identity is never consulted.
+func (p *webhookPipeline) resolveAccount(ctx context.Context, msg *miov1.Message) (tenantID, accountID string, ok bool) {
+	if p.accounts != nil {
+		workspaceKey := ""
+		if wk, isWK := p.inbound.(channels.WorkspaceKeyer); isWK {
+			workspaceKey = wk.WorkspaceKey(msg)
+		}
+		if res, resolved := p.accounts.Resolve(ctx, p.channelType, workspaceKey); resolved {
+			return res.TenantID, res.AccountID, true
+		}
+	}
+	if p.tenantID == "" || p.accountID == "" {
+		return "", "", false
+	}
+	p.envFallbackWarn.Do(func() {
+		p.logger.Warn("webhook: using env identity fallback (MIO_TENANT_ID/MIO_ACCOUNT_ID) — "+
+			"create an account row for DB-backed routing", "channel", p.channelType)
+	})
+	return p.tenantID, p.accountID, true
 }
 
 func stringPtrIfNotEmpty(s string) *string {

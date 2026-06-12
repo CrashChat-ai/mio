@@ -62,6 +62,11 @@ func (c *cliqInbound) WebhookSecretNames() []string {
 // RouteAliases preserves the locked ingress path mio.../cliq.
 func (c *cliqInbound) RouteAliases() []string { return []string{"/cliq"} }
 
+// WorkspaceKey returns the Cliq organization id for multi-account routing.
+func (c *cliqInbound) WorkspaceKey(msg *miov1.Message) string {
+	return msg.GetAttributes()["cliq_org_id"]
+}
+
 // VerifySignature validates the X-Webhook-Signature header against the body
 // using HMAC-SHA256 (hex or base64).
 //

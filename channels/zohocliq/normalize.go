@@ -83,13 +83,14 @@ type FileObj struct {
 
 // UserObj is the message sender from Cliq.
 type UserObj struct {
-	ID         string `json:"id,omitempty"`
-	Name       string `json:"name,omitempty"`
-	FirstName  string `json:"first_name,omitempty"`
-	LastName   string `json:"last_name,omitempty"`
-	IsBot      bool   `json:"is_bot,omitempty"`
-	ZohoUserID string `json:"zoho_user_id,omitempty"`
-	Email      string `json:"email,omitempty"`
+	ID             string `json:"id,omitempty"`
+	Name           string `json:"name,omitempty"`
+	FirstName      string `json:"first_name,omitempty"`
+	LastName       string `json:"last_name,omitempty"`
+	IsBot          bool   `json:"is_bot,omitempty"`
+	ZohoUserID     string `json:"zoho_user_id,omitempty"`
+	Email          string `json:"email,omitempty"`
+	OrganizationID string `json:"organization_id,omitempty"`
 }
 
 // ChatObj holds conversation metadata.
@@ -246,6 +247,11 @@ func Normalize(p *WebhookPayload) (*NormalizedMessage, error) {
 
 	// --- Operation → attributes (for consumers that care) ---
 	nm.Attributes["cliq_operation"] = p.Operation
+
+	// --- Workspace key for multi-account routing ---
+	if p.User != nil && p.User.OrganizationID != "" {
+		nm.Attributes["cliq_org_id"] = p.User.OrganizationID
+	}
 
 	if nm.ConversationExternalID == "" {
 		return nil, fmt.Errorf("zohocliq: normalize: empty conversation external_id")

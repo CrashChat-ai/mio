@@ -102,6 +102,7 @@ services:
       MIO_ENV: "dev"
       MIO_ADMIN_ADDR: "0.0.0.0:9090"
       MIO_ADMIN_PUBLIC_URL: "${MIO_ADMIN_PUBLIC_URL:-http://localhost:9090}"
+      MIO_GATEWAY_PUBLIC_URL: "${MIO_GATEWAY_PUBLIC_URL:-http://localhost:8080}"
       MIO_ADMIN_ALLOW_CIDRS: "${MIO_ADMIN_ALLOW_CIDRS:-0.0.0.0/0,::/0}"
       MIO_POSTGRES_DSN: "postgres://mio_app:dev_password@postgres:5432/mio?sslmode=disable"
       MIO_NATS_URLS: "nats://nats:4222"

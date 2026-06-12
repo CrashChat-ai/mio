@@ -170,3 +170,38 @@ func RotateCredential(
 	}
 	return nil
 }
+
+// ExpiringCredential is the scan shape for the refresh scheduler.
+type ExpiringCredential struct {
+	AccountID   uuid.UUID
+	AuthKind    string
+	ChannelType string
+}
+
+// ListExpiringCredentials returns credentials of enabled accounts whose
+// expires_at falls within lead. NULL expires_at (bot tokens, hmac) never
+// matches — those flavors have nothing to refresh.
+func ListExpiringCredentials(ctx context.Context, pool *pgxpool.Pool, lead time.Duration) ([]ExpiringCredential, error) {
+	const q = `
+SELECT c.account_id, c.auth_kind, a.channel_type
+FROM credentials c
+JOIN accounts a ON a.id = c.account_id
+WHERE c.expires_at IS NOT NULL
+  AND c.expires_at < now() + $1::interval
+  AND a.disabled_at IS NULL`
+	rows, err := pool.Query(ctx, q, lead.String())
+	if err != nil {
+		return nil, fmt.Errorf("store: list expiring credentials: %w", err)
+	}
+	defer rows.Close()
+
+	var out []ExpiringCredential
+	for rows.Next() {
+		var e ExpiringCredential
+		if err := rows.Scan(&e.AccountID, &e.AuthKind, &e.ChannelType); err != nil {
+			return nil, fmt.Errorf("store: scan expiring credential: %w", err)
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}

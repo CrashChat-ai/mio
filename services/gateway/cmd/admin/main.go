@@ -28,11 +28,12 @@ import (
 	_ "github.com/crashchat-ai/mio/channels/all"
 
 	"github.com/crashchat-ai/mio/pkg/channels"
-	"github.com/crashchat-ai/mio/services/gateway/internal/admin"
-	"github.com/crashchat-ai/mio/services/gateway/internal/crypto"
-	"github.com/crashchat-ai/mio/services/gateway/store"
 	"github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1/adminv1connect"
 	sdk "github.com/crashchat-ai/mio/sdk-go"
+	"github.com/crashchat-ai/mio/services/gateway/internal/admin"
+	"github.com/crashchat-ai/mio/services/gateway/internal/credrefresh"
+	"github.com/crashchat-ai/mio/services/gateway/internal/crypto"
+	"github.com/crashchat-ai/mio/services/gateway/store"
 )
 
 type flags struct {
@@ -64,6 +65,18 @@ func envDefault(key, def string) string {
 		return v
 	}
 	return def
+}
+
+func envDuration(key string, def time.Duration) time.Duration {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return def
+	}
+	return d
 }
 
 func main() {
@@ -135,6 +148,12 @@ func main() {
 		PublicURL: f.publicURL,
 	})
 	srv.StartBackground(ctx)
+
+	refresher := credrefresh.New(pool, cipher, registry,
+		envDuration("MIO_CRED_REFRESH_INTERVAL", credrefresh.DefaultInterval),
+		envDuration("MIO_CRED_REFRESH_LEAD", credrefresh.DefaultLead),
+		logger, prometheus.DefaultRegisterer)
+	go refresher.Run(ctx)
 
 	// Wire HTTP mux: connect-go path + /oauth/callback + /metrics + /healthz.
 	mux := http.NewServeMux()

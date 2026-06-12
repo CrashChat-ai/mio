@@ -1,0 +1,143 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: jdx/mise-action@v4
+        with:
+          cache: true
+
+      - name: Resolve SemVer from tag
+        id: ver
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "release tags must look like v1.2.3 or v1.2.3-rc.1" >&2
+            exit 1
+          fi
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Lowercase repository
+        id: repo
+        run: echo "lc=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate protobuf stubs
+        run: buf generate proto
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build + push gateway
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: services/gateway/Dockerfile
+          push: true
+          build-args: BUILD_VERSION=${{ steps.ver.outputs.version }}
+          tags: ghcr.io/${{ steps.repo.outputs.lc }}/gateway:${{ steps.ver.outputs.version }}
+          cache-from: type=registry,ref=ghcr.io/${{ steps.repo.outputs.lc }}/gateway:cache
+          cache-to: type=registry,ref=ghcr.io/${{ steps.repo.outputs.lc }}/gateway:cache,mode=max
+          platforms: linux/amd64
+
+      - name: Build + push sink-gcs
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: services/sink-gcs/Dockerfile
+          push: true
+          build-args: BUILD_VERSION=${{ steps.ver.outputs.version }}
+          tags: ghcr.io/${{ steps.repo.outputs.lc }}/sink-gcs:${{ steps.ver.outputs.version }}
+          cache-from: type=registry,ref=ghcr.io/${{ steps.repo.outputs.lc }}/sink-gcs:cache
+          cache-to: type=registry,ref=ghcr.io/${{ steps.repo.outputs.lc }}/sink-gcs:cache,mode=max
+          platforms: linux/amd64
+
+      - name: Build + push media-vault
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: services/media-vault/Dockerfile
+          push: true
+          build-args: BUILD_VERSION=${{ steps.ver.outputs.version }}
+          tags: ghcr.io/${{ steps.repo.outputs.lc }}/media-vault:${{ steps.ver.outputs.version }}
+          cache-from: type=registry,ref=ghcr.io/${{ steps.repo.outputs.lc }}/media-vault:cache
+          cache-to: type=registry,ref=ghcr.io/${{ steps.repo.outputs.lc }}/media-vault:cache,mode=max
+          platforms: linux/amd64
+
+      - name: Build + push echo-consumer
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: examples/echo-consumer/Dockerfile
+          push: true
+          tags: ghcr.io/${{ steps.repo.outputs.lc }}/echo-consumer:${{ steps.ver.outputs.version }}
+          cache-from: type=registry,ref=ghcr.io/${{ steps.repo.outputs.lc }}/echo-consumer:cache
+          cache-to: type=registry,ref=ghcr.io/${{ steps.repo.outputs.lc }}/echo-consumer:cache,mode=max
+          platforms: linux/amd64
+
+      - name: Build + push web
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ui/web/Dockerfile
+          push: true
+          tags: ghcr.io/${{ steps.repo.outputs.lc }}/web:${{ steps.ver.outputs.version }}
+          cache-from: type=registry,ref=ghcr.io/${{ steps.repo.outputs.lc }}/web:cache
+          cache-to: type=registry,ref=ghcr.io/${{ steps.repo.outputs.lc }}/web:cache,mode=max
+          platforms: linux/amd64
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: "3.14.4"
+
+      - name: Package + push Helm charts to GHCR
+        run: |
+          version="${{ steps.ver.outputs.version }}"
+          repo="${{ steps.repo.outputs.lc }}"
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
+            --username "${{ github.actor }}" \
+            --password-stdin
+
+          helm dependency update deploy/charts/mio-nats
+
+          for chart in \
+            mio-nats \
+            mio-jetstream-bootstrap \
+            mio-gateway \
+            mio-web \
+            mio-sink-gcs \
+            mio-echo-consumer \
+            mio-media-vault
+          do
+            helm package "deploy/charts/$chart" \
+              --version "$version" \
+              --app-version "$version" \
+              -d /tmp/mio-charts
+            helm push "/tmp/mio-charts/$chart-$version.tgz" "oci://ghcr.io/$repo/charts"
+          done
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag

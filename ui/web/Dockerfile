@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-bookworm-slim AS web
+FROM node:26-bookworm-slim AS web
 WORKDIR /src/ui/web/app
 
-RUN corepack enable && corepack prepare pnpm@10.33.2 --activate
+RUN npm install -g pnpm@10.33.2
 COPY ui/web/app/package.json ui/web/app/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
@@ -16,7 +16,7 @@ COPY buf.yaml buf.gen.yaml ./
 COPY proto/ ./proto/
 RUN buf generate proto
 
-FROM golang:1.25-bookworm AS go-builder
+FROM golang:1.26-bookworm AS go-builder
 WORKDIR /src
 
 COPY go.mod go.sum ./

@@ -586,10 +586,13 @@ Defined in `.github/workflows/ci.yaml` (dorny/paths-filter):
 - `ghcr.io/crashchat-ai/mio/sink-gcs:{sha}`
 - `ghcr.io/crashchat-ai/mio/media-vault:{sha}`
 - `ghcr.io/crashchat-ai/mio/echo-consumer:{sha}`
+- `ghcr.io/crashchat-ai/mio/web:{sha}`
 
 **Tag policy:**
 - Always tag by commit SHA (immutable, traceable)
 - Also tag `:main` on main branch (rolling, for dev)
+- Also tag by SemVer on release tags (`v1.2.3` publishes `:1.2.3`)
+- Publish Helm charts as OCI artifacts with chart version and appVersion equal to the SemVer release
 - Never `:latest` on non-tag pushes (prevents surprise upgrades)
 
 ### Pre-commit Checks

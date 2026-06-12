@@ -24,6 +24,8 @@ type Admin interface {
 	DisableAccount(ctx context.Context, accountID string) error
 	RotateCredential(ctx context.Context, accountID string) error
 	TailMessages(ctx context.Context, accountID, conversationID string) (MessageStream, error)
+	GetWebhookInfo(ctx context.Context, accountID string) (*adminv1.GetWebhookInfoResponse, error)
+	GetStreamHealth(ctx context.Context) (*adminv1.GetStreamHealthResponse, error)
 }
 
 type MessageStream interface {
@@ -172,4 +174,22 @@ func (c *Client) TailMessages(ctx context.Context, accountID, conversationID str
 		AccountId:      accountID,
 		ConversationId: conversationID,
 	}))
+}
+
+func (c *Client) GetWebhookInfo(ctx context.Context, accountID string) (*adminv1.GetWebhookInfoResponse, error) {
+	resp, err := c.c.GetWebhookInfo(ctx, connect.NewRequest(&adminv1.GetWebhookInfoRequest{
+		AccountId: accountID,
+	}))
+	if err != nil {
+		return nil, err
+	}
+	return resp.Msg, nil
+}
+
+func (c *Client) GetStreamHealth(ctx context.Context) (*adminv1.GetStreamHealthResponse, error) {
+	resp, err := c.c.GetStreamHealth(ctx, connect.NewRequest(&adminv1.GetStreamHealthRequest{}))
+	if err != nil {
+		return nil, err
+	}
+	return resp.Msg, nil
 }

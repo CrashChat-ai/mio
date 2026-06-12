@@ -1,94 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-
-type Operator = {
-  email: string;
-  name: string;
-  avatarUrl: string;
-  role: "viewer" | "operator" | "credential-admin";
-  expiresAt: string;
-};
-
-type SessionResponse = {
-  authenticated: boolean;
-  authMode: string;
-  operator?: Operator;
-};
-
-type Tenant = {
-  id: string;
-  slug: string;
-  displayName: string;
-  status: string;
-  createdAt: string;
-  disabledAt?: string;
-};
-
-type Account = {
-  id: string;
-  tenantId: string;
-  channelType: string;
-  provider: string;
-  externalId: string;
-  displayName: string;
-  rateLimitPerSecond: number;
-  rateLimitScope: string;
-  createdAt: string;
-  disabledAt?: string;
-};
-
-type ChannelType = {
-  slug: string;
-  status: string;
-  authKind: string;
-  supportsThreads: boolean;
-  supportsEdit: boolean;
-  supportsDelete: boolean;
-  allowedAttachmentKinds: string[];
-  rateLimitScope: string;
-  rateLimitPerSecond: number;
-  maxTextBytes: number;
-};
-
-type TailMessage = {
-  id: string;
-  tenantId: string;
-  accountId: string;
-  conversationId: string;
-  channelType: string;
-  senderDisplay: string;
-  text: string;
-  receivedAt: string;
-};
-
-type CredentialMetadata = {
-  accountId: string;
-  hasCredential: boolean;
-  authKind?: string;
-  keyVersion?: number;
-  expiresAt?: string;
-  rotatedAt?: string;
-};
-
-type LoadState = "idle" | "loading" | "ready" | "error";
-
-async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(url, { credentials: "same-origin", ...init });
-  if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
-  }
-  if (response.status === 204) {
-    return undefined as T;
-  }
-  return (await response.json()) as T;
-}
-
-function jsonRequest(method: "POST" | "PATCH", body: unknown): RequestInit {
-  return {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  };
-}
+import type {
+  SessionResponse,
+  Tenant,
+  Account,
+  ChannelType,
+  TailMessage,
+  CredentialMetadata,
+  LoadState,
+} from "./types";
+import { api, jsonRequest, roleAllows, flagText, formatTime, formatDateTime } from "./types";
+import { WebhookPanel } from "./WebhookPanel";
 
 function App() {
   const [session, setSession] = useState<SessionResponse | null>(null);
@@ -411,6 +332,7 @@ function App() {
           <a href="#accounts">Accounts</a>
           {canMutate && <a href="#manage">Manage</a>}
           <a href="#credentials">Credentials</a>
+          <a href="#onboarding">Onboarding</a>
           <a href="#channels">Channels</a>
           <a href="#tail">Live tail</a>
         </nav>
@@ -665,6 +587,8 @@ function App() {
           </section>
         </section>
 
+        <WebhookPanel selectedAccount={selectedAccount} operatorRole={operatorRole} />
+
         <section className="grid">
           <section className="panel" id="channels">
             <div className="panelHeader">
@@ -737,52 +661,6 @@ function App() {
       </section>
     </main>
   );
-}
-
-function flagText(channel: ChannelType): string {
-  const flags = [
-    channel.supportsThreads ? "threads" : "",
-    channel.supportsEdit ? "edit" : "",
-    channel.supportsDelete ? "delete" : "",
-  ].filter(Boolean);
-  return flags.length > 0 ? flags.join(", ") : "read-only";
-}
-
-function formatTime(value: string): string {
-  if (!value) {
-    return "";
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(new Date(value));
-}
-
-function formatDateTime(value: string): string {
-  if (!value) {
-    return "";
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
-function roleAllows(actual: Operator["role"], required: Operator["role"]): boolean {
-  return roleRank(actual) >= roleRank(required);
-}
-
-function roleRank(role: Operator["role"]): number {
-  if (role === "credential-admin") {
-    return 3;
-  }
-  if (role === "operator") {
-    return 2;
-  }
-  return 1;
 }
 
 export default App;

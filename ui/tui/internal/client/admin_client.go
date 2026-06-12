@@ -22,6 +22,8 @@ type Admin interface {
 	ListAccounts(ctx context.Context, tenantID string) ([]*adminv1.Account, error)
 	ListChannelTypes(ctx context.Context) ([]*adminv1.ChannelTypeInfo, error)
 	TailMessages(ctx context.Context, accountID, conversationID string) (<-chan *adminv1.TailMessagesResponse, error)
+	GetWebhookInfo(ctx context.Context, accountID string) (*adminv1.GetWebhookInfoResponse, error)
+	GetStreamHealth(ctx context.Context) (*adminv1.GetStreamHealthResponse, error)
 }
 
 // httpAdmin is the connect-go implementation. Constructed from a base URL.
@@ -63,6 +65,22 @@ func (h *httpAdmin) ListChannelTypes(ctx context.Context) ([]*adminv1.ChannelTyp
 		return nil, err
 	}
 	return resp.Msg.GetChannelTypes(), nil
+}
+
+func (h *httpAdmin) GetWebhookInfo(ctx context.Context, accountID string) (*adminv1.GetWebhookInfoResponse, error) {
+	resp, err := h.c.GetWebhookInfo(ctx, connect.NewRequest(&adminv1.GetWebhookInfoRequest{AccountId: accountID}))
+	if err != nil {
+		return nil, err
+	}
+	return resp.Msg, nil
+}
+
+func (h *httpAdmin) GetStreamHealth(ctx context.Context) (*adminv1.GetStreamHealthResponse, error) {
+	resp, err := h.c.GetStreamHealth(ctx, connect.NewRequest(&adminv1.GetStreamHealthRequest{}))
+	if err != nil {
+		return nil, err
+	}
+	return resp.Msg, nil
 }
 
 // TailMessages opens a server-stream and returns a channel of message

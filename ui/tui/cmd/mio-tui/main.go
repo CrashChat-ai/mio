@@ -19,26 +19,31 @@ const (
 	viewTenants viewKind = iota
 	viewAccounts
 	viewChannels
+	viewOnboarding
 	viewTail
 )
 
+const numViews = 5
+
 type appModel struct {
-	admin    client.Admin
-	current  viewKind
-	tenants  views.TenantsModel
-	accounts views.AccountsModel
-	channels views.ChannelsModel
-	tail     views.TailModel
+	admin      client.Admin
+	current    viewKind
+	tenants    views.TenantsModel
+	accounts   views.AccountsModel
+	channels   views.ChannelsModel
+	onboarding views.WebhookHealthModel
+	tail       views.TailModel
 }
 
 func newApp(admin client.Admin) appModel {
 	return appModel{
-		admin:    admin,
-		current:  viewTenants,
-		tenants:  views.NewTenants(admin),
-		accounts: views.NewAccounts(admin),
-		channels: views.NewChannels(admin),
-		tail:     views.NewTail(admin),
+		admin:      admin,
+		current:    viewTenants,
+		tenants:    views.NewTenants(admin),
+		accounts:   views.NewAccounts(admin),
+		channels:   views.NewChannels(admin),
+		onboarding: views.NewWebhookHealth(admin),
+		tail:       views.NewTail(admin),
 	}
 }
 
@@ -54,11 +59,17 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.tail.Stop()
 			return a, tea.Quit
 		case "tab":
-			a.current = (a.current + 1) % 4
+			a.current = (a.current + 1) % numViews
 			if a.current == viewAccounts {
 				if t := a.tenants.Selected(); t != nil {
 					a.accounts.SetTenant(t.GetId())
 					return a, a.accounts.Init()
+				}
+			}
+			if a.current == viewOnboarding {
+				if acct := a.accounts.Selected(); acct != nil {
+					a.onboarding.SetAccount(acct.GetId())
+					return a, a.onboarding.Init()
 				}
 			}
 			if a.current == viewTail {
@@ -69,24 +80,25 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return a, nil
 		case "shift+tab":
-			a.current = (a.current + 3) % 4
+			a.current = (a.current + numViews - 1) % numViews
 			return a, nil
 		}
 	}
 
-	// Always feed loaded-data messages into every view; only the relevant
-	// model's Update will react. Keystrokes go only to the active view.
 	var cmds []tea.Cmd
 
 	switch msg.(type) {
 	case views.TenantsLoadedMsg, views.AccountsLoadedMsg,
-		views.ChannelsLoadedMsg, views.TailMsg:
+		views.ChannelsLoadedMsg, views.TailMsg,
+		views.WebhookInfoLoadedMsg, views.StreamHealthLoadedMsg:
 		var c tea.Cmd
 		a.tenants, c = a.tenants.Update(msg)
 		cmds = append(cmds, c)
 		a.accounts, c = a.accounts.Update(msg)
 		cmds = append(cmds, c)
 		a.channels, c = a.channels.Update(msg)
+		cmds = append(cmds, c)
+		a.onboarding, c = a.onboarding.Update(msg)
 		cmds = append(cmds, c)
 		a.tail, c = a.tail.Update(msg)
 		cmds = append(cmds, c)
@@ -99,6 +111,8 @@ func (a appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.accounts, c = a.accounts.Update(msg)
 		case viewChannels:
 			a.channels, c = a.channels.Update(msg)
+		case viewOnboarding:
+			a.onboarding, c = a.onboarding.Update(msg)
 		case viewTail:
 			a.tail, c = a.tail.Update(msg)
 		}
@@ -115,6 +129,8 @@ func (a appModel) View() string {
 		return a.accounts.View()
 	case viewChannels:
 		return a.channels.View()
+	case viewOnboarding:
+		return a.onboarding.View()
 	case viewTail:
 		return a.tail.View()
 	}

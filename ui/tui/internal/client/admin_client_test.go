@@ -148,6 +148,24 @@ func TestHTTPAdmin_TailMessages_StreamUnwrapsAndCloses(t *testing.T) {
 	}
 }
 
+func TestHTTPAdmin_GetWebhookInfo_Unimplemented(t *testing.T) {
+	admin, cleanup := startStub(t, &stubServer{})
+	defer cleanup()
+	_, err := admin.GetWebhookInfo(context.Background(), "acct-1")
+	if err == nil {
+		t.Fatal("expected error for unimplemented stub")
+	}
+}
+
+func TestHTTPAdmin_GetStreamHealth_Unimplemented(t *testing.T) {
+	admin, cleanup := startStub(t, &stubServer{})
+	defer cleanup()
+	_, err := admin.GetStreamHealth(context.Background())
+	if err == nil {
+		t.Fatal("expected error for unimplemented stub")
+	}
+}
+
 func TestHTTPAdmin_TailMessages_CtxCancelStopsStream(t *testing.T) {
 	// Stub with no messages — the server handler returns immediately so the
 	// channel closes. Still useful to confirm cancel doesn't deadlock.

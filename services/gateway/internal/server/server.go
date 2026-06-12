@@ -108,6 +108,11 @@ func buildWebhookPipelines(
 		channelType := adapter.ChannelType()
 
 		secret := cfg.WebhookSecrets[channelType]
+		if secret == nil {
+			// Empty non-nil = deliberate dev mode (adapters accept all);
+			// nil would read as "not configured" and 401 everything.
+			secret = []byte{}
+		}
 		if sc, ok := inbound.(channels.SecretConfigurable); ok {
 			inbound = sc.WithSecret(secret)
 		}

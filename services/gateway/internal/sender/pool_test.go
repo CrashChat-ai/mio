@@ -121,7 +121,7 @@ func TestPool_ResolveEdit_ExplicitExternalID(t *testing.T) {
 func TestOutboundState_IntegrationWithPool(t *testing.T) {
 	state := store.NewOutboundState()
 	state.Set(t.Context(), "cmd-A", "acct-test", "ext-AAA")
-	got, ok := state.Get(t.Context(), "cmd-A")
+	got, ok := state.Get(t.Context(), "cmd-A", "acct-test")
 	if !ok || got != "ext-AAA" {
 		t.Fatalf("expected ext-AAA, got %s (ok=%v)", got, ok)
 	}
@@ -153,7 +153,7 @@ func TestPool_EditFallback_StateMissing(t *testing.T) {
 		EditOfMessageId: "cmd-original", // correlator
 		Text:            "final answer",
 	}
-	_, missInState := state.Get(t.Context(), cmd.GetEditOfMessageId())
+	_, missInState := state.Get(t.Context(), cmd.GetEditOfMessageId(), cmd.GetAccountId())
 	if missInState {
 		t.Fatal("state should be empty initially")
 	}

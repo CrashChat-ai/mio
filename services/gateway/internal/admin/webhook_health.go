@@ -3,7 +3,6 @@ package admin
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -11,6 +10,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/crashchat-ai/mio/pkg/channels"
 	adminv1 "github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1"
 	"github.com/crashchat-ai/mio/services/gateway/store"
 )
@@ -30,17 +30,25 @@ func (s *AdminServer) GetWebhookInfo(ctx context.Context, req *connect.Request[a
 
 	adapter := s.adapterByChannelType(acct.ChannelType)
 	authKind := ""
+	var aliases []string
 	if adapter != nil {
 		authKind = adapter.Capabilities().GetAuthKind()
+		if inb := adapter.Inbound(); inb != nil {
+			if ra, ok := inb.(channels.RouteAliaser); ok {
+				aliases = ra.RouteAliases()
+			}
+		}
 	}
 
+	base := s.gatewayPublicURL
+	if base == "" {
+		base = s.publicURL
+	}
 	urlSlug := strings.ReplaceAll(acct.ChannelType, "_", "-")
 	webhookURL := ""
-	if s.publicURL != "" {
-		webhookURL = s.publicURL + "/webhooks/" + urlSlug
+	if base != "" {
+		webhookURL = strings.TrimSuffix(base, "/") + "/webhooks/" + urlSlug
 	}
-
-	aliases := webhookAliases(acct.ChannelType)
 
 	hint := setupHint(authKind)
 
@@ -68,9 +76,6 @@ func (s *AdminServer) GetStreamHealth(ctx context.Context, _ *connect.Request[ad
 			s.Logger.Warn("admin: stream health: stream lookup failed", "stream", streamName, "error", err)
 			continue
 		}
-
-		consumers := stream.CachedInfo().State // re-fetch via ListConsumers
-		_ = consumers
 
 		lister := stream.ListConsumers(ctx)
 		for ci := range lister.Info() {
@@ -102,19 +107,10 @@ func consumerHealthFromInfo(stream string, ci *jetstream.ConsumerInfo) *adminv1.
 	return h
 }
 
-func webhookAliases(channelType string) []string {
-	switch channelType {
-	case "zoho_cliq":
-		return []string{"/cliq"}
-	default:
-		return nil
-	}
-}
-
 func setupHint(authKind string) string {
 	switch authKind {
 	case "oauth2_refresh":
-		return fmt.Sprintf("Click Start Install to begin the OAuth flow. After authorizing, click Complete Install to finalize.")
+		return "Click Start Install to begin the OAuth flow. After authorizing, click Complete Install to finalize."
 	case "hmac_webhook":
 		return "Configure the webhook URL in the platform dashboard and paste the signing secret in the credential form."
 	case "bot_token":

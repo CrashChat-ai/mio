@@ -74,6 +74,7 @@ func envDuration(key string, def time.Duration) time.Duration {
 	}
 	d, err := time.ParseDuration(v)
 	if err != nil {
+		slog.Warn("invalid duration env — using default", "key", key, "value", v, "default", def)
 		return def
 	}
 	return d
@@ -139,13 +140,14 @@ func main() {
 	logger.Info("admin: registered adapters", "count", len(registry))
 
 	srv := admin.NewServer(admin.Deps{
-		Pool:      pool,
-		Cipher:    cipher,
-		SDK:       sdkClient,
-		Registry:  registry,
-		Metrics:   metrics,
-		Logger:    logger,
-		PublicURL: f.publicURL,
+		Pool:             pool,
+		Cipher:           cipher,
+		SDK:              sdkClient,
+		Registry:         registry,
+		Metrics:          metrics,
+		Logger:           logger,
+		PublicURL:        f.publicURL,
+		GatewayPublicURL: envDefault("MIO_GATEWAY_PUBLIC_URL", ""),
 	})
 	srv.StartBackground(ctx)
 

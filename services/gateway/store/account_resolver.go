@@ -18,10 +18,13 @@ type ResolvedAccount struct {
 }
 
 // AccountResolver routes an inbound webhook to an account:
-//  1. exactly one enabled account for the channel_type → that account
+//  1. exactly one enabled account for the channel_type → that account,
+//     unless both its external_id and the workspace key are set and differ
 //  2. workspace key matches accounts.external_id → that account
 //  3. otherwise not resolved (caller falls back to env identity or drops)
 //
+// A non-nil error means the lookup itself failed — callers must NOT treat
+// that as "no match" (env fallback on a DB blip would misroute tenants).
 // Account rows are cached per channel_type for resolverCacheTTL — webhook
 // hot path must not query Postgres per request.
 type AccountResolver struct {
@@ -56,23 +59,27 @@ func NewAccountResolver(pool *pgxpool.Pool, logger *slog.Logger) *AccountResolve
 	}
 }
 
-func (r *AccountResolver) Resolve(ctx context.Context, channelType, workspaceKey string) (ResolvedAccount, bool) {
+func (r *AccountResolver) Resolve(ctx context.Context, channelType, workspaceKey string) (ResolvedAccount, bool, error) {
 	accounts, err := r.enabledAccounts(ctx, channelType)
 	if err != nil {
 		r.logger.Error("account resolver: query failed", "channel", channelType, "err", err)
-		return ResolvedAccount{}, false
+		return ResolvedAccount{}, false, err
 	}
 	acct, ok := pickAccount(accounts, workspaceKey)
 	if !ok {
-		return ResolvedAccount{}, false
+		return ResolvedAccount{}, false, nil
 	}
-	return ResolvedAccount{TenantID: acct.tenantID, AccountID: acct.accountID}, true
+	return ResolvedAccount{TenantID: acct.tenantID, AccountID: acct.accountID}, true, nil
 }
 
 // pickAccount applies the routing rules over the enabled-account set.
 func pickAccount(accounts []resolverAccount, workspaceKey string) (resolverAccount, bool) {
 	if len(accounts) == 1 {
-		return accounts[0], true
+		a := accounts[0]
+		if workspaceKey != "" && a.externalID != "" && a.externalID != workspaceKey {
+			return resolverAccount{}, false
+		}
+		return a, true
 	}
 	if workspaceKey != "" {
 		for _, a := range accounts {

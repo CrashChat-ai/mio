@@ -18,8 +18,10 @@ func TestPickAccount(t *testing.T) {
 		want     string
 		ok       bool
 	}{
-		{"single account wins regardless of key", []resolverAccount{a}, "", "a1", true},
-		{"single account wins with mismatched key", []resolverAccount{a}, "org-9", "a1", true},
+		{"single account wins with empty key", []resolverAccount{a}, "", "a1", true},
+		{"single account wins with matching key", []resolverAccount{a}, "org-1", "a1", true},
+		{"single account REJECTS mismatched key", []resolverAccount{a}, "org-9", "", false},
+		{"single account w/ empty external_id accepts any key", []resolverAccount{{tenantID: "t3", accountID: "a3", externalID: ""}}, "org-9", "a3", true},
 		{"multi: key match routes", []resolverAccount{a, b}, "org-2", "a2", true},
 		{"multi: no key → unresolved", []resolverAccount{a, b}, "", "", false},
 		{"multi: wrong key → unresolved", []resolverAccount{a, b}, "org-9", "", false},
@@ -53,11 +55,11 @@ func TestAccountResolver_DB(t *testing.T) {
 	}
 
 	r := NewAccountResolver(pool, nil)
-	res, ok := r.Resolve(ctx, "rsv_chan", "org-bbb")
-	if !ok || res.AccountID != acctB.ID.String() {
-		t.Fatalf("want acctB, got %+v ok=%v", res, ok)
+	res, ok, err := r.Resolve(ctx, "rsv_chan", "org-bbb")
+	if err != nil || !ok || res.AccountID != acctB.ID.String() {
+		t.Fatalf("want acctB, got %+v ok=%v err=%v", res, ok, err)
 	}
-	if _, ok := r.Resolve(ctx, "rsv_chan", ""); ok {
+	if _, ok, _ := r.Resolve(ctx, "rsv_chan", ""); ok {
 		t.Fatal("two accounts + empty key must not resolve")
 	}
 
@@ -66,8 +68,8 @@ func TestAccountResolver_DB(t *testing.T) {
 	}
 	// Cache still holds both; fresh resolver sees the single survivor.
 	r2 := NewAccountResolver(pool, nil)
-	res, ok = r2.Resolve(ctx, "rsv_chan", "")
-	if !ok || res.AccountID != acctA.ID.String() {
-		t.Fatalf("single enabled account must auto-route, got %+v ok=%v", res, ok)
+	res, ok, err = r2.Resolve(ctx, "rsv_chan", "")
+	if err != nil || !ok || res.AccountID != acctA.ID.String() {
+		t.Fatalf("single enabled account must auto-route, got %+v ok=%v err=%v", res, ok, err)
 	}
 }

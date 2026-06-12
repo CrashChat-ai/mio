@@ -62,7 +62,7 @@ type RateProvider interface {
 // store.DurableOutboundState (Postgres + cache).
 type OutboundState interface {
 	Set(ctx context.Context, sendCommandID, accountID, externalID string)
-	Get(ctx context.Context, sendCommandID string) (string, bool)
+	Get(ctx context.Context, sendCommandID, accountID string) (string, bool)
 }
 
 // Pool is the outbound sender pool. It consumes from MESSAGES_OUTBOUND,
@@ -284,7 +284,7 @@ func (p *Pool) resolveEdit(ctx context.Context, cmd *miov1.SendCommand, channelT
 		return false
 	}
 
-	extID, ok := p.state.Get(ctx, correlator)
+	extID, ok := p.state.Get(ctx, correlator, cmd.GetAccountId())
 	if !ok {
 		p.editFallback.WithLabelValues(channelType, "state_missing").Inc()
 		p.logger.Warn("sender: outbound_state miss — falling back to Send",

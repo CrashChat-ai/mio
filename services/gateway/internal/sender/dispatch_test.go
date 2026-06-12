@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/crashchat-ai/mio/pkg/channels"
-	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
+	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
 )
 
 // stubAdapter implements channels.Adapter for testing.

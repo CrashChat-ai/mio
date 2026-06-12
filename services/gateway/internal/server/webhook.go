@@ -31,8 +31,10 @@ type inboundPublisher interface {
 
 // AccountResolver routes a webhook to an installed account. Satisfied by
 // store.AccountResolver; nil disables DB resolution (env identity only).
+// A non-nil error means the lookup failed — the pipeline responds 500 so
+// the platform retries instead of misrouting via the env fallback.
 type AccountResolver interface {
-	Resolve(ctx context.Context, channelType, workspaceKey string) (store.ResolvedAccount, bool)
+	Resolve(ctx context.Context, channelType, workspaceKey string) (store.ResolvedAccount, bool, error)
 }
 
 // webhookPipeline handles inbound webhooks for one channel adapter.
@@ -96,7 +98,12 @@ func (p *webhookPipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	tenantID, accountID, routed := p.resolveAccount(ctx, msg)
+	tenantID, accountID, routed, err := p.resolveAccount(ctx, msg)
+	if err != nil {
+		p.logger.Error("webhook: account resolution failed", "channel", p.channelType, "err", err)
+		p.finish(w, start, "db_error", http.StatusInternalServerError, "db error")
+		return
+	}
 	if !routed {
 		p.logger.Warn("webhook: unroutable — no matching account, no env identity",
 			"channel", p.channelType,
@@ -201,26 +208,32 @@ func (p *webhookPipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // resolveAccount picks the routing identity: DB resolution first (workspace
-// key from the adapter), env identity as compat fallback. Isolation rule:
-// once DB resolution succeeds the env identity is never consulted.
-func (p *webhookPipeline) resolveAccount(ctx context.Context, msg *miov1.Message) (tenantID, accountID string, ok bool) {
+// key from the adapter), env identity as compat fallback. Isolation rules:
+// once DB resolution succeeds the env identity is never consulted, and a
+// resolver ERROR aborts (500) rather than falling back — a Postgres blip
+// must not stamp messages with the env tenant.
+func (p *webhookPipeline) resolveAccount(ctx context.Context, msg *miov1.Message) (tenantID, accountID string, ok bool, err error) {
 	if p.accounts != nil {
 		workspaceKey := ""
 		if wk, isWK := p.inbound.(channels.WorkspaceKeyer); isWK {
 			workspaceKey = wk.WorkspaceKey(msg)
 		}
-		if res, resolved := p.accounts.Resolve(ctx, p.channelType, workspaceKey); resolved {
-			return res.TenantID, res.AccountID, true
+		res, resolved, rerr := p.accounts.Resolve(ctx, p.channelType, workspaceKey)
+		if rerr != nil {
+			return "", "", false, rerr
+		}
+		if resolved {
+			return res.TenantID, res.AccountID, true, nil
 		}
 	}
 	if p.tenantID == "" || p.accountID == "" {
-		return "", "", false
+		return "", "", false, nil
 	}
 	p.envFallbackWarn.Do(func() {
 		p.logger.Warn("webhook: using env identity fallback (MIO_TENANT_ID/MIO_ACCOUNT_ID) — "+
 			"create an account row for DB-backed routing", "channel", p.channelType)
 	})
-	return p.tenantID, p.accountID, true
+	return p.tenantID, p.accountID, true, nil
 }
 
 func stringPtrIfNotEmpty(s string) *string {

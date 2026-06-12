@@ -40,10 +40,11 @@ func (c *AccountRateCache) RateFor(ctx context.Context, accountID string) (float
 
 	var perSecond float64
 	err := c.pool.QueryRow(ctx,
-		`SELECT rate_limit_per_second FROM accounts WHERE id = $1`, accountID).Scan(&perSecond)
+		`SELECT COALESCE(rate_limit_per_second, 0) FROM accounts WHERE id = $1`, accountID).Scan(&perSecond)
 	if err != nil {
-		// Miss or DB error: cache nothing, fall through to defaults.
-		return 0, false
+		// Negative-cache misses/errors too: a NULL override is the common
+		// case and must not put Postgres on the per-send hot path.
+		perSecond = 0
 	}
 
 	c.mu.Lock()

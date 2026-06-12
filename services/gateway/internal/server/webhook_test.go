@@ -261,14 +261,15 @@ func TestWebhookPipeline_ReplyUnresolvedParent(t *testing.T) {
 type fakeResolver struct {
 	res        store.ResolvedAccount
 	ok         bool
+	err        error
 	gotKey     string
 	gotChannel string
 }
 
-func (f *fakeResolver) Resolve(_ context.Context, channelType, workspaceKey string) (store.ResolvedAccount, bool) {
+func (f *fakeResolver) Resolve(_ context.Context, channelType, workspaceKey string) (store.ResolvedAccount, bool, error) {
 	f.gotChannel = channelType
 	f.gotKey = workspaceKey
-	return f.res, f.ok
+	return f.res, f.ok, f.err
 }
 
 type keyedInbound struct {
@@ -330,6 +331,24 @@ func TestWebhookPipeline_Unroutable200NoPublish(t *testing.T) {
 	}
 	if st.gotKind != "" {
 		t.Error("unroutable webhook must not touch the store")
+	}
+}
+
+func TestWebhookPipeline_ResolverError500(t *testing.T) {
+	st := &fakeStore{msgFresh: true}
+	pub := &fakePub{}
+	p := newPipeline(&fakeInbound{normalizeMsg: basicMsg()}, st, pub)
+	p.accounts = &fakeResolver{err: errors.New("pg down")}
+
+	rec := post(t, p)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("resolver error must 500 (platform retries), got %d", rec.Code)
+	}
+	if pub.published != nil {
+		t.Error("resolver error must not publish")
+	}
+	if st.gotKind != "" {
+		t.Error("resolver error must not fall back to env identity and touch the store")
 	}
 }
 

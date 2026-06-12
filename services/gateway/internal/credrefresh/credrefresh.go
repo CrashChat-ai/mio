@@ -99,6 +99,14 @@ func (r *Refresher) RefreshExpiring(ctx context.Context) {
 }
 
 func (r *Refresher) refreshOne(ctx context.Context, e store.ExpiringCredential) {
+	// A panicking adapter RefreshCredential must not kill the admin binary.
+	defer func() {
+		if rec := recover(); rec != nil {
+			r.refreshTotal.WithLabelValues(e.ChannelType, "panic").Inc()
+			r.logger.Error("credrefresh: adapter panic recovered",
+				"channel", e.ChannelType, "account_id", e.AccountID, "panic", rec)
+		}
+	}()
 	adapter, ok := r.adapters[e.ChannelType]
 	if !ok {
 		r.refreshTotal.WithLabelValues(e.ChannelType, "no_adapter").Inc()

@@ -40,18 +40,19 @@ ON CONFLICT (send_command_id) DO UPDATE SET external_id = EXCLUDED.external_id`,
 	}
 }
 
-func (s *DurableOutboundState) Get(ctx context.Context, sendCommandID string) (string, bool) {
-	if extID, ok := s.cache.Get(ctx, sendCommandID); ok {
+func (s *DurableOutboundState) Get(ctx context.Context, sendCommandID, accountID string) (string, bool) {
+	if extID, ok := s.cache.Get(ctx, sendCommandID, accountID); ok {
 		return extID, true
 	}
-	var accountID, externalID string
+	var owner, externalID string
 	err := s.pool.QueryRow(ctx, `
-SELECT account_id, external_id FROM outbound_state WHERE send_command_id = $1`,
-		sendCommandID).Scan(&accountID, &externalID)
+SELECT account_id, external_id FROM outbound_state
+WHERE send_command_id = $1 AND account_id = $2`,
+		sendCommandID, accountID).Scan(&owner, &externalID)
 	if err != nil {
 		return "", false
 	}
-	s.cache.Set(ctx, sendCommandID, accountID, externalID)
+	s.cache.Set(ctx, sendCommandID, owner, externalID)
 	return externalID, true
 }
 

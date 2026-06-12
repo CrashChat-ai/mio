@@ -37,13 +37,18 @@ func TestGetStreamHealth_NoSDK(t *testing.T) {
 	}
 }
 
-func TestWebhookAliases(t *testing.T) {
-	aliases := webhookAliases("zoho_cliq")
-	if len(aliases) == 0 || aliases[0] != "/cliq" {
-		t.Fatalf("expected [/cliq], got %v", aliases)
+func TestWebhookAliases_FromAdapterRouteAliaser(t *testing.T) {
+	var aliases []string
+	for _, a := range channels.RegisteredAdapters() {
+		if a.ChannelType() != "zoho_cliq" {
+			continue
+		}
+		if ra, ok := a.Inbound().(channels.RouteAliaser); ok {
+			aliases = ra.RouteAliases()
+		}
 	}
-	if len(webhookAliases("unknown")) != 0 {
-		t.Fatal("expected no aliases for unknown channel")
+	if len(aliases) == 0 || aliases[0] != "/cliq" {
+		t.Fatalf("expected [/cliq] from adapter RouteAliaser, got %v", aliases)
 	}
 }
 

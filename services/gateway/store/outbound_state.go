@@ -22,6 +22,7 @@ const (
 
 type outboundEntry struct {
 	key        string
+	accountID  string
 	externalID string
 	insertedAt time.Time
 }
@@ -46,15 +47,16 @@ func NewOutboundState() *OutboundState {
 	}
 }
 
-// Set stores (sendCommandID → externalID). Evicts the LRU entry if at capacity.
-// accountID is carried for interface parity with DurableOutboundState.
-func (s *OutboundState) Set(_ context.Context, sendCommandID, _, externalID string) {
+// Set stores (sendCommandID → externalID) owned by accountID. Evicts the
+// LRU entry if at capacity.
+func (s *OutboundState) Set(_ context.Context, sendCommandID, accountID, externalID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	// Update existing.
 	if el, ok := s.items[sendCommandID]; ok {
 		s.order.MoveToFront(el)
+		el.Value.(*outboundEntry).accountID = accountID
 		el.Value.(*outboundEntry).externalID = externalID
 		el.Value.(*outboundEntry).insertedAt = time.Now()
 		return
@@ -72,14 +74,16 @@ func (s *OutboundState) Set(_ context.Context, sendCommandID, _, externalID stri
 
 	el := s.order.PushFront(&outboundEntry{
 		key:        sendCommandID,
+		accountID:  accountID,
 		externalID: externalID,
 		insertedAt: time.Now(),
 	})
 	s.items[sendCommandID] = el
 }
 
-// Get returns (externalID, true) if found and not expired, else ("", false).
-func (s *OutboundState) Get(_ context.Context, sendCommandID string) (string, bool) {
+// Get returns (externalID, true) if found, unexpired, and owned by
+// accountID — a correlator from another account never resolves.
+func (s *OutboundState) Get(_ context.Context, sendCommandID, accountID string) (string, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -91,6 +95,9 @@ func (s *OutboundState) Get(_ context.Context, sendCommandID string) (string, bo
 	if time.Since(entry.insertedAt) > s.ttl {
 		s.order.Remove(el)
 		delete(s.items, sendCommandID)
+		return "", false
+	}
+	if entry.accountID != accountID {
 		return "", false
 	}
 	s.order.MoveToFront(el)

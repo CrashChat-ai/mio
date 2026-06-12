@@ -38,6 +38,10 @@ type AdminServer struct {
 
 	stash     *installStash
 	publicURL string // e.g. http://127.0.0.1:9090 — used for redirect_uri
+	// gatewayPublicURL is the GATEWAY ingress base for webhook URLs
+	// (operators paste these into platform consoles); falls back to
+	// publicURL when unset — wrong on split-host deploys, set it.
+	gatewayPublicURL string
 }
 
 // Deps groups required dependencies for NewServer.
@@ -48,7 +52,8 @@ type Deps struct {
 	Registry  []channels.Adapter
 	Metrics   *AdminMetrics
 	Logger    *slog.Logger
-	PublicURL string
+	PublicURL        string
+	GatewayPublicURL string
 }
 
 // NewServer constructs an AdminServer with sane defaults. Logger defaults
@@ -65,7 +70,8 @@ func NewServer(d Deps) *AdminServer {
 		Metrics:   d.Metrics,
 		Logger:    d.Logger,
 		stash:     newInstallStash(),
-		publicURL: d.PublicURL,
+		publicURL:        d.PublicURL,
+		gatewayPublicURL: d.GatewayPublicURL,
 	}
 }
 

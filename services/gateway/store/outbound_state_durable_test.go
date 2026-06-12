@@ -36,7 +36,7 @@ func TestDurableOutboundState_SurvivesRestart(t *testing.T) {
 
 	// Fresh instance = restarted process with cold cache.
 	second := NewDurableOutboundState(pool, nil)
-	extID, ok := second.Get(ctx, "cmd-restart-1")
+	extID, ok := second.Get(ctx, "cmd-restart-1", "acct-1")
 	if !ok || extID != "ext-99" {
 		t.Fatalf("want ext-99 from DB after restart, got %q ok=%v", extID, ok)
 	}
@@ -45,7 +45,7 @@ func TestDurableOutboundState_SurvivesRestart(t *testing.T) {
 	if _, err := pool.Exec(ctx, `DELETE FROM outbound_state WHERE send_command_id = 'cmd-restart-1'`); err != nil {
 		t.Fatal(err)
 	}
-	if extID, ok := second.Get(ctx, "cmd-restart-1"); !ok || extID != "ext-99" {
+	if extID, ok := second.Get(ctx, "cmd-restart-1", "acct-1"); !ok || extID != "ext-99" {
 		t.Fatalf("want cache hit after delete, got %q ok=%v", extID, ok)
 	}
 }
@@ -59,7 +59,7 @@ func TestDurableOutboundState_UpsertOverwrites(t *testing.T) {
 	s.Set(ctx, "cmd-up-1", "acct-1", "ext-2")
 
 	fresh := NewDurableOutboundState(pool, nil)
-	if extID, _ := fresh.Get(ctx, "cmd-up-1"); extID != "ext-2" {
+	if extID, _ := fresh.Get(ctx, "cmd-up-1", "acct-1"); extID != "ext-2" {
 		t.Fatalf("want ext-2 after upsert, got %q", extID)
 	}
 }
@@ -67,7 +67,23 @@ func TestDurableOutboundState_UpsertOverwrites(t *testing.T) {
 func TestDurableOutboundState_MissReturnsFalse(t *testing.T) {
 	pool := durableTestPool(t)
 	s := NewDurableOutboundState(pool, nil)
-	if _, ok := s.Get(t.Context(), "cmd-never-existed"); ok {
+	if _, ok := s.Get(t.Context(), "cmd-never-existed", "acct-1"); ok {
 		t.Fatal("want miss")
+	}
+}
+
+func TestDurableOutboundState_CrossAccountDenied(t *testing.T) {
+	pool := durableTestPool(t)
+	ctx := t.Context()
+
+	s := NewDurableOutboundState(pool, nil)
+	s.Set(ctx, "cmd-x-acct", "acct-owner", "ext-x")
+
+	if _, ok := s.Get(ctx, "cmd-x-acct", "acct-other"); ok {
+		t.Fatal("correlator owned by another account must not resolve")
+	}
+	fresh := NewDurableOutboundState(pool, nil)
+	if _, ok := fresh.Get(ctx, "cmd-x-acct", "acct-other"); ok {
+		t.Fatal("cross-account denial must hold on DB path too")
 	}
 }

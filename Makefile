@@ -73,12 +73,17 @@ gateway-migrate: ## Run database migrations manually via gateway CLI
 gateway-bench-outbound: ## Fairness bench: burst account A (50/s), assert account B p99 < 2s
 	go test ./services/gateway/integration_test/... -run TestFairness -v -timeout 30s
 
-gateway-dispatch-lint: ## CI guard: dispatch.go must have zero channel-specific branches
+gateway-dispatch-lint: ## CI guard: gateway core must have zero channel-specific branches
 	@test -f services/gateway/internal/sender/dispatch.go || \
 		(echo "ERROR: services/gateway/internal/sender/dispatch.go not found — repo layout drift"; exit 1)
 	@! grep -E 'zoho|slack|cliq|telegram|discord' services/gateway/internal/sender/dispatch.go && \
 		echo "dispatch.go: clean (no adapter-specific branches)" || \
 		(echo "ERROR: adapter-specific branch found in dispatch.go — P9 litmus FAIL"; exit 1)
+	@! grep -rE 'zoho|slack|cliq|telegram|discord' --include='*.go' \
+		--exclude='*_test.go' \
+		services/gateway/internal/server services/gateway/internal/config services/gateway/internal/runtime && \
+		echo "server/config/runtime: clean (no adapter-specific branches)" || \
+		(echo "ERROR: adapter-specific reference found in gateway core — purity FAIL"; exit 1)
 
 admin-build: ## Build the admin connect-go server binary
 	go build -o ./bin/mio-admin ./services/gateway/cmd/admin

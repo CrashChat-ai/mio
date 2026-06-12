@@ -10,6 +10,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+const channelType = "zoho_cliq"
+
 // cliqInbound satisfies channels.InboundAdapter for Zoho Cliq webhook
 // requests. It is a thin façade over the existing free functions
 // VerifySignature, ParseWebhookPayload, and Normalize — no behaviour
@@ -43,6 +45,22 @@ var ErrSecretNotConfigured = errors.New("zohocliq: cliqInbound: secret not confi
 // Exposed for callers that need to verify signatures via Adapter.Inbound()
 // at request time (e.g. P4 admin server diagnostic endpoints).
 func NewInbound(secret []byte) channels.InboundAdapter { return &cliqInbound{secret: secret} }
+
+// WithSecret satisfies channels.SecretConfigurable for the gateway's
+// mount-time secret injection.
+func (c *cliqInbound) WithSecret(secret []byte) channels.InboundAdapter {
+	return &cliqInbound{secret: secret}
+}
+
+// WebhookSecretNames returns the legacy mount name first: prod mounts
+// cliq-webhook-secret (locked in mio-gateway-secrets) from before the
+// generic naming convention.
+func (c *cliqInbound) WebhookSecretNames() []string {
+	return []string{"cliq-webhook-secret", channels.DefaultWebhookSecretName(channelType)}
+}
+
+// RouteAliases preserves the locked ingress path mio.../cliq.
+func (c *cliqInbound) RouteAliases() []string { return []string{"/cliq"} }
 
 // VerifySignature validates the X-Webhook-Signature header against the body
 // using HMAC-SHA256 (hex or base64).
@@ -83,7 +101,14 @@ func (c *cliqInbound) Normalize(rawBody []byte) (*miov1.Message, error) {
 	}
 	nm, err := Normalize(payload)
 	if err != nil {
-		return nil, fmt.Errorf("zohocliq: normalize: %w", err)
+		return nil, fmt.Errorf("%w: zohocliq: %v", channels.ErrNormalizeSoft, err)
+	}
+
+	if nm.ConversationDisplayName != "" {
+		if nm.Attributes == nil {
+			nm.Attributes = map[string]string{}
+		}
+		nm.Attributes[channels.AttrConversationDisplayName] = nm.ConversationDisplayName
 	}
 
 	msg := &miov1.Message{
@@ -118,4 +143,39 @@ func (c *cliqInbound) Normalize(rawBody []byte) (*miov1.Message, error) {
 // proceeds with VerifySignature + Normalize).
 func (c *cliqInbound) HandleHandshake(w http.ResponseWriter, r *http.Request) bool {
 	return false
+}
+
+func applyReplyFields(
+	msg *miov1.Message,
+	parentExternalID, threadRootMessageID, relationTargetMessageID string,
+) {
+	if parentExternalID == "" {
+		return
+	}
+
+	msg.ParentConversationId = parentExternalID // external id as proxy until UUID resolved
+	msg.ThreadRootMessageId = threadRootMessageID
+	msg.Relation = &miov1.MessageRelation{
+		Kind:             miov1.MessageRelation_KIND_REPLY,
+		TargetMessageId:  relationTargetMessageID,
+		TargetExternalId: parentExternalID,
+	}
+}
+
+// kindStringToEnum converts a kind string to the proto enum value.
+func kindStringToEnum(kind string) miov1.ConversationKind {
+	switch kind {
+	case "CONVERSATION_KIND_DM":
+		return miov1.ConversationKind_CONVERSATION_KIND_DM
+	case "CONVERSATION_KIND_GROUP_DM":
+		return miov1.ConversationKind_CONVERSATION_KIND_GROUP_DM
+	case "CONVERSATION_KIND_CHANNEL_PUBLIC":
+		return miov1.ConversationKind_CONVERSATION_KIND_CHANNEL_PUBLIC
+	case "CONVERSATION_KIND_CHANNEL_PRIVATE":
+		return miov1.ConversationKind_CONVERSATION_KIND_CHANNEL_PRIVATE
+	case "CONVERSATION_KIND_THREAD":
+		return miov1.ConversationKind_CONVERSATION_KIND_THREAD
+	default:
+		return miov1.ConversationKind_CONVERSATION_KIND_UNSPECIFIED
+	}
 }

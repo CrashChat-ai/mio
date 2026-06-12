@@ -27,12 +27,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/crashchat-ai/mio/pkg/channels"
+	sdk "github.com/crashchat-ai/mio/sdk-go"
 	"github.com/crashchat-ai/mio/services/gateway/internal/config"
 	"github.com/crashchat-ai/mio/services/gateway/internal/ratelimit"
 	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
 	"github.com/crashchat-ai/mio/services/gateway/internal/server"
 	"github.com/crashchat-ai/mio/services/gateway/store"
-	sdk "github.com/crashchat-ai/mio/sdk-go"
 )
 
 // RunGateway runs the gateway HTTP server + sender pool until SIGTERM.
@@ -138,11 +138,15 @@ func RunGateway(logger *slog.Logger, version string) error {
 	}()
 	logger.Info("sender: pool started", "workers", senderWorkers)
 
+	webhookSecrets := make(map[string][]byte, len(cfg.WebhookSecrets))
+	for channelType, secret := range cfg.WebhookSecrets {
+		webhookSecrets[channelType] = []byte(secret)
+	}
 	serverCfg := server.Config{
-		TenantID:          cfg.TenantID,
-		AccountID:         cfg.AccountID,
-		CliqWebhookSecret: []byte(cfg.CliqWebhookSecret),
-		Logger:            logger,
+		TenantID:       cfg.TenantID,
+		AccountID:      cfg.AccountID,
+		WebhookSecrets: webhookSecrets,
+		Logger:         logger,
 	}
 	handler := server.New(pg, nc, sdkClient, serverCfg, prometheus.DefaultRegisterer)
 

@@ -184,7 +184,7 @@ kubectl create namespace mio
 
 ### Helm Charts
 
-Six charts in `deploy/charts/`:
+Seven charts in `deploy/charts/`:
 
 1. **mio-nats** — NATS JetStream cluster
    ```bash
@@ -226,24 +226,32 @@ Six charts in `deploy/charts/`:
 
 **Linting:**
 ```bash
-make helm-lint       # Lint all 6 charts
+make helm-lint       # Lint all charts
 make helm-template   # Render with helm template to stdout
 ```
 
-### Image Tag Policy
+### Release And Image Tag Policy
 
-**CI publishes per-SHA tags to GHCR:**
+**Main branch CI publishes per-SHA tags and rolling `main` tags to GHCR:**
 ```
 ghcr.io/crashchat-ai/mio/gateway:<sha>
 ghcr.io/crashchat-ai/mio/sink-gcs:<sha>
 ghcr.io/crashchat-ai/mio/media-vault:<sha>
 ghcr.io/crashchat-ai/mio/echo-consumer:<sha>
+ghcr.io/crashchat-ai/mio/web:<sha>
 ```
 
-**Helm release tagging:**
+**SemVer releases:**
+- Push a tag like `v0.3.0` to run `.github/workflows/release.yaml`.
+- The workflow publishes all service images with the same version tag, e.g. `ghcr.io/crashchat-ai/mio/gateway:0.3.0`.
+- The workflow packages all Helm charts as OCI artifacts under `oci://ghcr.io/crashchat-ai/mio/charts`, with chart version and appVersion set to the tag version.
+- The workflow creates a GitHub Release with generated notes.
+
+**Helm release tagging during deployment:**
 - HelmRelease values pin `image.tag` to specific SHA
+- For SemVer deployments, pin `image.tag` to the release version and consume the matching OCI chart version.
 - Manual bump: edit SHA in infra repo (`fluxcd/apps/prod/mio/release-*.yaml`), push, Flux reconciles
-- Auto-bump deferred to P10 (image-reflector-controller)
+- Auto-bump remains deferred to the infra repo (image-reflector-controller or release PR automation).
 
 ### Database Bootstrap
 

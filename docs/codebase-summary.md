@@ -357,7 +357,7 @@ mio-media-cli gdpr-delete --account-id=abc123
 
 **Today:** Placeholder (empty). Reserved for future commercial features (e.g., audit logs, advanced rate limiting, RBAC).
 
-### `deploy/charts/` — Helm Charts (6)
+### `deploy/charts/` — Helm Charts (7)
 
 1. **mio-nats** — NATS JetStream cluster (3-replica StatefulSet)
    - Upstream nats chart as dependency
@@ -394,7 +394,7 @@ mio-media-cli gdpr-delete --account-id=abc123
    - Deployment, ServiceAccount
    - Env: NATS cluster URL, optional dry-run flag
 
-**Image registry:** `ghcr.io/crashchat-ai/mio/{component}:{sha}` (per-commit tags). Manual bump via infra repo; auto-bump deferred.
+**Image registry:** `ghcr.io/crashchat-ai/mio/{component}:{sha}` on main pushes, plus SemVer tags from `v*` releases. Helm charts publish as OCI artifacts under `ghcr.io/crashchat-ai/mio/charts` with chart version and appVersion equal to the release version. Infra repo bumps remain explicit.
 
 ### `docs/` — Documentation
 
@@ -508,7 +508,7 @@ make gateway-build            # gateway:$(git describe)
 - `proto/**` → test-proto (buf lint + breaking)
 - `services/gateway/**`, `sdks/go/**` → test-gateway (lint + go test)
 - `sdks/python/**`, `examples/echo-consumer/**` → test-python (ruff + pytest)
-- `deploy/charts/**` → helm-lint (all 6 charts)
+- `deploy/charts/**` → helm-lint (all charts)
 - `services/media-vault/**` → test-media-vault (go test)
 - `services/sink-gcs/sql/**`, `proto/mio/v1/**` → test-bq-schema (schema drift check)
 

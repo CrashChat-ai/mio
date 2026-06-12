@@ -60,7 +60,7 @@
 - `pkg/channels/` — public adapter contract (extracted from gateway internals)
 - `channels/` — in-tree adapters (zohocliq today)
 - `ee/` — commercial overlay placeholder (build-tag-gated)
-- `deploy/charts/` — 6 charts (mio-nats, mio-jetstream-bootstrap, mio-gateway, mio-media-vault, mio-sink-gcs, mio-echo-consumer)
+- `deploy/charts/` — 7 charts (mio-nats, mio-jetstream-bootstrap, mio-gateway, mio-web, mio-media-vault, mio-sink-gcs, mio-echo-consumer)
 
 **Code:** `services/gateway/internal/admin/`, `ui/tui/`, `pkg/channels/`, `channels/`
 

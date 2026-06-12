@@ -223,19 +223,26 @@ All gateway + media-vault + SDKs depend on **only** the public contract in `pkg/
 ```go
 // pkg/channels/adapter.go
 type Adapter interface {
-    Send(context.Context, *mio.SendCommand) error
-    Capabilities() *mio.ChannelCapabilities
+    Send(ctx context.Context, cmd *miov1.SendCommand) (externalID string, err error)
+    Edit(ctx context.Context, cmd *miov1.SendCommand) error
+    ChannelType() string
+    MaxDeliver() int
+    RateLimitKey(cmd *miov1.SendCommand) string
+    Capabilities() *miov1.ChannelCapabilities
+    Inbound() InboundAdapter
+    Credentials() CredentialAdapter
 }
 
 type InboundAdapter interface {
-    ParseWebhook([]byte, signature string) (*mio.Message, error)
-    VerifySignature([]byte, signature string) bool
+    VerifySignature(headers http.Header, rawBody []byte) error
+    Normalize(rawBody []byte) (*miov1.Message, error)
+    HandleHandshake(w http.ResponseWriter, r *http.Request) bool
 }
 
 type CredentialAdapter interface {
-    StoreCredential(ctx context.Context, accountID, channelType, value string) error
-    GetCredential(ctx context.Context, accountID, channelType string) (string, error)
-    RefreshToken(ctx context.Context, accountID, channelType string) error
+    AuthorizeURL(state string) string
+    ExchangeCode(ctx context.Context, code string) (Credential, error)
+    RefreshCredential(ctx context.Context, cur Credential) (Credential, error)
 }
 
 type HistoryAdapter interface {
@@ -246,6 +253,24 @@ type DeliveryError interface {
     error
     IsRetryable() bool
     IsRateLimited() bool
+    RetryAfterSeconds() int
+}
+
+// Optional interfaces for enhanced behavior:
+type SecretConfigurable interface {
+    WithSecret(secret []byte) InboundAdapter
+}
+
+type SecretNamer interface {
+    WebhookSecretNames() []string
+}
+
+type RouteAliaser interface {
+    RouteAliases() []string
+}
+
+type WorkspaceKeyer interface {
+    WorkspaceKey(msg *miov1.Message) string
 }
 ```
 
@@ -253,7 +278,7 @@ type DeliveryError interface {
 workers and must not be called from webhook handlers.
 
 **Registry pattern** (`pkg/channels/registry.go`):
-- Adapters self-register at `init()` via `channels.Register(slug, impl)`
+- Adapters self-register at `init()` via `channels.RegisterAdapter(impl)`
 - Gateway loads all adapters via `channels/all/all.go` blank-imports
 - No concrete adapter imports in dispatcher or core gateway logic
 
@@ -269,13 +294,19 @@ workers and must not be called from webhook handlers.
 2. **Self-registration.** Adapter registers at `init()`:
    ```go
    func init() {
-       channels.Register("zoho_cliq", &adapter{})
+       channels.RegisterAdapter(&Adapter{...})
    }
    ```
 
 3. **Zero globals per adapter.** All state (HTTP client, OAuth token manager) owned by Adapter instance.
 
-4. **Rate limiter key is configurable.** Default `account_id`, adapter can override (e.g., Slack: per-channel fairness).
+4. **Inbound contract:** `InboundAdapter` handles signature verification, payload normalization, and optional handshake. Soft failures (unknown operations, missing fields) wrap errors with `channels.ErrNormalizeSoft` so the handler responds 200 (prevents platform retry).
+
+5. **Credential lifecycle:** `CredentialAdapter` owns OAuth/token refresh. Non-OAuth adapters return informative errors from `AuthorizeURL` and `ExchangeCode`.
+
+6. **Rate limiter key is configurable.** Default `account_id`, adapter can override via `RateLimitKey()` (e.g., Slack: per-channel fairness).
+
+7. **Delivery error routing:** Adapters return `DeliveryError` from `Send()/Edit()`. The sender pool routes: `IsRetryable()==true` → Nak (retry); `IsRateLimited()==true` → Retry-After or Nak; otherwise → Term (final).
 
 ### Adding a New Adapter
 

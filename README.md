@@ -1,11 +1,14 @@
-# MIO — Messaging I/O for AI Agents
+# MIO — Open Channel Gateway
 
-MIO is a messaging I/O platform that connects AI agents to the chat channels
-customers actually live in (Zoho Cliq first, then Slack, Telegram, Discord, …)
-and gives them a clean, channel-agnostic envelope to receive messages and
-respond back.
+MIO is an open-source channel gateway that connects your app (AI agents, workflows, services)
+to the chat platforms your customers actually use: Zoho Cliq, Slack, Telegram, Discord, and more.
+It normalizes messy channel webhooks into a clean, durable envelope and routes messages via NATS JetStream.
 
-> Channels are messy. Agents shouldn't care.
+> Build once, integrate anywhere. Your code stays channel-agnostic.
+
+**Position:** Community adopters integrate any chat surface once via the adapter contract (`pkg/channels/`).
+Operator console ([mio-web](./ui/web)) manages accounts and credentials. Reference consumer
+([channel-pulse](https://github.com/crashchat-ai/channel-pulse)) demonstrates AI integration.
 
 ## Why decoupled
 
@@ -52,11 +55,11 @@ Migration history: see `.work/plans/260513-0833-repo-layout-option-b/`.
 
 ## Stack
 
-- **Bus**: NATS JetStream (3-replica on GKE; cloud-agnostic)
+- **Bus**: NATS JetStream (cloud-agnostic; 3-replica on GKE, embedded or external)
 - **Schema**: Protobuf via `buf` (lint STANDARD, breaking WIRE_JSON)
-- **Storage**: Postgres + pgvector (operational); GCS (raw + attachments)
-- **Platform**: GKE for POC; only K8s primitives, no managed lock-in
-- **Local dev**: `docker compose` brings up NATS + Postgres + MinIO
+- **Storage**: Postgres (operational); S3/MinIO/GCS (attachments + message archive)
+- **Platform**: Kubernetes-ready (Helm charts); local dev via docker-compose or all-in-one binary
+- **SDK**: Go + Python async/await (LangGraph-compatible)
 
 ## Quickstart
 

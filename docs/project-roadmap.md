@@ -22,6 +22,7 @@
 | **P8** | ✅ | POC deploy on GKE | Reference Kubernetes topology, CNPG Postgres, Flux reconciliation | `.work/plans/260509-2125-p8-poc-deploy-gke/` |
 | **P9** | ✅ | Attachment persistence | Media-vault sidecar, content-addressed storage, 7-day TTL | `.work/plans/260509-2328-attachment-persistence/` |
 | **P9.5** | ✅ | Admin control plane + TUI scaffold | Admin server (connect-rpc), TUI (bubbletea, read-only v1), embedded NATS option | Recent |
+| **P9.6** | 🚧 | Pure-gateway refactor | Dynamic inbound routing, generic secret loading, S3 backend, multi-account routing, community adapter kit | `.work/plans/260612-1626-pure-gateway-refactor/` |
 | **P10** | 🚧 | BigQuery sink / lakehouse | External tables + native warehouse table, loader pipeline | `.work/plans/260510-1102-bq-sink-lakehouse/` |
 | **P11** | 🚧 | Channel registry control plane | Additive admin RPCs for account detail/update, rate limits, and credential metadata | `.work/plans/260513-0351-channel-management-control-plane/` |
 | **P12** | 🚧 | Operator web admin | `ui/web` Go BFF + embedded React SPA with role-gated audited mutations | `.work/plans/260610-1352-issue-31-web-admin-phase0-reconcile/` |

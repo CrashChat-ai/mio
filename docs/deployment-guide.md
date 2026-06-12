@@ -110,7 +110,7 @@ make tui-run    # Connects to admin server (default ADMIN_URL=http://127.0.0.1:9
 
 **TUI v1 features:**
 - Read-only: inspect messages, list channels, view consumer lag
-- Write ops (create account, rotate credentials) deferred to P6+
+- Write ops (create account, rotate credentials) deferred to P11+
 
 ---
 

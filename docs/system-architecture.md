@@ -92,8 +92,10 @@ flowchart LR
 ```
 
 Crucial: **the AI service is not in this repo.** MIO ships the SDKs and
-guarantees the envelope; MIU imports `sdk-py` and lives elsewhere. This
-is the boundary that keeps "intelligence" and "transport" separable.
+guarantees the envelope; AI consumers integrate `sdk-py` and live elsewhere. 
+Reference implementation: **channel-pulse** (separate repository) demonstrates
+LLM integration with LangGraph + observability. This boundary keeps "intelligence" 
+and "transport" separable.
 
 ---
 
@@ -101,14 +103,17 @@ is the boundary that keeps "intelligence" and "transport" separable.
 
 **mio-admin** (`cmd/admin`): Connect-RPC server (loopback:9090 by default, CIDR allowlist).
 
-**RPCs:**
+**RPCs (16 total):**
 - `CreateTenant`, `ListTenants`, `GetTenant` — tenant lifecycle and lookup
 - `ListChannelTypes` — registered channel adapters and capabilities
 - `StartInstall`, `CompleteInstall` — operator-driven OAuth install dance
+- `GetAccount`, `UpdateAccount` — account detail and mutation (P11)
+- `SetRateLimit`, `GetCredentialMetadata` — per-account rate limits and credential metadata (P11)
 - `ListAccounts` — enumerate accounts per tenant
-- `DisableAccount`, `RotateCredential` — existing write operations
+- `DisableAccount`, `RotateCredential` — account lifecycle
 - `TailMessages` — streaming tail of inbound messages (debugging)
-- `install_stash` OAuth flow with `purgeExpired` ticker — clean up stale install state
+- `GetWebhookInfo` — operator console webhook URL display (P12)
+- `GetStreamHealth` — NATS stream lag + health metadata
 
 **mio-tui** (`ui/tui`, bubbletea): Read-only v1 terminal client.
 - Connects to admin server over HTTP (default `ADMIN_URL=http://127.0.0.1:9090`)

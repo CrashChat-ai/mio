@@ -179,3 +179,31 @@ func TestFairness_BurstADoesNotBlockB(t *testing.T) {
 		t.Fatal("account B denied despite separate bucket")
 	}
 }
+
+func TestAllowWithRate_OverrideAndChange(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l := New(ctx, prometheus.NewRegistry(), nil)
+
+	for i := 0; i < defaultBurst; i++ {
+		if !l.AllowWithRate("acct-rate", 100) {
+			t.Fatalf("burst token %d denied", i)
+		}
+	}
+
+	l.AllowWithRate("acct-rate", 1)
+	l.mu.Lock()
+	got := l.buckets["acct-rate"].Limit()
+	l.mu.Unlock()
+	if got != 1 {
+		t.Fatalf("rate change must apply via SetLimit, got %v", got)
+	}
+
+	l.Allow("acct-default")
+	l.mu.Lock()
+	got = l.buckets["acct-default"].Limit()
+	l.mu.Unlock()
+	if got != defaultRate {
+		t.Fatalf("zero rate must keep default, got %v", got)
+	}
+}

@@ -50,6 +50,13 @@ type PoolConfig struct {
 	Logger *slog.Logger
 }
 
+// RateProvider supplies per-account rate overrides (accounts table,
+// SetRateLimit RPC). Nil provider or (0, false) falls through to the
+// adapter's advertised capability rate, then the limiter default.
+type RateProvider interface {
+	RateFor(ctx context.Context, accountID string) (float64, bool)
+}
+
 // OutboundState resolves send-command ids to platform message ids for
 // edits. Implemented by store.OutboundState (memory) and
 // store.DurableOutboundState (Postgres + cache).
@@ -64,6 +71,7 @@ type Pool struct {
 	dispatcher *Dispatcher
 	sdkClient  *sdk.Client
 	limiter    *ratelimit.Limiter
+	rates      RateProvider
 	state      OutboundState
 	cfg        PoolConfig
 	logger     *slog.Logger
@@ -127,6 +135,10 @@ func NewPool(
 	}
 }
 
+// SetRateProvider installs the per-account rate override source.
+// Call before Start; not safe to swap while workers run.
+func (p *Pool) SetRateProvider(r RateProvider) { p.rates = r }
+
 // Start launches the worker pool. Blocks until ctx is cancelled.
 // Call from a goroutine alongside the HTTP server.
 func (p *Pool) Start(ctx context.Context) error {
@@ -165,11 +177,23 @@ func (p *Pool) handle(ctx context.Context, d sdk.CommandDelivery) {
 	}
 
 	// ── 2. Rate-limit gate ─────────────────────────────────────────────────
+	// Precedence: account override > adapter capability > limiter default.
+	perSecond := 0.0
+	if p.rates != nil {
+		if r, ok := p.rates.RateFor(ctx, cmd.GetAccountId()); ok && r > 0 {
+			perSecond = r
+		}
+	}
+	if perSecond == 0 {
+		if c := adapter.Capabilities(); c.GetRateLimitPerSecond() > 0 {
+			perSecond = float64(c.GetRateLimitPerSecond())
+		}
+	}
 	key := adapter.RateLimitKey(cmd)
 	if key == "" {
 		key = cmd.GetAccountId()
 	}
-	if !p.limiter.Allow(key) {
+	if !p.limiter.AllowWithRate(key, perSecond) {
 		_ = d.Nak(jitter())
 		return
 	}

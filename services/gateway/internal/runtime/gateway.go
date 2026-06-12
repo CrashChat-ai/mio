@@ -129,6 +129,7 @@ func RunGateway(logger *slog.Logger, version string) error {
 		},
 		prometheus.DefaultRegisterer,
 	)
+	pool.SetRateProvider(store.NewAccountRateCache(pg))
 
 	poolErrCh := make(chan error, 1)
 	go func() {

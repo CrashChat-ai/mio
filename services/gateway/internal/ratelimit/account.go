@@ -80,11 +80,17 @@ func New(ctx context.Context, reg prometheus.Registerer, logger *slog.Logger) *L
 // The bucket is created on first use. Empty key panics — callers must
 // provide at least account_id.
 func (l *Limiter) Allow(key string) bool {
+	return l.AllowWithRate(key, 0)
+}
+
+// AllowWithRate is Allow with a caller-supplied rate (tokens/sec).
+// perSecond <= 0 keeps the default. A rate change on an existing bucket
+// applies via SetLimit — account overrides take effect without eviction.
+func (l *Limiter) AllowWithRate(key string, perSecond float64) bool {
 	if key == "" {
 		panic("ratelimit: Allow called with empty key")
 	}
-	b := l.bucket(key)
-	return b.Allow()
+	return l.bucket(key, perSecond).Allow()
 }
 
 // Reserve reserves a token, returning the delay until the token is available.
@@ -93,18 +99,24 @@ func (l *Limiter) Reserve(key string) *rate.Reservation {
 	if key == "" {
 		panic("ratelimit: Reserve called with empty key")
 	}
-	return l.bucket(key).Reserve()
+	return l.bucket(key, 0).Reserve()
 }
 
 // bucket returns (or creates) the rate.Limiter for the given key.
-func (l *Limiter) bucket(key string) *rate.Limiter {
+func (l *Limiter) bucket(key string, perSecond float64) *rate.Limiter {
+	want := l.r
+	if perSecond > 0 {
+		want = rate.Limit(perSecond)
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	b, ok := l.buckets[key]
 	if !ok {
-		b = rate.NewLimiter(l.r, l.burst)
+		b = rate.NewLimiter(want, l.burst)
 		l.buckets[key] = b
 		l.active.Inc()
+	} else if b.Limit() != want {
+		b.SetLimit(want)
 	}
 	l.lastUse[key] = time.Now()
 	return b

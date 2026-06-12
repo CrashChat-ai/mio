@@ -1,4 +1,4 @@
-.PHONY: help up down operator-web-up proto proto-gen proto-lint proto-breaking proto-roundtrip sdk-go-test sdk-py-test sink-gcs-test sink-gcs-build-local sink-gcs-build lint docs-check test clean gateway-build gateway-build-local gateway-test gateway-migrate gateway-bench-outbound admin-build admin-run admin-test tui-build tui-run tui-test ui-web-install ui-web-build ui-web-test docker-mio-web echo-up echo-logs echo-consumer-test helm-lint helm-template kind-up kind-deploy kind-smoke kind-down
+.PHONY: help up down operator-web-up proto proto-gen proto-lint proto-breaking proto-roundtrip proto-stubs-python sdk-go-test sdk-py-test sink-gcs-test sink-gcs-build-local sink-gcs-build lint docs-check test clean gateway-build gateway-build-local gateway-test gateway-migrate gateway-bench-outbound admin-build admin-run admin-test tui-build tui-run tui-test ui-web-install ui-web-build ui-web-test docker-mio-web echo-up echo-logs echo-consumer-test helm-lint helm-template kind-up kind-deploy kind-smoke kind-down
 
 COMPOSE := docker compose -f deploy/local/docker-compose.yml
 BUILD_VERSION := $(shell git describe --always --dirty 2>/dev/null || echo dev)
@@ -41,6 +41,12 @@ proto-breaking: ## Run buf breaking check against main branch (WIRE_JSON ruleset
 proto-roundtrip: ## Run Go+Python proto round-trip test (pipes bytes; both must print OK)
 	@echo "==> Go half: marshal + subject-token validator"
 	go run ./tools/proto-roundtrip/
+
+proto-stubs-python: ## Emit Python proto stubs to dist/py-stubs (gitignored; for consumer vendoring)
+	@mkdir -p dist/py-stubs
+	buf generate \
+		--template '{"version":"v2","plugins":[{"remote":"buf.build/protocolbuffers/python","out":"dist/py-stubs"}]}'
+	@echo "==> Python stubs written to dist/py-stubs/"
 
 lint: ## Run buf lint + go vet
 	buf lint

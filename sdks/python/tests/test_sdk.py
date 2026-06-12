@@ -215,10 +215,7 @@ def test_send_command_rich_content_roundtrip():
 
     assert decoded.rich_content.card.title == "Digest"
     assert decoded.rich_content.blocks[0].table.rows[0].cells[1] == "42"
-    assert (
-        decoded.rich_content.buttons[0].action.url
-        == "https://example.com/dashboard"
-    )
+    assert decoded.rich_content.buttons[0].action.url == "https://example.com/dashboard"
 
 
 # ---------------------------------------------------------------------------

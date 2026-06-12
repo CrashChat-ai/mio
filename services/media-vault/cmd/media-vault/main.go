@@ -26,6 +26,7 @@ import (
 	"github.com/crashchat-ai/mio/services/media-vault/internal/publisher"
 	"github.com/crashchat-ai/mio/services/media-vault/internal/storage"
 	_ "github.com/crashchat-ai/mio/services/media-vault/internal/storage/gcs" // register gcs backend
+	_ "github.com/crashchat-ai/mio/services/media-vault/internal/storage/s3"  // register s3 backend
 	"github.com/crashchat-ai/mio/services/media-vault/internal/worker"
 )
 

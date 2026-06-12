@@ -18,15 +18,19 @@ make gateway-test    # Run gateway unit tests
 
 ### Services
 
-Docker Compose (`deploy/local/docker-compose.yml`) brings up 5 services:
+Docker Compose (`deploy/local/docker-compose.yml`) brings up services:
 
 | Service | Port | Purpose | Health Check |
 |---|---|---|---|
 | `nats` | 4222 (client), 8222 (monitoring) | NATS JetStream message bus | TCP 4222 |
 | `postgres` | 5432 | Operational database (mio_app user, mio DB) | SQL query |
 | `minio` | 9000 (API), 9001 (console) | S3-compatible object storage | TCP 9000 |
+| `minio-init` | — | Creates `mio-messages` and `mio-attachments` buckets | one-shot job |
 | `gateway` | 8080 | mio-gateway service (HTTP) | GET /health |
 | `sink-gcs` | async | Archive consumer (writes to MinIO) | NATS consumer lag |
+| `media-vault` | 9090 (metrics) | Attachment persistence (profile: `media`) | GET /healthz |
+
+**media-vault** requires `--profile media`: `docker compose --profile media up`
 
 **Port collisions:** Copy `.env.example` to `.env.local`, override ports, then `export $(grep -v '^#' .env.local | xargs) && make up`.
 
@@ -521,10 +525,44 @@ Default TTL: 1 hour. Re-mint from storage_key:
 mio-media-cli signed-url gs://bucket/mio/attachments/... --ttl=1h
 ```
 
+### Storage Provider Matrix
+
+`MIO_STORAGE_BACKEND` selects the object storage implementation for media-vault.
+
+| Backend | `MIO_STORAGE_BACKEND` | Auth | Notes |
+|---|---|---|---|
+| Google Cloud Storage | `gcs` | Workload Identity (ADC) | Production default |
+| AWS S3 | `s3` | `MIO_STORAGE_S3_ACCESS_KEY` + `SECRET_KEY` | `MIO_STORAGE_S3_ENDPOINT` empty → `s3.amazonaws.com` |
+| MinIO (local dev) | `s3` | `MIO_STORAGE_S3_ACCESS_KEY` + `SECRET_KEY` | Set `MIO_STORAGE_S3_ENDPOINT=http://minio:9000`, `MIO_STORAGE_S3_USE_SSL=false` |
+| Cloudflare R2 | `s3` | R2 API token (S3-compat) | Set endpoint to your R2 S3 URL |
+| Any S3-compatible | `s3` | Static credentials | Works with any S3-API endpoint |
+
+**S3 env surface:**
+
+| Env var | Default | Description |
+|---|---|---|
+| `MIO_STORAGE_S3_ENDPOINT` | _(empty → AWS S3)_ | Host:port or `http://host:port` for non-AWS |
+| `MIO_STORAGE_S3_ACCESS_KEY` | — | Access key / API token |
+| `MIO_STORAGE_S3_SECRET_KEY` | — | Secret key |
+| `MIO_STORAGE_S3_USE_SSL` | `true` | Set `false` for plain HTTP (MinIO local) |
+| `MIO_STORAGE_S3_REGION` | _(auto-detect)_ | Region override (optional) |
+| `MIO_STORAGE_BUCKET` | — | Bucket name (required for all backends) |
+
+**Local dev with MinIO** (`docker compose --profile media up`):
+
+```bash
+MIO_STORAGE_BACKEND=s3
+MIO_STORAGE_BUCKET=mio-attachments
+MIO_STORAGE_S3_ENDPOINT=http://localhost:9000
+MIO_STORAGE_S3_ACCESS_KEY=minioadmin
+MIO_STORAGE_S3_SECRET_KEY=minioadmin
+MIO_STORAGE_S3_USE_SSL=false
+```
+
 ### Operator Notes
 
 - **7-day round-trip test:** Image must be retrievable ≥7d after receipt (verify after first deploy)
-- **Backend swap:** Add new storage backend under `services/media-vault/internal/storage/{s3,azure}/`, flip `MIO_STORAGE_BACKEND=s3`
+- **Backend swap:** Set `MIO_STORAGE_BACKEND=s3` (+ S3 env vars above) to switch from GCS to S3/MinIO without code changes.
 - **Old consumer removal:** After successful enriched-stream cutover, remove deprecated `ai-consumer` on `MESSAGES_INBOUND`:
   ```bash
   nats consumer rm MESSAGES_INBOUND ai-consumer

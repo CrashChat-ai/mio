@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/crashchat-ai/mio/pkg/channels"
+	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 	"github.com/crashchat-ai/mio/services/gateway/internal/ratelimit"
 	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
 	"github.com/crashchat-ai/mio/services/gateway/store"
-	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -120,8 +120,8 @@ func TestPool_ResolveEdit_ExplicitExternalID(t *testing.T) {
 // TestOutboundState_IntegrationWithPool: Set stores ext id; Get retrieves it.
 func TestOutboundState_IntegrationWithPool(t *testing.T) {
 	state := store.NewOutboundState()
-	state.Set("cmd-A", "ext-AAA")
-	got, ok := state.Get("cmd-A")
+	state.Set(t.Context(), "cmd-A", "acct-test", "ext-AAA")
+	got, ok := state.Get(t.Context(), "cmd-A")
 	if !ok || got != "ext-AAA" {
 		t.Fatalf("expected ext-AAA, got %s (ok=%v)", got, ok)
 	}
@@ -153,7 +153,7 @@ func TestPool_EditFallback_StateMissing(t *testing.T) {
 		EditOfMessageId: "cmd-original", // correlator
 		Text:            "final answer",
 	}
-	_, missInState := state.Get(cmd.GetEditOfMessageId())
+	_, missInState := state.Get(t.Context(), cmd.GetEditOfMessageId())
 	if missInState {
 		t.Fatal("state should be empty initially")
 	}

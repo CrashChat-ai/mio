@@ -117,7 +117,8 @@ func RunGateway(logger *slog.Logger, version string) error {
 	defer poolCancel()
 
 	rateLimiter := ratelimit.New(poolCtx, prometheus.DefaultRegisterer, logger)
-	outboundState := store.NewOutboundState()
+	outboundState := store.NewDurableOutboundState(pg, logger)
+	go outboundState.CleanupLoop(poolCtx, time.Hour, 24*time.Hour)
 
 	senderWorkers := cfg.SenderWorkers
 	pool := sender.NewPool(dispatcher, sdkClient, rateLimiter, outboundState,

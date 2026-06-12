@@ -22,10 +22,9 @@ import (
 	"time"
 
 	"github.com/crashchat-ai/mio/pkg/channels"
-	"github.com/crashchat-ai/mio/services/gateway/internal/ratelimit"
-	"github.com/crashchat-ai/mio/services/gateway/store"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 	sdk "github.com/crashchat-ai/mio/sdk-go"
+	"github.com/crashchat-ai/mio/services/gateway/internal/ratelimit"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -51,13 +50,21 @@ type PoolConfig struct {
 	Logger *slog.Logger
 }
 
+// OutboundState resolves send-command ids to platform message ids for
+// edits. Implemented by store.OutboundState (memory) and
+// store.DurableOutboundState (Postgres + cache).
+type OutboundState interface {
+	Set(ctx context.Context, sendCommandID, accountID, externalID string)
+	Get(ctx context.Context, sendCommandID string) (string, bool)
+}
+
 // Pool is the outbound sender pool. It consumes from MESSAGES_OUTBOUND,
 // applies rate limiting, and dispatches to channel adapters.
 type Pool struct {
 	dispatcher *Dispatcher
 	sdkClient  *sdk.Client
 	limiter    *ratelimit.Limiter
-	state      *store.OutboundState
+	state      OutboundState
 	cfg        PoolConfig
 	logger     *slog.Logger
 
@@ -72,7 +79,7 @@ func NewPool(
 	dispatcher *Dispatcher,
 	sdkClient *sdk.Client,
 	limiter *ratelimit.Limiter,
-	state *store.OutboundState,
+	state OutboundState,
 	cfg PoolConfig,
 	reg prometheus.Registerer,
 ) *Pool {
@@ -168,7 +175,7 @@ func (p *Pool) handle(ctx context.Context, d sdk.CommandDelivery) {
 	}
 
 	// ── 3. Resolve edit target from outbound_state ─────────────────────────
-	isEdit := p.resolveEdit(cmd, channelType)
+	isEdit := p.resolveEdit(ctx, cmd, channelType)
 
 	// ── 4. Dispatch to adapter ─────────────────────────────────────────────
 	var externalID string
@@ -183,7 +190,7 @@ func (p *Pool) handle(ctx context.Context, d sdk.CommandDelivery) {
 	// ── 5. HTTP outcome routing ────────────────────────────────────────────
 	if callErr == nil {
 		if !isEdit && externalID != "" {
-			p.state.Set(cmd.GetId(), externalID)
+			p.state.Set(ctx, cmd.GetId(), cmd.GetAccountId(), externalID)
 		}
 		p.sentTotal.WithLabelValues(channelType, "ok").Inc()
 		_ = d.Ack()
@@ -237,7 +244,7 @@ func (p *Pool) routeDeliveryError(
 // resolveEdit determines whether the command is an Edit or Send.
 // Falls back to Send (and increments metric) when outbound_state is absent.
 // Mutates cmd.EditOfExternalId when resolved from state.
-func (p *Pool) resolveEdit(cmd *miov1.SendCommand, channelType string) bool {
+func (p *Pool) resolveEdit(ctx context.Context, cmd *miov1.SendCommand, channelType string) bool {
 	if cmd.GetEditOfExternalId() != "" {
 		return true
 	}
@@ -253,7 +260,7 @@ func (p *Pool) resolveEdit(cmd *miov1.SendCommand, channelType string) bool {
 		return false
 	}
 
-	extID, ok := p.state.Get(correlator)
+	extID, ok := p.state.Get(ctx, correlator)
 	if !ok {
 		p.editFallback.WithLabelValues(channelType, "state_missing").Inc()
 		p.logger.Warn("sender: outbound_state miss — falling back to Send",

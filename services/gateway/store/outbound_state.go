@@ -1,18 +1,16 @@
-// Package store — in-memory outbound state map for two-step "thinking…" UX.
+// Package store — outbound state maps for two-step "thinking…" UX.
 //
 // OutboundState maps SendCommand.Id → platform external_id returned by the
 // first Send call. The pool uses this to resolve Edit targets when only
 // edit_of_message_id (the internal send command id) is known.
 //
-// Failure mode (documented, accepted for POC): gateway restart between the
-// initial send and the final edit clears this map. The pool falls back to a
-// fresh Send — the "thinking…" message is left dangling. Metric:
-// mio_gateway_outbound_edit_fallback_total{reason="state_missing"}.
-// Persistent storage is deferred until that metric goes non-zero in production.
+// OutboundState alone is the in-memory LRU; DurableOutboundState wraps it
+// with Postgres persistence (survives restarts, multi-replica safe).
 package store
 
 import (
 	"container/list"
+	"context"
 	"sync"
 	"time"
 )
@@ -49,7 +47,8 @@ func NewOutboundState() *OutboundState {
 }
 
 // Set stores (sendCommandID → externalID). Evicts the LRU entry if at capacity.
-func (s *OutboundState) Set(sendCommandID, externalID string) {
+// accountID is carried for interface parity with DurableOutboundState.
+func (s *OutboundState) Set(_ context.Context, sendCommandID, _, externalID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -80,7 +79,7 @@ func (s *OutboundState) Set(sendCommandID, externalID string) {
 }
 
 // Get returns (externalID, true) if found and not expired, else ("", false).
-func (s *OutboundState) Get(sendCommandID string) (string, bool) {
+func (s *OutboundState) Get(_ context.Context, sendCommandID string) (string, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

@@ -31,6 +31,8 @@ type fakeAdmin struct {
 	credential    *adminv1.GetCredentialMetadataResponse
 	disabledID    string
 	rotatedID     string
+	webhookInfo   *adminv1.GetWebhookInfoResponse
+	streamHealth  *adminv1.GetStreamHealthResponse
 }
 
 func (f *fakeAdmin) CreateTenant(_ context.Context, slug, displayName string) (*adminv1.Tenant, error) {
@@ -100,6 +102,31 @@ func (f *fakeAdmin) RotateCredential(_ context.Context, accountID string) error 
 
 func (f *fakeAdmin) TailMessages(context.Context, string, string) (adminclient.MessageStream, error) {
 	return f.stream, nil
+}
+
+func (f *fakeAdmin) GetWebhookInfo(_ context.Context, accountID string) (*adminv1.GetWebhookInfoResponse, error) {
+	if f.webhookInfo != nil {
+		return f.webhookInfo, nil
+	}
+	return &adminv1.GetWebhookInfoResponse{
+		AccountId:    accountID,
+		ChannelType:  "zoho_cliq",
+		WebhookUrl:   "https://mio.example.com/webhooks/zoho-cliq",
+		RouteAliases: []string{"/cliq"},
+		AuthKind:     "oauth2_refresh",
+		SetupHint:    "Click Start Install to begin the OAuth flow.",
+	}, nil
+}
+
+func (f *fakeAdmin) GetStreamHealth(context.Context) (*adminv1.GetStreamHealthResponse, error) {
+	if f.streamHealth != nil {
+		return f.streamHealth, nil
+	}
+	return &adminv1.GetStreamHealthResponse{
+		Consumers: []*adminv1.ConsumerHealth{
+			{ConsumerName: "sender-pool", Stream: "MESSAGES_OUTBOUND", NumPending: 0, NumAckPending: 0},
+		},
+	}, nil
 }
 
 type fakeStream struct {
@@ -269,6 +296,52 @@ func TestCredentialMetadataDoesNotExposePlaintext(t *testing.T) {
 	}
 	if !strings.Contains(body, `"keyVersion":7`) {
 		t.Fatalf("credential body: %s", body)
+	}
+}
+
+func TestWebhookInfoViewerCanRead(t *testing.T) {
+	handler, _, _ := newTestFixture(t, auth.RoleViewer)
+	cookie := loginCookie(t, handler)
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/accounts/webhook-info?account_id=a1", nil)
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: %d body=%s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `"webhookUrl"`) {
+		t.Fatalf("webhook info body: %s", body)
+	}
+	if strings.Contains(body, "accessToken") || strings.Contains(body, "refreshToken") {
+		t.Fatalf("webhook info body leaked plaintext: %s", body)
+	}
+}
+
+func TestStreamHealthViewerCanRead(t *testing.T) {
+	handler, _, _ := newTestFixture(t, auth.RoleViewer)
+	cookie := loginCookie(t, handler)
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/stream-health", nil)
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"consumers"`) {
+		t.Fatalf("stream health body: %s", rec.Body.String())
+	}
+}
+
+func TestWebhookInfoRequiresAccountID(t *testing.T) {
+	handler := newTestHandler(t)
+	cookie := loginCookie(t, handler)
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/accounts/webhook-info", nil)
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status: %d body=%s", rec.Code, rec.Body.String())
 	}
 }
 

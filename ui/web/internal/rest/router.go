@@ -69,6 +69,8 @@ func New(cfg Config) http.Handler {
 	adminMux.HandleFunc("/api/admin/installs/start", s.method(http.MethodPost, s.handleStartInstall))
 	adminMux.HandleFunc("/api/admin/installs/complete", s.method(http.MethodPost, s.handleCompleteInstall))
 	adminMux.HandleFunc("/api/admin/messages/tail", s.method(http.MethodGet, s.handleTailMessages))
+	adminMux.HandleFunc("/api/admin/accounts/webhook-info", s.method(http.MethodGet, s.handleWebhookInfo))
+	adminMux.HandleFunc("/api/admin/stream-health", s.method(http.MethodGet, s.handleStreamHealth))
 	mux.Handle("/api/admin/", s.auth.Require(adminMux))
 
 	mux.Handle("/", cfg.Assets)
@@ -578,6 +580,23 @@ type credentialMetadataJSON struct {
 	RotatedAt     string `json:"rotatedAt,omitempty"`
 }
 
+type webhookInfoJSON struct {
+	AccountID    string   `json:"accountId"`
+	ChannelType  string   `json:"channelType"`
+	WebhookURL   string   `json:"webhookUrl"`
+	RouteAliases []string `json:"routeAliases"`
+	AuthKind     string   `json:"authKind"`
+	SetupHint    string   `json:"setupHint"`
+}
+
+type consumerHealthJSON struct {
+	ConsumerName  string `json:"consumerName"`
+	Stream        string `json:"stream"`
+	NumPending    uint64 `json:"numPending"`
+	NumAckPending uint64 `json:"numAckPending"`
+	LastDelivered string `json:"lastDelivered,omitempty"`
+}
+
 func tenantToJSON(tenant *adminv1.Tenant) tenantJSON {
 	if tenant == nil {
 		return tenantJSON{}
@@ -648,6 +667,37 @@ func tailMessageToJSON(msg *adminv1.TailMessagesResponse) tailMessageJSON {
 	}
 }
 
+func webhookInfoToJSON(info *adminv1.GetWebhookInfoResponse) webhookInfoJSON {
+	if info == nil {
+		return webhookInfoJSON{}
+	}
+	aliases := info.GetRouteAliases()
+	if aliases == nil {
+		aliases = []string{}
+	}
+	return webhookInfoJSON{
+		AccountID:    info.GetAccountId(),
+		ChannelType:  info.GetChannelType(),
+		WebhookURL:   info.GetWebhookUrl(),
+		RouteAliases: aliases,
+		AuthKind:     info.GetAuthKind(),
+		SetupHint:    info.GetSetupHint(),
+	}
+}
+
+func consumerHealthToJSON(c *adminv1.ConsumerHealth) consumerHealthJSON {
+	if c == nil {
+		return consumerHealthJSON{}
+	}
+	return consumerHealthJSON{
+		ConsumerName:  c.GetConsumerName(),
+		Stream:        c.GetStream(),
+		NumPending:    c.GetNumPending(),
+		NumAckPending: c.GetNumAckPending(),
+		LastDelivered: timestamp(c.GetLastDelivered()),
+	}
+}
+
 func credentialMetadataToJSON(meta *adminv1.GetCredentialMetadataResponse) credentialMetadataJSON {
 	if meta == nil {
 		return credentialMetadataJSON{}
@@ -673,6 +723,33 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func (s *Server) handleWebhookInfo(w http.ResponseWriter, r *http.Request) {
+	accountID := strings.TrimSpace(r.URL.Query().Get("account_id"))
+	if accountID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "account_id_required"})
+		return
+	}
+	info, err := s.admin.GetWebhookInfo(r.Context(), accountID)
+	if err != nil {
+		s.writeAdminError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"webhookInfo": webhookInfoToJSON(info)})
+}
+
+func (s *Server) handleStreamHealth(w http.ResponseWriter, r *http.Request) {
+	health, err := s.admin.GetStreamHealth(r.Context())
+	if err != nil {
+		s.writeAdminError(w, err)
+		return
+	}
+	consumers := make([]consumerHealthJSON, 0, len(health.GetConsumers()))
+	for _, c := range health.GetConsumers() {
+		consumers = append(consumers, consumerHealthToJSON(c))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"consumers": consumers})
 }
 
 func writeSSEError(w http.ResponseWriter, flusher http.Flusher, code string) {

@@ -8,7 +8,7 @@ import type {
   CredentialMetadata,
   LoadState,
 } from "./types";
-import { api, jsonRequest, roleAllows, flagText, formatTime, formatDateTime } from "./types";
+import { api, jsonRequest, roleAllows, formatTime, formatDateTime } from "./types";
 import { WebhookPanel } from "./WebhookPanel";
 
 function App() {
@@ -21,12 +21,9 @@ function App() {
   const [selectedAccountID, setSelectedAccountID] = useState("");
   const [conversationID, setConversationID] = useState("");
   const [messages, setMessages] = useState<TailMessage[]>([]);
-  const [dataState, setDataState] = useState<LoadState>("idle");
-  const [accountsState, setAccountsState] = useState<LoadState>("idle");
   const [tailState, setTailState] = useState<"idle" | "connecting" | "open" | "closed">("idle");
   const [error, setError] = useState("");
   const [mutationState, setMutationState] = useState<LoadState>("idle");
-  const [tenantForm, setTenantForm] = useState({ slug: "", displayName: "" });
   const [installForm, setInstallForm] = useState({ tenantId: "", channelType: "", provider: "default" });
   const [completeInstallID, setCompleteInstallID] = useState("");
   const [lastInstall, setLastInstall] = useState<{ installId: string; oauthUrl: string; redirectUri: string } | null>(null);
@@ -116,7 +113,6 @@ function App() {
   }
 
   async function loadDashboard() {
-    setDataState("loading");
     setError("");
     try {
       const [tenantResponse, channelResponse] = await Promise.all([
@@ -125,24 +121,19 @@ function App() {
       ]);
       setTenants(tenantResponse.tenants);
       setChannels(channelResponse.channelTypes);
-      setDataState("ready");
     } catch (err) {
       setError(err instanceof Error ? err.message : "dashboard failed");
-      setDataState("error");
     }
   }
 
   async function loadAccounts(tenantID: string) {
-    setAccountsState("loading");
     try {
       const response = await api<{ accounts: Account[] }>(
         `/api/admin/accounts?tenant_id=${encodeURIComponent(tenantID)}`,
       );
       setAccounts(response.accounts);
-      setAccountsState("ready");
     } catch (err) {
       setError(err instanceof Error ? err.message : "accounts failed");
-      setAccountsState("error");
     }
   }
 
@@ -156,14 +147,6 @@ function App() {
       setError(err instanceof Error ? err.message : "mutation failed");
       setMutationState("error");
     }
-  }
-
-  async function createTenant() {
-    await runMutation(async () => {
-      await api<{ tenant: Tenant }>("/api/admin/tenants", jsonRequest("POST", tenantForm));
-      setTenantForm({ slug: "", displayName: "" });
-      await loadDashboard();
-    });
   }
 
   async function startInstall() {
@@ -369,92 +352,14 @@ function App() {
           </article>
         </section>
 
-        <section className="grid">
-          <section className="panel" id="tenants">
-            <div className="panelHeader">
-              <h2>Tenants</h2>
-              <span className={`pill ${dataState}`}>{dataState}</span>
-            </div>
-            <div className="list">
-              {tenants.map((tenant) => (
-                <button
-                  type="button"
-                  className={`rowButton ${tenant.id === selectedTenantID ? "selected" : ""}`}
-                  key={tenant.id}
-                  onClick={() => setSelectedTenantID(tenant.id)}
-                >
-                  <span>
-                    <strong>{tenant.displayName || tenant.slug}</strong>
-                    <small>{tenant.slug}</small>
-                  </span>
-                  <span className="rowMeta">{tenant.status}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="panel" id="accounts">
-            <div className="panelHeader">
-              <h2>Accounts</h2>
-              <span className={`pill ${accountsState}`}>{accountsState}</span>
-            </div>
-            <div className="toolbar">
-              <select
-                value={selectedTenantID}
-                onChange={(event) => setSelectedTenantID(event.target.value)}
-                aria-label="Tenant"
-              >
-                {tenants.map((tenant) => (
-                  <option key={tenant.id} value={tenant.id}>
-                    {tenant.displayName || tenant.slug}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="list compact">
-              {accounts.map((account) => (
-                <button
-                  type="button"
-                  className={`rowButton ${account.id === selectedAccountID ? "selected" : ""}`}
-                  key={account.id}
-                  onClick={() => setSelectedAccountID(account.id)}
-                >
-                  <span>
-                    <strong>{account.displayName || account.externalId || account.id}</strong>
-                    <small>{account.channelType} · {account.provider}</small>
-                  </span>
-                  <span className="rowMeta">{account.disabledAt ? "disabled" : "active"}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        </section>
-
         {canMutate && (
           <section className="grid" id="manage">
             <section className="panel">
               <div className="panelHeader">
-                <h2>Tenant and install</h2>
+                <h2>Channel install</h2>
                 <span className={`pill ${mutationState}`}>{mutationState}</span>
               </div>
               <div className="formStack">
-                <div className="fieldGrid">
-                  <input
-                    value={tenantForm.slug}
-                    onChange={(event) => setTenantForm((current) => ({ ...current, slug: event.target.value }))}
-                    placeholder="tenant-slug"
-                    aria-label="Tenant slug"
-                  />
-                  <input
-                    value={tenantForm.displayName}
-                    onChange={(event) => setTenantForm((current) => ({ ...current, displayName: event.target.value }))}
-                    placeholder="Display name"
-                    aria-label="Tenant display name"
-                  />
-                  <button type="button" onClick={() => void createTenant()} disabled={mutationState === "loading" || !tenantForm.slug.trim()}>
-                    Create tenant
-                  </button>
-                </div>
                 <div className="fieldGrid">
                   <select
                     value={installForm.tenantId}
@@ -590,35 +495,23 @@ function App() {
         <WebhookPanel selectedAccount={selectedAccount} operatorRole={operatorRole} />
 
         <section className="grid">
-          <section className="panel" id="channels">
-            <div className="panelHeader">
-              <h2>Channel types</h2>
-              <span>{channels.length}</span>
-            </div>
-            <div className="table">
-              <div className="tableHead">
-                <span>Slug</span>
-                <span>Auth</span>
-                <span>Rate</span>
-                <span>Flags</span>
-              </div>
-              {channels.map((channel) => (
-                <div className="tableRow" key={channel.slug}>
-                  <span>{channel.slug}</span>
-                  <span>{channel.authKind || "none"}</span>
-                  <span>{channel.rateLimitPerSecond || 0}/s {channel.rateLimitScope}</span>
-                  <span>{flagText(channel)}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-
           <section className="panel" id="tail">
             <div className="panelHeader">
               <h2>Live tail</h2>
               <span className={`pill ${tailState}`}>{tailState}</span>
             </div>
             <div className="tailControls">
+              <select
+                value={selectedTenantID}
+                onChange={(event) => setSelectedTenantID(event.target.value)}
+                aria-label="Tenant"
+              >
+                {tenants.map((tenant) => (
+                  <option key={tenant.id} value={tenant.id}>
+                    {tenant.displayName || tenant.slug}
+                  </option>
+                ))}
+              </select>
               <select
                 value={selectedAccountID}
                 onChange={(event) => setSelectedAccountID(event.target.value)}

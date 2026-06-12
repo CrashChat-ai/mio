@@ -70,7 +70,7 @@ func (s *AdminServer) GetStreamHealth(ctx context.Context, _ *connect.Request[ad
 	js := s.SDK.JetStream()
 	out := &adminv1.GetStreamHealthResponse{}
 
-	for _, streamName := range []string{store.StreamInbound, store.StreamOutbound} {
+	for _, streamName := range []string{store.StreamInbound, store.StreamInboundEnriched, store.StreamOutbound} {
 		stream, err := js.Stream(ctx, streamName)
 		if err != nil {
 			s.Logger.Warn("admin: stream health: stream lookup failed", "stream", streamName, "error", err)

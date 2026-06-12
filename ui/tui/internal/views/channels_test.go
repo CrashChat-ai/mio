@@ -28,6 +28,12 @@ func (f *fakeAdmin) TailMessages(context.Context, string, string) (<-chan *admin
 	close(ch)
 	return ch, nil
 }
+func (f *fakeAdmin) GetWebhookInfo(context.Context, string) (*adminv1.GetWebhookInfoResponse, error) {
+	return &adminv1.GetWebhookInfoResponse{}, nil
+}
+func (f *fakeAdmin) GetStreamHealth(context.Context) (*adminv1.GetStreamHealthResponse, error) {
+	return &adminv1.GetStreamHealthResponse{}, nil
+}
 
 func TestChannelsModel_FoldsLoadedMsg(t *testing.T) {
 	fake := &fakeAdmin{channels: []*adminv1.ChannelTypeInfo{

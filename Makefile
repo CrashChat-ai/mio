@@ -121,6 +121,8 @@ ui-web-install: ## Install web admin app dependencies
 ui-web-build: ui-web-install ## Build the web admin shell and mio-web binary
 	$(BUF) generate proto
 	pnpm --dir ui/web/app build
+	rm -rf ui/web/internal/embed/dist && mkdir -p ui/web/internal/embed/dist
+	cp -R ui/web/app/dist/. ui/web/internal/embed/dist/
 	go build -o ./bin/mio-web ./ui/web/cmd/mio-web
 
 ui-web-test: ui-web-install ## Run web admin shell tests

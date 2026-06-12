@@ -38,6 +38,8 @@ type Config struct {
 	PgxMaxConns    int    // MIO_PGX_MAX_CONNS, default (GOMAXPROCS*2)+1
 	MigrateOnStart bool   // MIO_MIGRATE_ON_START, default true
 
+	PublicBaseURL string // MIO_PUBLIC_BASE_URL, e.g. https://mio.example.com (no trailing slash)
+
 	// Secrets (file-mounted)
 	CliqWebhookSecret string // /etc/mio/secrets/cliq-webhook-secret
 }
@@ -70,6 +72,7 @@ func Load() (*Config, error) {
 		PostgresDSN:         envStr("MIO_POSTGRES_DSN", ""),
 		PgxMaxConns:         envInt("MIO_PGX_MAX_CONNS", (runtime.GOMAXPROCS(0)*2)+1),
 		MigrateOnStart:      envBool("MIO_MIGRATE_ON_START", true),
+		PublicBaseURL:       envStr("MIO_PUBLIC_BASE_URL", ""),
 	}
 
 	// Load secrets from file mounts.

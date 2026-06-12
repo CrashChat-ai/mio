@@ -93,6 +93,65 @@ func TestNormalize_ThreadReply(t *testing.T) {
 	}
 }
 
+func TestNormalize_ThreadReply_SnapshotAttributes(t *testing.T) {
+	body := loadFixture(t, "2026-05-07T22-06-22-channel-thread-reply.json")
+	payload, err := ParseWebhookPayload(body)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	nm, err := Normalize(payload)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+
+	wantAttrs := map[string]string{
+		"cliq_replied_message_id":          "1778170007565%2039466508029614",
+		"cliq_replied_message_text":        "Edited message content for testing purposes",
+		"cliq_replied_message_sender_id":   "100000002",
+		"cliq_replied_message_sender_name": "Test Editor",
+		"cliq_replied_message_time":        "1778170007565",
+		"cliq_replied_message_type":        "text",
+	}
+	for k, want := range wantAttrs {
+		got, ok := nm.Attributes[k]
+		if !ok {
+			t.Errorf("attribute %q missing", k)
+			continue
+		}
+		if got != want {
+			t.Errorf("attribute %q = %q, want %q", k, got, want)
+		}
+	}
+}
+
+func TestNormalize_PlainMessage_NoRelationAttributes(t *testing.T) {
+	body := loadFixture(t, "2026-05-03T10-38-07-channel-text.json")
+	payload, err := ParseWebhookPayload(body)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	nm, err := Normalize(payload)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	if nm.ParentExternalID != "" {
+		t.Error("plain message must have empty ParentExternalID")
+	}
+	replyAttrs := []string{
+		"cliq_replied_message_id",
+		"cliq_replied_message_text",
+		"cliq_replied_message_sender_id",
+		"cliq_replied_message_sender_name",
+		"cliq_replied_message_time",
+		"cliq_replied_message_type",
+	}
+	for _, k := range replyAttrs {
+		if _, ok := nm.Attributes[k]; ok {
+			t.Errorf("plain message must not have attribute %q", k)
+		}
+	}
+}
+
 func TestNormalize_DM(t *testing.T) {
 	body := loadFixture(t, "2026-05-03T05-40-13-dm-to-bot.json")
 	payload, err := ParseWebhookPayload(body)

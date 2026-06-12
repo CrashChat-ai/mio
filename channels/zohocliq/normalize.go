@@ -15,6 +15,7 @@ package zohocliq
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
@@ -83,13 +84,14 @@ type FileObj struct {
 
 // UserObj is the message sender from Cliq.
 type UserObj struct {
-	ID         string `json:"id,omitempty"`
-	Name       string `json:"name,omitempty"`
-	FirstName  string `json:"first_name,omitempty"`
-	LastName   string `json:"last_name,omitempty"`
-	IsBot      bool   `json:"is_bot,omitempty"`
-	ZohoUserID string `json:"zoho_user_id,omitempty"`
-	Email      string `json:"email,omitempty"`
+	ID             string `json:"id,omitempty"`
+	Name           string `json:"name,omitempty"`
+	FirstName      string `json:"first_name,omitempty"`
+	LastName       string `json:"last_name,omitempty"`
+	IsBot          bool   `json:"is_bot,omitempty"`
+	ZohoUserID     string `json:"zoho_user_id,omitempty"`
+	Email          string `json:"email,omitempty"`
+	OrganizationID string `json:"organization_id,omitempty"`
 }
 
 // ChatObj holds conversation metadata.
@@ -207,8 +209,26 @@ func Normalize(p *WebhookPayload) (*NormalizedMessage, error) {
 
 	// --- Thread parent ref (FINDINGS.md Q3) ---
 	if msg.RepliedMessage != nil && msg.RepliedMessage.ID != "" {
-		nm.ParentExternalID = msg.RepliedMessage.ID
-		nm.Attributes["cliq_replied_message_id"] = msg.RepliedMessage.ID
+		rm := msg.RepliedMessage
+		nm.ParentExternalID = rm.ID
+		nm.Attributes["cliq_replied_message_id"] = rm.ID
+		if rm.Text != "" {
+			nm.Attributes["cliq_replied_message_text"] = rm.Text
+		}
+		if rm.Sender != nil {
+			if rm.Sender.ID != "" {
+				nm.Attributes["cliq_replied_message_sender_id"] = rm.Sender.ID
+			}
+			if rm.Sender.Name != "" {
+				nm.Attributes["cliq_replied_message_sender_name"] = rm.Sender.Name
+			}
+		}
+		if rm.Time != 0 {
+			nm.Attributes["cliq_replied_message_time"] = strconv.FormatInt(rm.Time, 10)
+		}
+		if rm.Type != "" {
+			nm.Attributes["cliq_replied_message_type"] = rm.Type
+		}
 	}
 
 	// --- Sender (FINDINGS.md Q4) ---
@@ -246,6 +266,11 @@ func Normalize(p *WebhookPayload) (*NormalizedMessage, error) {
 
 	// --- Operation → attributes (for consumers that care) ---
 	nm.Attributes["cliq_operation"] = p.Operation
+
+	// --- Workspace key for multi-account routing ---
+	if p.User != nil && p.User.OrganizationID != "" {
+		nm.Attributes["cliq_org_id"] = p.User.OrganizationID
+	}
 
 	if nm.ConversationExternalID == "" {
 		return nil, fmt.Errorf("zohocliq: normalize: empty conversation external_id")

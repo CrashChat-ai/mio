@@ -164,10 +164,22 @@ func TestConfigFromEnv_MissingBucket(t *testing.T) {
 }
 
 func TestConfigFromEnv_InvalidBackend(t *testing.T) {
-	t.Setenv("SINK_BACKEND", "s3")
+	t.Setenv("SINK_BACKEND", "azure")
 	t.Setenv("SINK_BUCKET", "mio-messages")
 	if _, err := writer.ConfigFromEnv(); err == nil {
-		t.Error("expected error for unknown backend 's3'")
+		t.Error("expected error for unknown backend 'azure'")
+	}
+}
+
+func TestConfigFromEnv_S3Alias(t *testing.T) {
+	t.Setenv("SINK_BACKEND", "s3")
+	t.Setenv("SINK_BUCKET", "mio-messages")
+	cfg, err := writer.ConfigFromEnv()
+	if err != nil {
+		t.Fatalf("expected s3 alias to be valid, got: %v", err)
+	}
+	if cfg.Backend != writer.BackendMinIO {
+		t.Errorf("s3 alias should resolve to BackendMinIO, got %q", cfg.Backend)
 	}
 }
 

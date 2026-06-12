@@ -230,5 +230,73 @@ func TestReceivedAtDrivesPartition(t *testing.T) {
 	}
 }
 
+// TestNDJSONRoundtrip_RelationReply verifies that a reply message carries the
+// relation block through the NDJSON encode path and that all four fields emit
+// with the correct snake_case names.
+func TestNDJSONRoundtrip_RelationReply(t *testing.T) {
+	msg := &miov1.Message{
+		Id:              "msg-reply-001",
+		SchemaVersion:   1,
+		TenantId:        "t1",
+		AccountId:       "a1",
+		ChannelType:     "zoho_cliq",
+		ConversationId:  "conv-1",
+		SourceMessageId: "src-reply-1",
+		ReceivedAt:      timestamppb.New(time.Date(2026, 5, 8, 12, 0, 0, 0, time.UTC)),
+		Relation: &miov1.MessageRelation{
+			Kind:             miov1.MessageRelation_KIND_REPLY,
+			TargetExternalId: "src-parent-1",
+		},
+	}
+
+	line, err := encode.ToNDJSONLine(msg)
+	if err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	s := string(line)
+
+	for _, want := range []string{
+		`"relation"`,
+		`"kind":"KIND_REPLY"`,
+		`"target_external_id":"src-parent-1"`,
+	} {
+		if !contains(s, want) {
+			t.Errorf("expected %q in NDJSON line, got: %s", want, s)
+		}
+	}
+	if contains(s, `"target_message_id"`) {
+		t.Error("empty target_message_id should be omitted with EmitUnpopulated=false")
+	}
+	if contains(s, `"reaction_emoji"`) {
+		t.Error("empty reaction_emoji should be omitted with EmitUnpopulated=false")
+	}
+}
+
+// TestNDJSONRoundtrip_PlainMessage_NoRelation verifies that a plain message
+// with no relation set emits no "relation" key in the NDJSON line.
+func TestNDJSONRoundtrip_PlainMessage_NoRelation(t *testing.T) {
+	msg := &miov1.Message{
+		Id:              "msg-plain-001",
+		SchemaVersion:   1,
+		TenantId:        "t1",
+		AccountId:       "a1",
+		ChannelType:     "zoho_cliq",
+		ConversationId:  "conv-1",
+		SourceMessageId: "src-plain-1",
+		Text:            "hello world",
+		ReceivedAt:      timestamppb.New(time.Date(2026, 5, 8, 12, 0, 0, 0, time.UTC)),
+	}
+
+	line, err := encode.ToNDJSONLine(msg)
+	if err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	s := string(line)
+
+	if contains(s, `"relation"`) {
+		t.Errorf("plain message must not emit relation field, got: %s", s)
+	}
+}
+
 // Compile-time check that the encode package is importable.
 var _ = context.Background

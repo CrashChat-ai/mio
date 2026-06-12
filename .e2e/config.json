@@ -1,0 +1,25 @@
+{
+  "name": "mio-operator-stack",
+  "baseUrl": "http://localhost:18081",
+  "profile": "mio-e2e",
+  "boot": {
+    "up": "set -a; source /tmp/mio-e2e.env; set +a; docker compose -f deploy/local/docker-compose.yml --profile operator --profile media up -d",
+    "down": "docker compose -f deploy/local/docker-compose.yml --profile operator --profile media down"
+  },
+  "health": [
+    { "url": "http://localhost:18080/healthz", "expect": 200 },
+    { "url": "http://localhost:19090/healthz", "expect": 200 },
+    { "url": "http://localhost:18081/healthz", "expect": 200 }
+  ],
+  "checks": [
+    { "name": "nats", "cmd": "curl -sf http://localhost:18222/healthz" },
+    { "name": "minio", "cmd": "curl -sf http://localhost:19000/minio/health/live" }
+  ],
+  "auth": {
+    "strategy": "form",
+    "probeUrl": "http://localhost:18081/",
+    "loginUrlPattern": "/login",
+    "loginUrl": "http://localhost:18081/login",
+    "notes": "MIO_WEB_AUTH_MODE=dev — dev login button signs in as operator@localhost (credential-admin); no real credentials"
+  }
+}

@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/crashchat-ai/mio/channels/zohocliq"
+	"github.com/crashchat-ai/mio/pkg/channels"
+	sdk "github.com/crashchat-ai/mio/sdk-go"
 	"github.com/crashchat-ai/mio/services/gateway/internal/health"
 	"github.com/crashchat-ai/mio/services/gateway/store"
-	sdk "github.com/crashchat-ai/mio/sdk-go"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,17 +21,23 @@ import (
 
 // Config holds runtime knobs for the HTTP server layer.
 type Config struct {
-	TenantID          string
-	AccountID         string
-	CliqWebhookSecret []byte // empty = dev mode (no sig verify)
-	Logger            *slog.Logger
+	// TenantID/AccountID are the env-identity fallback used when DB
+	// resolution finds no account. Optional once accounts exist.
+	TenantID  string
+	AccountID string
+	// Accounts resolves webhooks to installed accounts; nil = env-only.
+	Accounts AccountResolver
+	// WebhookSecrets maps channel_type → file-mounted signing secret.
+	// Missing/empty entry = dev mode for that channel (no sig verify).
+	WebhookSecrets map[string][]byte
+	Logger         *slog.Logger
 }
 
 // New constructs and returns a chi router with all routes registered.
 // Middleware order (outermost → innermost): logging → recovery → Prometheus.
-// The URL slug /webhooks/zoho-cliq maps to registry key zoho_cliq via
-// strings.ReplaceAll(slug, "-", "_") — two slugs by design (URL hyphen,
-// internal underscore per arch contract and master Revisions 11:45).
+// Webhook routes are mounted from the adapter registry: /webhooks/<slug>
+// (URL hyphen → registry underscore) plus any adapter-declared aliases.
+// Core stays channel-blind — adding a channel touches zero files here.
 func New(
 	pg *pgxpool.Pool,
 	nc *nats.Conn,
@@ -66,54 +72,75 @@ func New(
 		prometheus.DefaultGatherer, promhttp.HandlerOpts{EnableOpenMetrics: true},
 	))
 
-	// Webhook routes. URL uses hyphen (web convention); router maps to registry
-	// slug (underscore) via strings.ReplaceAll. For a single channel this is a
-	// direct mapping; the pattern generalises for future adapters.
-	zohoCliqDeps := buildZohoCliqDeps(pg, sdkClient, cfg, m)
+	pipelines := buildWebhookPipelines(pg, sdkClient, cfg, m, r)
+
 	r.Post("/webhooks/{channel}", func(w http.ResponseWriter, r *http.Request) {
-		urlSlug := chi.URLParam(r, "channel")
-		registrySlug := strings.ReplaceAll(urlSlug, "-", "_")
-
-		switch registrySlug {
-		case "zoho_cliq":
-			zohocliq.Handler(zohoCliqDeps).ServeHTTP(w, r)
-		default:
+		registrySlug := strings.ReplaceAll(chi.URLParam(r, "channel"), "-", "_")
+		p, ok := pipelines[registrySlug]
+		if !ok {
 			http.Error(w, `{"error":"unknown channel"}`, http.StatusNotFound)
+			return
 		}
+		p.ServeHTTP(w, r)
 	})
-
-	// Server-side alias: /cliq → zoho_cliq handler. Keeps ingress path simple
-	// (no rewrite annotations) and matches the locked Cliq webhook URL.
-	r.Post("/cliq", zohocliq.Handler(zohoCliqDeps).ServeHTTP)
 
 	return r
 }
 
-// buildZohoCliqDeps wires Zoho Cliq handler dependencies once so both the
-// generic /webhooks/{channel} route and the /cliq alias share the same deps.
-func buildZohoCliqDeps(
+// buildWebhookPipelines constructs one pipeline per registered adapter with
+// inbound support, injects its secret, and mounts adapter-declared route
+// aliases on the router.
+func buildWebhookPipelines(
 	pg *pgxpool.Pool,
 	sdkClient *sdk.Client,
 	cfg Config,
 	m *gatewayMetrics,
-) zohocliq.HandlerDeps {
-	return zohocliq.HandlerDeps{
-		Store:     store.NewInboundStore(pg),
-		SDK:       sdkClient,
-		TenantID:  cfg.TenantID,
-		AccountID: cfg.AccountID,
-		Secret:    cfg.CliqWebhookSecret,
-		IncInbound: func(direction, outcome string) {
-			m.incInbound("zoho_cliq", direction, outcome)
-		},
-		ObserveLatency: func(direction, outcome string, secs float64) {
-			m.observeLatency("zoho_cliq", direction, outcome, secs)
-		},
-		IncDedup: func() {
-			m.incDedup("zoho_cliq")
-		},
-		Logger: cfg.Logger,
+	r chi.Router,
+) map[string]*webhookPipeline {
+	pipelines := make(map[string]*webhookPipeline)
+	inboundStore := store.NewInboundStore(pg)
+
+	for _, adapter := range channels.RegisteredAdapters() {
+		inbound := adapter.Inbound()
+		if inbound == nil {
+			continue
+		}
+		channelType := adapter.ChannelType()
+
+		secret := cfg.WebhookSecrets[channelType]
+		if secret == nil {
+			// Empty non-nil = deliberate dev mode (adapters accept all);
+			// nil would read as "not configured" and 401 everything.
+			secret = []byte{}
+		}
+		if sc, ok := inbound.(channels.SecretConfigurable); ok {
+			inbound = sc.WithSecret(secret)
+		}
+		if len(secret) == 0 {
+			cfg.Logger.Warn("webhook: SECRET UNSET — accepting all requests (dev only)",
+				"channel", channelType)
+		}
+
+		p := &webhookPipeline{
+			channelType: channelType,
+			inbound:     inbound,
+			store:       inboundStore,
+			pub:         sdkClient,
+			accounts:    cfg.Accounts,
+			tenantID:    cfg.TenantID,
+			accountID:   cfg.AccountID,
+			metrics:     m,
+			logger:      cfg.Logger,
+		}
+		pipelines[channelType] = p
+
+		if ra, ok := inbound.(channels.RouteAliaser); ok {
+			for _, alias := range ra.RouteAliases() {
+				r.Post(alias, p.ServeHTTP)
+			}
+		}
 	}
+	return pipelines
 }
 
 // slogMiddleware logs each request with method, path, status, duration.

@@ -48,6 +48,7 @@ type Backend string
 const (
 	BackendGCS   Backend = "gcs"
 	BackendMinIO Backend = "minio"
+	BackendS3    Backend = "s3" // alias for BackendMinIO
 )
 
 // Config holds the storage backend configuration derived from environment.
@@ -72,8 +73,11 @@ func ConfigFromEnv() (*Config, error) {
 	if backend == "" {
 		backend = BackendMinIO // default for local dev
 	}
+	if backend == BackendS3 {
+		backend = BackendMinIO
+	}
 	if backend != BackendGCS && backend != BackendMinIO {
-		return nil, fmt.Errorf("writer: SINK_BACKEND must be 'gcs' or 'minio', got %q", backend)
+		return nil, fmt.Errorf("writer: SINK_BACKEND must be 'gcs', 'minio', or 's3', got %q", backend)
 	}
 
 	bucket := os.Getenv("SINK_BUCKET")
@@ -114,7 +118,7 @@ func New(ctx context.Context, cfg *Config) (Writer, error) {
 	switch cfg.Backend {
 	case BackendGCS:
 		return newGCSWriter(ctx, cfg)
-	case BackendMinIO:
+	case BackendMinIO, BackendS3:
 		return newMinIOWriter(ctx, cfg)
 	default:
 		return nil, fmt.Errorf("writer: unknown backend %q", cfg.Backend)

@@ -24,6 +24,9 @@ import (
 const (
 	StreamInbound  = "MESSAGES_INBOUND"
 	StreamOutbound = "MESSAGES_OUTBOUND"
+	// StreamInboundEnriched is provisioned by media-vault, not the gateway;
+	// named here so health/admin views can observe its consumers.
+	StreamInboundEnriched = "MESSAGES_INBOUND_ENRICHED"
 )
 
 // EnsureStreams provisions MESSAGES_INBOUND and MESSAGES_OUTBOUND with

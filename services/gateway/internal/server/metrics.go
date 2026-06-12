@@ -9,9 +9,10 @@ import (
 // Label set is exactly {channel_type, direction, outcome} — no account_id,
 // no conversation_id (cardinality discipline per arch-doc §10).
 type gatewayMetrics struct {
-	inboundTotal   *prometheus.CounterVec
-	inboundLatency *prometheus.HistogramVec
-	dedupTotal     *prometheus.CounterVec
+	inboundTotal    *prometheus.CounterVec
+	inboundLatency  *prometheus.HistogramVec
+	dedupTotal      *prometheus.CounterVec
+	unroutableTotal *prometheus.CounterVec
 }
 
 func newGatewayMetrics(reg prometheus.Registerer) *gatewayMetrics {
@@ -32,6 +33,11 @@ func newGatewayMetrics(reg prometheus.Registerer) *gatewayMetrics {
 			Name: "mio_idempotency_dedup_total",
 			Help: "Total duplicate messages suppressed by (account_id, source_message_id) check.",
 		}, []string{"channel_type"}),
+
+		unroutableTotal: factory.NewCounterVec(prometheus.CounterOpts{
+			Name: "mio_gateway_unroutable_webhook_total",
+			Help: "Webhooks soft-dropped because no account matched and no env identity was set.",
+		}, []string{"channel_type"}),
 	}
 }
 
@@ -45,4 +51,8 @@ func (m *gatewayMetrics) observeLatency(channelType, direction, outcome string, 
 
 func (m *gatewayMetrics) incDedup(channelType string) {
 	m.dedupTotal.WithLabelValues(channelType).Inc()
+}
+
+func (m *gatewayMetrics) incUnroutable(channelType string) {
+	m.unroutableTotal.WithLabelValues(channelType).Inc()
 }

@@ -1,4 +1,4 @@
-.PHONY: help up down operator-web-up proto proto-gen proto-lint proto-breaking proto-roundtrip sdk-go-test sdk-py-test sink-gcs-test sink-gcs-build-local sink-gcs-build lint docs-check test clean gateway-build gateway-build-local gateway-test gateway-migrate gateway-bench-outbound admin-build admin-run admin-test tui-build tui-run tui-test ui-web-install ui-web-build ui-web-test docker-mio-web echo-up echo-logs echo-consumer-test helm-lint helm-template kind-up kind-deploy kind-smoke kind-down
+.PHONY: help up down operator-web-up proto proto-gen proto-lint proto-breaking proto-roundtrip proto-stubs-python sdk-go-test sdk-py-test sink-gcs-test sink-gcs-build-local sink-gcs-build lint docs-check test clean gateway-build gateway-build-local gateway-test gateway-migrate gateway-bench-outbound admin-build admin-run admin-test tui-build tui-run tui-test ui-web-install ui-web-build ui-web-test docker-mio-web echo-up echo-logs echo-consumer-test helm-lint helm-template kind-up kind-deploy kind-smoke kind-down
 
 COMPOSE := docker compose -f deploy/local/docker-compose.yml
 BUILD_VERSION := $(shell git describe --always --dirty 2>/dev/null || echo dev)
@@ -42,6 +42,12 @@ proto-roundtrip: ## Run Go+Python proto round-trip test (pipes bytes; both must 
 	@echo "==> Go half: marshal + subject-token validator"
 	go run ./tools/proto-roundtrip/
 
+proto-stubs-python: ## Emit Python proto stubs to dist/py-stubs (gitignored; for consumer vendoring)
+	@mkdir -p dist/py-stubs
+	buf generate \
+		--template '{"version":"v2","plugins":[{"remote":"buf.build/protocolbuffers/python","out":"dist/py-stubs"}]}'
+	@echo "==> Python stubs written to dist/py-stubs/"
+
 lint: ## Run buf lint + go vet
 	buf lint
 	go vet ./...
@@ -73,12 +79,17 @@ gateway-migrate: ## Run database migrations manually via gateway CLI
 gateway-bench-outbound: ## Fairness bench: burst account A (50/s), assert account B p99 < 2s
 	go test ./services/gateway/integration_test/... -run TestFairness -v -timeout 30s
 
-gateway-dispatch-lint: ## CI guard: dispatch.go must have zero channel-specific branches
+gateway-dispatch-lint: ## CI guard: gateway core must have zero channel-specific branches
 	@test -f services/gateway/internal/sender/dispatch.go || \
 		(echo "ERROR: services/gateway/internal/sender/dispatch.go not found — repo layout drift"; exit 1)
 	@! grep -E 'zoho|slack|cliq|telegram|discord' services/gateway/internal/sender/dispatch.go && \
 		echo "dispatch.go: clean (no adapter-specific branches)" || \
 		(echo "ERROR: adapter-specific branch found in dispatch.go — P9 litmus FAIL"; exit 1)
+	@! grep -rE 'zoho|slack|cliq|telegram|discord' --include='*.go' \
+		--exclude='*_test.go' \
+		services/gateway/internal/server services/gateway/internal/config services/gateway/internal/runtime && \
+		echo "server/config/runtime: clean (no adapter-specific branches)" || \
+		(echo "ERROR: adapter-specific reference found in gateway core — purity FAIL"; exit 1)
 
 admin-build: ## Build the admin connect-go server binary
 	go build -o ./bin/mio-admin ./services/gateway/cmd/admin

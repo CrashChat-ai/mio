@@ -8,9 +8,12 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/crashchat-ai/mio/pkg/channels"
 )
 
-const secretsDir = "/etc/mio/secrets"
+// secretsDir is a var so tests can point it at a tempdir.
+var secretsDir = "/etc/mio/secrets"
 
 // Config holds all gateway configuration. Non-secret values come from env
 // vars; secrets are read from file mounts (never env vars).
@@ -38,8 +41,10 @@ type Config struct {
 	PgxMaxConns    int    // MIO_PGX_MAX_CONNS, default (GOMAXPROCS*2)+1
 	MigrateOnStart bool   // MIO_MIGRATE_ON_START, default true
 
-	// Secrets (file-mounted)
-	CliqWebhookSecret string // /etc/mio/secrets/cliq-webhook-secret
+	// Webhook signing secrets keyed by channel_type, file-mounted from
+	// secretsDir. Names come from each adapter's SecretNamer (fallback:
+	// channels.DefaultWebhookSecretName). Missing file = dev mode.
+	WebhookSecrets map[string]string
 }
 
 // validEnvs is the allowlist for MIO_ENV. Unknown values are rejected loud
@@ -72,19 +77,16 @@ func Load() (*Config, error) {
 		MigrateOnStart:      envBool("MIO_MIGRATE_ON_START", true),
 	}
 
-	// Load secrets from file mounts.
-	secret, err := readSecret("cliq-webhook-secret")
+	secrets, err := loadWebhookSecrets()
 	if err != nil {
-		return nil, fmt.Errorf("config: cliq-webhook-secret: %w", err)
+		return nil, err
 	}
-	cfg.CliqWebhookSecret = secret
+	cfg.WebhookSecrets = secrets
 
-	// Validate required fields.
-	if cfg.TenantID == "" {
-		return nil, fmt.Errorf("config: MIO_TENANT_ID is required")
-	}
-	if cfg.AccountID == "" {
-		return nil, fmt.Errorf("config: MIO_ACCOUNT_ID is required")
+	// Validate required fields. Tenant/account identity is optional here:
+	// the runtime enforces "env identity OR at least one enabled account".
+	if (cfg.TenantID == "") != (cfg.AccountID == "") {
+		return nil, fmt.Errorf("config: MIO_TENANT_ID and MIO_ACCOUNT_ID must be set together")
 	}
 	if cfg.PostgresDSN == "" {
 		return nil, fmt.Errorf("config: MIO_POSTGRES_DSN is required")
@@ -94,6 +96,34 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// loadWebhookSecrets reads each registered inbound adapter's signing secret,
+// first matching name wins. Adapters without inbound support are skipped;
+// binaries that don't blank-import channel packages load none.
+func loadWebhookSecrets() (map[string]string, error) {
+	secrets := make(map[string]string)
+	for _, adapter := range channels.RegisteredAdapters() {
+		inbound := adapter.Inbound()
+		if inbound == nil {
+			continue
+		}
+		names := []string{channels.DefaultWebhookSecretName(adapter.ChannelType())}
+		if sn, ok := inbound.(channels.SecretNamer); ok {
+			names = sn.WebhookSecretNames()
+		}
+		for _, name := range names {
+			secret, err := readSecret(name)
+			if err != nil {
+				return nil, fmt.Errorf("config: %s: %w", name, err)
+			}
+			if secret != "" {
+				secrets[adapter.ChannelType()] = secret
+				break
+			}
+		}
+	}
+	return secrets, nil
 }
 
 // readSecret reads a secret file from secretsDir, returning its trimmed content.

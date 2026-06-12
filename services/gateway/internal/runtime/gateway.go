@@ -27,12 +27,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/crashchat-ai/mio/pkg/channels"
+	sdk "github.com/crashchat-ai/mio/sdk-go"
 	"github.com/crashchat-ai/mio/services/gateway/internal/config"
 	"github.com/crashchat-ai/mio/services/gateway/internal/ratelimit"
 	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
 	"github.com/crashchat-ai/mio/services/gateway/internal/server"
 	"github.com/crashchat-ai/mio/services/gateway/store"
-	sdk "github.com/crashchat-ai/mio/sdk-go"
 )
 
 // RunGateway runs the gateway HTTP server + sender pool until SIGTERM.
@@ -117,7 +117,8 @@ func RunGateway(logger *slog.Logger, version string) error {
 	defer poolCancel()
 
 	rateLimiter := ratelimit.New(poolCtx, prometheus.DefaultRegisterer, logger)
-	outboundState := store.NewOutboundState()
+	outboundState := store.NewDurableOutboundState(pg, logger)
+	go outboundState.CleanupLoop(poolCtx, time.Hour, 24*time.Hour)
 
 	senderWorkers := cfg.SenderWorkers
 	pool := sender.NewPool(dispatcher, sdkClient, rateLimiter, outboundState,
@@ -128,6 +129,7 @@ func RunGateway(logger *slog.Logger, version string) error {
 		},
 		prometheus.DefaultRegisterer,
 	)
+	pool.SetRateProvider(store.NewAccountRateCache(pg))
 
 	poolErrCh := make(chan error, 1)
 	go func() {
@@ -138,11 +140,26 @@ func RunGateway(logger *slog.Logger, version string) error {
 	}()
 	logger.Info("sender: pool started", "workers", senderWorkers)
 
+	if cfg.TenantID == "" {
+		hasAccounts, err := store.HasEnabledAccounts(ctx, pg)
+		if err != nil {
+			return fmt.Errorf("accounts: %w", err)
+		}
+		if !hasAccounts {
+			return fmt.Errorf("identity: set MIO_TENANT_ID/MIO_ACCOUNT_ID or create an account (admin CreateAccount)")
+		}
+	}
+
+	webhookSecrets := make(map[string][]byte, len(cfg.WebhookSecrets))
+	for channelType, secret := range cfg.WebhookSecrets {
+		webhookSecrets[channelType] = []byte(secret)
+	}
 	serverCfg := server.Config{
-		TenantID:          cfg.TenantID,
-		AccountID:         cfg.AccountID,
-		CliqWebhookSecret: []byte(cfg.CliqWebhookSecret),
-		Logger:            logger,
+		TenantID:       cfg.TenantID,
+		AccountID:      cfg.AccountID,
+		Accounts:       store.NewAccountResolver(pg, logger),
+		WebhookSecrets: webhookSecrets,
+		Logger:         logger,
 	}
 	handler := server.New(pg, nc, sdkClient, serverCfg, prometheus.DefaultRegisterer)
 

@@ -1,18 +1,16 @@
-// Package store — in-memory outbound state map for two-step "thinking…" UX.
+// Package store — outbound state maps for two-step "thinking…" UX.
 //
 // OutboundState maps SendCommand.Id → platform external_id returned by the
 // first Send call. The pool uses this to resolve Edit targets when only
 // edit_of_message_id (the internal send command id) is known.
 //
-// Failure mode (documented, accepted for POC): gateway restart between the
-// initial send and the final edit clears this map. The pool falls back to a
-// fresh Send — the "thinking…" message is left dangling. Metric:
-// mio_gateway_outbound_edit_fallback_total{reason="state_missing"}.
-// Persistent storage is deferred until that metric goes non-zero in production.
+// OutboundState alone is the in-memory LRU; DurableOutboundState wraps it
+// with Postgres persistence (survives restarts, multi-replica safe).
 package store
 
 import (
 	"container/list"
+	"context"
 	"sync"
 	"time"
 )
@@ -24,6 +22,7 @@ const (
 
 type outboundEntry struct {
 	key        string
+	accountID  string
 	externalID string
 	insertedAt time.Time
 }
@@ -48,14 +47,16 @@ func NewOutboundState() *OutboundState {
 	}
 }
 
-// Set stores (sendCommandID → externalID). Evicts the LRU entry if at capacity.
-func (s *OutboundState) Set(sendCommandID, externalID string) {
+// Set stores (sendCommandID → externalID) owned by accountID. Evicts the
+// LRU entry if at capacity.
+func (s *OutboundState) Set(_ context.Context, sendCommandID, accountID, externalID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	// Update existing.
 	if el, ok := s.items[sendCommandID]; ok {
 		s.order.MoveToFront(el)
+		el.Value.(*outboundEntry).accountID = accountID
 		el.Value.(*outboundEntry).externalID = externalID
 		el.Value.(*outboundEntry).insertedAt = time.Now()
 		return
@@ -73,14 +74,16 @@ func (s *OutboundState) Set(sendCommandID, externalID string) {
 
 	el := s.order.PushFront(&outboundEntry{
 		key:        sendCommandID,
+		accountID:  accountID,
 		externalID: externalID,
 		insertedAt: time.Now(),
 	})
 	s.items[sendCommandID] = el
 }
 
-// Get returns (externalID, true) if found and not expired, else ("", false).
-func (s *OutboundState) Get(sendCommandID string) (string, bool) {
+// Get returns (externalID, true) if found, unexpired, and owned by
+// accountID — a correlator from another account never resolves.
+func (s *OutboundState) Get(_ context.Context, sendCommandID, accountID string) (string, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -92,6 +95,9 @@ func (s *OutboundState) Get(sendCommandID string) (string, bool) {
 	if time.Since(entry.insertedAt) > s.ttl {
 		s.order.Remove(el)
 		delete(s.items, sendCommandID)
+		return "", false
+	}
+	if entry.accountID != accountID {
 		return "", false
 	}
 	s.order.MoveToFront(el)

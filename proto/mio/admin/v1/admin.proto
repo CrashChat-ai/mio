@@ -35,6 +35,9 @@ service AdminService {
   // TailMessages opens a server-stream of canonical mio messages for a
   // given account. Server-side filtering on conversation_id is optional.
   rpc TailMessages(TailMessagesRequest) returns (stream TailMessagesResponse);
+
+  rpc GetWebhookInfo(GetWebhookInfoRequest) returns (GetWebhookInfoResponse);
+  rpc GetStreamHealth(GetStreamHealthRequest) returns (GetStreamHealthResponse);
 }
 
 // --- Tenants ---
@@ -136,6 +139,33 @@ message DisableAccountResponse {}
 
 message RotateCredentialRequest  { string account_id = 1; }
 message RotateCredentialResponse {}
+
+// --- Webhook info ---
+
+message GetWebhookInfoRequest { string account_id = 1; }
+message GetWebhookInfoResponse {
+  string account_id    = 1;
+  string channel_type  = 2;
+  string webhook_url   = 3; // primary URL (public_base_url + /webhooks/<slug>)
+  repeated string route_aliases = 4; // e.g. ["/cliq"] if adapter exposes aliases
+  string auth_kind     = 5; // from capabilities
+  string setup_hint    = 6; // human-readable next step
+}
+
+// --- Stream health ---
+
+message ConsumerHealth {
+  string consumer_name  = 1;
+  string stream         = 2;
+  uint64 num_pending    = 3;
+  uint64 num_ack_pending = 4;
+  google.protobuf.Timestamp last_delivered = 5; // may be unset
+}
+
+message GetStreamHealthRequest {}
+message GetStreamHealthResponse {
+  repeated ConsumerHealth consumers = 1;
+}
 
 // --- Tail ---
 

@@ -176,7 +176,7 @@ kubectl create namespace mio
 |---|---|---|---|
 | `mio-gateway` | Deployment | 2 replicas | Stateless, scales horizontally |
 | `mio-nats` | StatefulSet | 1 replica (POC) | File-backed PVC (standard storage class) |
-| `mio-jetstream-bootstrap` | Job | — | Post-install, creates streams (one-shot) |
+| `mio-jetstream-bootstrap` | Job | — | Post-install verification; never creates or mutates JetStream resources |
 | `mio-media-vault` | Deployment | 1 replica (POC) | Can scale; MaxAckPending=N |
 | `mio-sink-gcs` | Deployment | 1 replica | Workload Identity to GCP SA |
 | `mio-echo-consumer` | Deployment | 1 replica | Example consumer (can remove) |
@@ -194,13 +194,7 @@ Six charts in `deploy/charts/`:
      --values deploy/charts/mio-nats/values.yaml
    ```
 
-2. **mio-jetstream-bootstrap** — Initialize streams (run as post-install Job)
-   ```bash
-   helm install mio-jetstream-bootstrap deploy/charts/mio-jetstream-bootstrap \
-     --namespace mio
-   ```
-
-3. **mio-gateway** — Main API
+2. **mio-gateway** — Main API
    ```bash
    helm install mio-gateway deploy/charts/mio-gateway \
      --namespace mio \
@@ -208,21 +202,27 @@ Six charts in `deploy/charts/`:
      --set secrets.existingSecret=mio-gateway-secrets
    ```
 
-4. **mio-media-vault** — Attachment sidecar
+3. **mio-media-vault** — Attachment sidecar
    ```bash
    helm install mio-media-vault deploy/charts/mio-media-vault \
      --namespace mio \
      --set serviceAccount.gcpServiceAccount=mio-media-vault@<project>.iam.gserviceaccount.com
    ```
 
-5. **mio-sink-gcs** — Archive consumer
+4. **mio-sink-gcs** — Archive consumer
    ```bash
    helm install mio-sink-gcs deploy/charts/mio-sink-gcs \
      --namespace mio \
      --set serviceAccount.gcpServiceAccount=mio-sink-gcs@<project>.iam.gserviceaccount.com
    ```
 
-6. **mio-echo-consumer** — Example consumer
+5. **mio-echo-consumer** — Example consumer
+
+6. **mio-jetstream-bootstrap** — Verify streams and durable consumers after their owning services have started
+   ```bash
+   helm install mio-jetstream-bootstrap deploy/charts/mio-jetstream-bootstrap \
+     --namespace mio
+   ```
 
 **Linting:**
 ```bash
@@ -250,8 +250,7 @@ ghcr.io/crashchat-ai/mio/echo-consumer:<sha>
 **Important:** Admin server does NOT run migrations. Follow this order:
 
 1. Deploy CNPG Postgres instance (independent, via infra repo)
-2. Deploy `mio-jetstream-bootstrap` (one-shot Job)
-3. Deploy `mio-admin` and run schema migrations:
+2. Run schema migrations before starting normal API traffic:
    ```bash
    # Option A: Set gateway to auto-migrate
    kubectl set env deployment/mio-gateway MIO_MIGRATE_ON_START=true
@@ -260,7 +259,8 @@ ghcr.io/crashchat-ai/mio/echo-consumer:<sha>
    # Option B: Run migrations manually
    make gateway-migrate   # Locally, or exec in pod
    ```
-4. After schema is live, deploy remaining services (gateway, media-vault, sink-gcs, echo-consumer)
+3. After schema is live, deploy NATS-backed services (gateway, media-vault, sink-gcs, echo-consumer) so they provision their owned streams and consumers.
+4. Run `mio-jetstream-bootstrap` as a verification gate after gateway, media-vault, and sink-gcs are ready.
 
 ---
 
@@ -399,13 +399,17 @@ Helm upgrade. NATS automatically discovers peers and forms cluster.
 
 ### Step 3: Update Stream Replication
 
-Edit `mio-jetstream-bootstrap` ConfigMap (or gateway's `AddOrUpdateStream` call):
+Edit the owning service's stream config, then update the
+`mio-jetstream-bootstrap` expected values so drift is caught by the verification
+Job:
 
 ```go
 Replicas: 3  // Was: 1
 ```
 
-Recreate streams (or Helm delete + reinstall mio-jetstream-bootstrap).
+Recreate streams after changing replication. Reinstalling
+`mio-jetstream-bootstrap` only verifies the resulting state; it does not mutate
+JetStream.
 
 **Warning:** Existing R=1 streams must be recreated to replicate. Plan downtime or dual-stream migration.
 
@@ -426,6 +430,33 @@ kubectl exec -n mio mio-nats-0 -- nats --server=nats://localhost:4222 server che
 | `MESSAGES_INBOUND` | `mio.inbound.>` | 7d, limits | gateway | media-vault, sink-gcs |
 | `MESSAGES_INBOUND_ENRICHED` | `mio.inbound_enriched.>` | 7d, limits | media-vault | echo/AI consumers |
 | `MESSAGES_OUTBOUND` | `mio.outbound.>` | 24h, workqueue | AI consumers | gateway sender-pool |
+
+### External Durable Consumers
+
+Downstream services that read MIO streams should create their own durable
+consumer, then register the expected policy through
+`mio-jetstream-bootstrap.externalExpectedConsumers` in that deployment's Helm
+values. This keeps the core bus channel-agnostic while still making consumer
+cursor policy auditable.
+
+Channel Pulse example:
+
+```yaml
+externalExpectedConsumers:
+  - stream: MESSAGES_INBOUND_ENRICHED
+    durable: channel-pulse
+    filterSubject: "mio.inbound_enriched.>"
+    ackPolicy: explicit
+    deliverPolicy: new
+    minAckWaitSeconds: 600
+```
+
+The same contract is available as
+`deploy/charts/mio-jetstream-bootstrap/values-channel-pulse.example.yaml` for
+deployment overlays.
+
+For this contract to be valid, the enriched stream must also keep
+`MaxAge>=600s`; the default MIO enriched stream keeps 7 days.
 
 ### Object Storage Layout
 

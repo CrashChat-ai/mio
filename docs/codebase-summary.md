@@ -354,10 +354,10 @@ mio-media-cli gdpr-delete --account-id=abc123
    - `values.yaml` (GKE prod), `values-kind.yaml` (local kind cluster)
    - Config: JetStream mode, file store (PVC), cluster replication
 
-2. **mio-jetstream-bootstrap** — Stream + Consumer initialization (Job post-NATS)
+2. **mio-jetstream-bootstrap** — JetStream verification (Job after owning services start)
    - Job template with RBAC (ServiceAccount, Role)
-   - ConfigMap: stream definitions (MESSAGES_INBOUND, MESSAGES_INBOUND_ENRICHED, MESSAGES_OUTBOUND)
-   - Durable consumer configs (media-vault, ai-consumer-enriched, sender-pool, gcs-archiver)
+   - ConfigMap: expected stream definitions (MESSAGES_INBOUND, MESSAGES_INBOUND_ENRICHED, MESSAGES_OUTBOUND)
+   - Durable consumer policy checks (media-vault, sender-pool, gcs-archiver, optional external consumers)
 
 3. **mio-gateway** — Main API Deployment (2 replicas POC)
    - Deployment, Service, Ingress, ConfigMap, Secret, ServiceAccount, HPA, ServiceMonitor
@@ -421,7 +421,7 @@ tenant_id → account_id → conversation_id → message_id
 |---|---|---|---|---|
 | `MESSAGES_INBOUND` | `mio.inbound.>` | limits (1GB per account) | 7d | Raw inbound. Published by gateway. Consumed by media-vault + sink-gcs. |
 | `MESSAGES_INBOUND_ENRICHED` | `mio.inbound_enriched.>` | limits (1GB per account) | 7d | Enriched with persistent attachment URLs. Published by media-vault. Consumed by AI service. |
-| `MESSAGES_OUTBOUND` | `mio.outbound.>` | workqueue | 23h | Drain semantics. Published by AI service. Consumed by gateway sender-pool. |
+| `MESSAGES_OUTBOUND` | `mio.outbound.>` | workqueue | 24h | Drain semantics. Published by AI service. Consumed by gateway sender-pool. |
 
 **Subject grammar:**
 ```

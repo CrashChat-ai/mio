@@ -1,0 +1,12 @@
+# Optional overlay for deployments that run Channel Pulse against MIO.
+#
+# Channel Pulse creates this durable consumer itself. The bootstrap chart stays
+# verify-only and fails the release if the live cursor policy drifts.
+
+externalExpectedConsumers:
+  - stream: MESSAGES_INBOUND_ENRICHED
+    durable: channel-pulse
+    filterSubject: "mio.inbound_enriched.>"
+    ackPolicy: explicit
+    deliverPolicy: new
+    minAckWaitSeconds: 600

@@ -39,9 +39,8 @@ spec:
 
               # ---------------------------------------------------------------
               # VERIFY-ONLY: This script never calls nats stream add/update or
-              # nats consumer add. Gateway startup (AddOrUpdateStream, P3) is
-              # the single authoritative writer. Two writers = race; we picked
-              # the gateway. This script is a post-install assertion gate only.
+              # nats consumer add. Each stream or consumer is created by its
+              # owning service. This script is a post-install assertion gate.
               # ---------------------------------------------------------------
 
               echo "==> Waiting for JetStream quorum (3 replicas)..."
@@ -77,35 +76,83 @@ spec:
               # Verify streams exist (no mutation).
               # ---------------------------------------------------------------
               echo "==> Verifying streams..."
-              {{- range .Values.expectedStreams }}
-              echo -n "    Checking stream {{ .name }}... "
-              if ! nats --server="$NATS_URL" stream info {{ .name }} > /dev/null 2>&1; then
+              {{ range .Values.expectedStreams }}
+              {{ $streamName := .name }}
+              echo -n "    Checking stream {{ $streamName }}... "
+              if ! nats --server="$NATS_URL" stream info {{ $streamName }} > /dev/null 2>&1; then
                 echo "MISSING"
-                echo "ERROR: MISSING stream {{ .name }} — gateway startup did not provision it"
+                echo "ERROR: MISSING stream {{ $streamName }} — owning service did not provision it"
                 exit 1
               fi
               # Verify replica count.
-              REPLICAS=$(nats --server="$NATS_URL" stream info {{ .name }} --json 2>/dev/null | \
-                grep -o '"num_replicas":[0-9]*' | grep -o '[0-9]*' || echo "0")
+              STREAM_JSON=$(nats --server="$NATS_URL" stream info {{ $streamName }} --json 2>/dev/null)
+              REPLICAS=$(echo "$STREAM_JSON" | jq -r '.config.num_replicas // 0')
               if [ "$REPLICAS" != "{{ .replicas }}" ]; then
                 echo "REPLICA MISMATCH"
-                echo "ERROR: stream {{ .name }} has replicas=$REPLICAS, expected {{ .replicas }}"
+                echo "ERROR: stream {{ $streamName }} has replicas=$REPLICAS, expected {{ .replicas }}"
                 exit 1
               fi
+              {{ if .minMaxAgeSeconds }}
+              MIN_MAX_AGE_NS=$(({{ .minMaxAgeSeconds }} * 1000000000))
+              MAX_AGE=$(echo "$STREAM_JSON" | jq -r '.config.max_age // 0')
+              if [ "$MAX_AGE" -lt "$MIN_MAX_AGE_NS" ]; then
+                echo "MAX_AGE MISMATCH"
+                echo "ERROR: stream {{ $streamName }} has max_age=${MAX_AGE}ns, expected at least ${MIN_MAX_AGE_NS}ns"
+                exit 1
+              fi
+              echo "OK (replicas=$REPLICAS, max_age=${MAX_AGE}ns)"
+              {{ else }}
               echo "OK (replicas=$REPLICAS)"
+              {{ end }}
               {{- end }}
 
               # ---------------------------------------------------------------
               # Verify consumers exist (no mutation).
               # ---------------------------------------------------------------
               echo "==> Verifying consumers..."
-              {{- range .Values.expectedConsumers }}
-              echo -n "    Checking consumer {{ .durable }} on {{ .stream }}... "
-              if ! nats --server="$NATS_URL" consumer info {{ .stream }} {{ .durable }} > /dev/null 2>&1; then
+              {{ range concat .Values.expectedConsumers .Values.externalExpectedConsumers }}
+              {{ $streamName := .stream }}
+              {{ $durableName := .durable }}
+              echo -n "    Checking consumer {{ $durableName }} on {{ $streamName }}... "
+              if ! nats --server="$NATS_URL" consumer info {{ $streamName }} {{ $durableName }} > /dev/null 2>&1; then
                 echo "MISSING"
-                echo "ERROR: MISSING consumer {{ .durable }} on stream {{ .stream }} — owning service did not create it on startup"
+                echo "ERROR: MISSING consumer {{ $durableName }} on stream {{ $streamName }} — owning service did not create it on startup"
                 exit 1
               fi
+              CONSUMER_JSON=$(nats --server="$NATS_URL" consumer info {{ $streamName }} {{ $durableName }} --json 2>/dev/null)
+              {{ if .filterSubject }}
+              FILTER_SUBJECT=$(echo "$CONSUMER_JSON" | jq -r '.config.filter_subject // ""')
+              if [ "$FILTER_SUBJECT" != "{{ .filterSubject }}" ]; then
+                echo "FILTER MISMATCH"
+                echo "ERROR: consumer {{ $durableName }} on {{ $streamName }} has filter_subject=$FILTER_SUBJECT, expected {{ .filterSubject }}"
+                exit 1
+              fi
+              {{ end }}
+              {{ if .ackPolicy }}
+              ACK_POLICY=$(echo "$CONSUMER_JSON" | jq -r '.config.ack_policy // ""')
+              if [ "$ACK_POLICY" != "{{ .ackPolicy }}" ]; then
+                echo "ACK POLICY MISMATCH"
+                echo "ERROR: consumer {{ $durableName }} on {{ $streamName }} has ack_policy=$ACK_POLICY, expected {{ .ackPolicy }}"
+                exit 1
+              fi
+              {{ end }}
+              {{ if .deliverPolicy }}
+              DELIVER_POLICY=$(echo "$CONSUMER_JSON" | jq -r '.config.deliver_policy // ""')
+              if [ "$DELIVER_POLICY" != "{{ .deliverPolicy }}" ]; then
+                echo "DELIVER POLICY MISMATCH"
+                echo "ERROR: consumer {{ $durableName }} on {{ $streamName }} has deliver_policy=$DELIVER_POLICY, expected {{ .deliverPolicy }}"
+                exit 1
+              fi
+              {{ end }}
+              {{ if .minAckWaitSeconds }}
+              MIN_ACK_WAIT_NS=$(({{ .minAckWaitSeconds }} * 1000000000))
+              ACK_WAIT=$(echo "$CONSUMER_JSON" | jq -r '.config.ack_wait // 0')
+              if [ "$ACK_WAIT" -lt "$MIN_ACK_WAIT_NS" ]; then
+                echo "ACK WAIT MISMATCH"
+                echo "ERROR: consumer {{ $durableName }} on {{ $streamName }} has ack_wait=${ACK_WAIT}ns, expected at least ${MIN_ACK_WAIT_NS}ns"
+                exit 1
+              fi
+              {{ end }}
               echo "OK"
               {{- end }}
 

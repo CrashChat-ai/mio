@@ -236,7 +236,7 @@ Three streams, all file-backed, all `mio.v1` envelope.
 |---|---|---|---|---|
 | `MESSAGES_INBOUND` | `mio.inbound.>` | `limits` | 7d | Raw inbound. Gateway publisher. Attachment-downloader + sink-gcs consumers. (Old AI consumer deprecated.) |
 | `MESSAGES_INBOUND_ENRICHED` | `mio.inbound_enriched.>` | `limits` | 7d | Enriched with persistent attachment URLs. Attachment-downloader publisher. AI consumer + future analytics subscribers. |
-| `MESSAGES_OUTBOUND` | `mio.outbound.>` | `workqueue` | 23h | Drain semantics. Sender-pool is the only consumer. |
+| `MESSAGES_OUTBOUND` | `mio.outbound.>` | `workqueue` | 24h | Drain semantics. Sender-pool is the only consumer. |
 
 ### Subject grammar
 
@@ -278,6 +278,14 @@ Why these dimensions live in the subject:
 | `gcs-archiver` | `MESSAGES_INBOUND` | Pull, durable | 64 | Long-tail consumer; falls behind without affecting attachment or AI path. Archives raw inbound. |
 | `ai-consumer-enriched` | `MESSAGES_INBOUND_ENRICHED` | Pull, durable | **1** | Single-flight. Per-thread ordering enforced globally for now; partition by subject when throughput demands. |
 | `sender-pool` | `MESSAGES_OUTBOUND` | Pull, durable | **32** | Workqueue drain. One pool per channel adapter eventually. |
+
+External consumers should use the same subject grammar and declare their
+consumer policy in deployment values, not in channel-specific core code. For
+example, Channel Pulse can bind `channel-pulse` to
+`MESSAGES_INBOUND_ENRICHED` with `filterSubject=mio.inbound_enriched.>`,
+`AckPolicy=explicit`, `DeliverPolicy=new` or `by_start_sequence`, and
+`AckWait>=600s`; `mio-jetstream-bootstrap.externalExpectedConsumers` verifies
+that contract after the consumer has created its durable cursor.
 
 *Deprecated:* `ai-consumer` on `MESSAGES_INBOUND` — remove after successful
 enriched-stream cutover via `nats consumer rm MESSAGES_INBOUND ai-consumer`.

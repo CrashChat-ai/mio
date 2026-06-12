@@ -14,22 +14,48 @@ image:
 retryCount: 5
 retrySleepSeconds: 10
 
-# Expected streams (verify-only — source of truth is services/gateway/store/jetstream.go).
+# Expected streams (verify-only; owning services provision these on startup).
 expectedStreams:
   - name: MESSAGES_INBOUND
     subjects: ["mio.inbound.>"]
     replicas: 3
     retention: limits
+    minMaxAgeSeconds: 604800
   - name: MESSAGES_OUTBOUND
     subjects: ["mio.outbound.>"]
     replicas: 3
     retention: workqueue
+    minMaxAgeSeconds: 86400
+  - name: MESSAGES_INBOUND_ENRICHED
+    subjects: ["mio.inbound_enriched.>"]
+    replicas: 1
+    retention: limits
+    minMaxAgeSeconds: 600
 
-# Expected consumers (created by their owning service on first start).
+# Expected MIO-owned consumers (created by their owning service on first start).
 expectedConsumers:
   - stream: MESSAGES_INBOUND
-    durable: ai-consumer
+    durable: media-vault
+    filterSubject: "mio.inbound.>"
+    ackPolicy: explicit
+    deliverPolicy: all
   - stream: MESSAGES_INBOUND
     durable: gcs-archiver
+    filterSubject: "mio.inbound.>"
+    ackPolicy: explicit
+    deliverPolicy: all
   - stream: MESSAGES_OUTBOUND
     durable: sender-pool
+    ackPolicy: explicit
+    deliverPolicy: all
+
+# Optional downstream consumers to verify without coupling core MIO to a
+# specific application. Example for Channel Pulse:
+# externalExpectedConsumers:
+#   - stream: MESSAGES_INBOUND_ENRICHED
+#     durable: channel-pulse
+#     filterSubject: "mio.inbound_enriched.>"
+#     ackPolicy: explicit
+#     deliverPolicy: new
+#     minAckWaitSeconds: 600
+externalExpectedConsumers: []

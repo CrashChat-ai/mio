@@ -378,9 +378,11 @@ mio.<direction>.<channel_type>.<account_id>.<conversation_id>[.<message_id>]
 - **Never reuse a field number.** If removing: add `reserved N;` to the message
 
 **Current reservations:**
-- `Message` field 17: reserved for `MessageRelation` (P5 future, edit/reaction linkage)
 - `Message` field 18: reserved for `is_summary` (message compaction flag, future)
-- `SendCommand` field 15: reserved for `MessageRelation`
+
+**Recently promoted fields:**
+- `Message` field 17 and `SendCommand` field 15: `MessageRelation`
+- `SendCommand` field 16: `RichContent`
 
 **When adding a field:**
 - Check `reserved` list first

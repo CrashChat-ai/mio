@@ -226,6 +226,14 @@ Two-step UX rule: for any LLM run > 1s, the AI service emits a "thinking…"
 `channel_message_id` once the real answer is ready. The user never sees
 a blank thread.
 
+`SendCommand.rich_content` is the portable rich outbound model. Producers can
+send card metadata, text/list/table/label/image blocks, and buttons without
+importing any channel SDK. Adapters render that model to native platform
+constructs, for example Cliq `card`, `slides`, and `buttons`; unsupported
+adapters keep using `text` as the fallback. URL-backed `SendCommand.attachments`
+are also rendered by adapters that support them. Storage-key-only attachments
+need a signed URL provider before an external chat platform can fetch them.
+
 ---
 
 ## 6. Streams and subjects

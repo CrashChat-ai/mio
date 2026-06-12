@@ -288,6 +288,7 @@ mio-media-cli gdpr-delete --account-id=abc123
 **Files:**
 - `mio/v1/message.proto` — Inbound envelope (tenant → account → conversation → message, attachments, relation)
 - `mio/v1/send_command.proto` — Outbound envelope (mirror of Message scope, edit support)
+- `mio/v1/rich_content.proto` — Channel-agnostic outbound cards, blocks, and buttons
 - `mio/v1/attachment.proto` — File/image/link carrier (storage_key, content_sha256)
 - `mio/v1/sender.proto` — Message author (platform-specific user ID, display name)
 - `mio/v1/enums.proto` — ConversationKind, PeerKind
@@ -298,7 +299,7 @@ mio-media-cli gdpr-delete --account-id=abc123
 
 **Conventions:**
 - Fields 1–15: single-byte tags (hot path)
-- Reserved fields: Message.17 (MessageRelation future), Message.18 (is_summary), SendCommand.15 (MessageRelation)
+- Reserved fields: Message.18 (is_summary)
 - Never reuse field numbers; use `reserved N;` instead
 
 **Codegen:**

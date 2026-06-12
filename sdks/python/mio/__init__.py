@@ -10,6 +10,16 @@
 #       ...
 #       await delivery.ack()
 #   await client.aclose()
+from pathlib import Path
+from pkgutil import extend_path
+
+# Allow local generated stubs from `buf generate` at repo-root/proto/gen/py/mio
+# to coexist with this SDK package during development and tests.
+__path__ = extend_path(__path__, __name__)  # type: ignore[name-defined]
+_repo_generated = Path(__file__).resolve().parents[3] / "proto" / "gen" / "py" / "mio"
+if _repo_generated.exists():
+    __path__.append(str(_repo_generated))  # type: ignore[name-defined]
+
 from mio.client import Client, Delivery, CommandDelivery
 from mio.version import SCHEMA_VERSION, verify, verify_command
 from mio.subjects import inbound, outbound

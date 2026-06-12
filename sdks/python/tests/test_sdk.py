@@ -181,6 +181,46 @@ def test_verify_command_empty_id():
         verify_command(_FakeCmd(id=""))
 
 
+def test_send_command_rich_content_roundtrip():
+    from mio.v1.rich_content_pb2 import RichButton, RichButtonAction
+    from mio.v1.send_command_pb2 import SendCommand
+
+    cmd = SendCommand(
+        id="cmd-rich",
+        schema_version=SCHEMA_VERSION,
+        tenant_id="tenant-01",
+        account_id="acct-01",
+        channel_type="zoho_cliq",
+        conversation_id="conv-01",
+        text="Daily digest",
+    )
+    cmd.rich_content.card.title = "Digest"
+    cmd.rich_content.card.theme = "modern-inline"
+
+    block = cmd.rich_content.blocks.add()
+    block.table.title = "Contributors"
+    block.table.headers.extend(["Name", "Score"])
+    row = block.table.rows.add()
+    row.cells.extend(["Alice", "42"])
+
+    button = cmd.rich_content.buttons.add()
+    button.label = "View dashboard"
+    button.style = RichButton.STYLE_PRIMARY
+    button.action.kind = RichButtonAction.KIND_OPEN_URL
+    button.action.url = "https://example.com/dashboard"
+
+    verify_command(cmd)
+    decoded = SendCommand()
+    decoded.ParseFromString(cmd.SerializeToString())
+
+    assert decoded.rich_content.card.title == "Digest"
+    assert decoded.rich_content.blocks[0].table.rows[0].cells[1] == "42"
+    assert (
+        decoded.rich_content.buttons[0].action.url
+        == "https://example.com/dashboard"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Consume-side asymmetry: schema_version=2 passes through untouched
 # ---------------------------------------------------------------------------

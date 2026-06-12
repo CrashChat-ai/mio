@@ -2,6 +2,7 @@ package zohocliq
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -63,6 +64,188 @@ func TestSend_Success(t *testing.T) {
 	}
 	if extID != "cmd-1" {
 		t.Fatalf("expected cmd-1 (synthesised), got %s", extID)
+	}
+}
+
+func TestSend_TextOnlyPayloadUnchanged(t *testing.T) {
+	var payload map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	a, _ := newTestAdapter(t, srv.URL)
+	cmd := testCmd("cmd-text-only", "hello")
+
+	if _, err := a.Send(context.Background(), cmd); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(payload) != 1 {
+		t.Fatalf("text-only payload must contain exactly one key, got %+v", payload)
+	}
+	if got := payload["text"]; got != "hello" {
+		t.Fatalf("payload text = %v, want hello", got)
+	}
+}
+
+func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
+	var payload map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	a, _ := newTestAdapter(t, srv.URL)
+	cmd := testCmd("cmd-rich", "Daily digest")
+	cmd.RichContent = &miov1.RichContent{
+		Card: &miov1.RichCard{
+			Title:        "Digest",
+			Theme:        "modern-inline",
+			ThumbnailUrl: "https://example.com/thumb.png",
+		},
+		Blocks: []*miov1.RichBlock{
+			{
+				Content: &miov1.RichBlock_Text{Text: &miov1.RichTextBlock{
+					Title: "Summary",
+					Text:  "Top contributors",
+				}},
+			},
+			{
+				Content: &miov1.RichBlock_List{List: &miov1.RichListBlock{
+					Title: "Highlights",
+					Items: []string{"Alice shipped API", "Bob fixed UI"},
+				}},
+			},
+			{
+				Content: &miov1.RichBlock_Table{Table: &miov1.RichTableBlock{
+					Title:   "Contributors",
+					Headers: []string{"Name", "Score"},
+					Rows: []*miov1.RichTableRow{
+						{Cells: []string{"Alice", "42"}},
+						{Cells: []string{"Bob", "35"}},
+					},
+				}},
+			},
+		},
+		Buttons: []*miov1.RichButton{
+			{
+				Label: "View dashboard",
+				Style: miov1.RichButton_STYLE_PRIMARY,
+				Action: &miov1.RichButtonAction{
+					Kind: miov1.RichButtonAction_KIND_OPEN_URL,
+					Url:  "https://example.com/dashboard",
+				},
+			},
+		},
+	}
+
+	if _, err := a.Send(context.Background(), cmd); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	card := requireMap(t, payload["card"], "card")
+	if got := card["title"]; got != "Digest" {
+		t.Fatalf("card.title = %v, want Digest", got)
+	}
+	if got := card["theme"]; got != "modern-inline" {
+		t.Fatalf("card.theme = %v, want modern-inline", got)
+	}
+
+	slides := requireSlice(t, payload["slides"], "slides")
+	if len(slides) != 3 {
+		t.Fatalf("slides len = %d, want 3; payload=%+v", len(slides), payload)
+	}
+	if got := requireMap(t, slides[0], "slides[0]")["type"]; got != "text" {
+		t.Fatalf("slides[0].type = %v, want text", got)
+	}
+	listSlide := requireMap(t, slides[1], "slides[1]")
+	if got := listSlide["type"]; got != "list" {
+		t.Fatalf("slides[1].type = %v, want list", got)
+	}
+	items := requireSlice(t, listSlide["data"], "slides[1].data")
+	if got := items[0]; got != "Alice shipped API" {
+		t.Fatalf("first list item = %v", got)
+	}
+	tableSlide := requireMap(t, slides[2], "slides[2]")
+	if got := tableSlide["type"]; got != "table" {
+		t.Fatalf("slides[2].type = %v, want table", got)
+	}
+	tableData := requireMap(t, tableSlide["data"], "slides[2].data")
+	rows := requireSlice(t, tableData["rows"], "table rows")
+	firstRow := requireMap(t, rows[0], "table rows[0]")
+	if got := firstRow["Name"]; got != "Alice" {
+		t.Fatalf("table first row Name = %v, want Alice", got)
+	}
+
+	buttons := requireSlice(t, payload["buttons"], "buttons")
+	firstButton := requireMap(t, buttons[0], "buttons[0]")
+	if got := firstButton["label"]; got != "View dashboard" {
+		t.Fatalf("button label = %v, want View dashboard", got)
+	}
+	action := requireMap(t, firstButton["action"], "button action")
+	if got := action["type"]; got != "open.url" {
+		t.Fatalf("button action type = %v, want open.url", got)
+	}
+	data := requireMap(t, action["data"], "button action data")
+	if got := data["web"]; got != "https://example.com/dashboard" {
+		t.Fatalf("button web url = %v", got)
+	}
+}
+
+func TestSend_AttachmentsRenderCliqSlides(t *testing.T) {
+	var payload map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	a, _ := newTestAdapter(t, srv.URL)
+	cmd := testCmd("cmd-attachments", "Attachments")
+	cmd.Attachments = []*miov1.Attachment{
+		{
+			Kind: miov1.Attachment_KIND_IMAGE,
+			Url:  "https://example.com/chart.png",
+		},
+		{
+			Kind:     miov1.Attachment_KIND_FILE,
+			Url:      "https://example.com/report.pdf",
+			Filename: "report.pdf",
+		},
+	}
+
+	if _, err := a.Send(context.Background(), cmd); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	slides := requireSlice(t, payload["slides"], "slides")
+	if len(slides) != 2 {
+		t.Fatalf("slides len = %d, want 2; payload=%+v", len(slides), payload)
+	}
+	images := requireMap(t, slides[0], "slides[0]")
+	if got := images["type"]; got != "images" {
+		t.Fatalf("slides[0].type = %v, want images", got)
+	}
+	imageURLs := requireSlice(t, images["data"], "image urls")
+	if got := imageURLs[0]; got != "https://example.com/chart.png" {
+		t.Fatalf("image url = %v", got)
+	}
+	files := requireMap(t, slides[1], "slides[1]")
+	if got := files["type"]; got != "label" {
+		t.Fatalf("slides[1].type = %v, want label", got)
+	}
+	labels := requireSlice(t, files["data"], "file labels")
+	firstLabel := requireMap(t, labels[0], "file labels[0]")
+	if got := firstLabel["report.pdf"]; got != "https://example.com/report.pdf" {
+		t.Fatalf("file label url = %v", got)
 	}
 }
 
@@ -356,4 +539,22 @@ func TestAdapter_Interface(t *testing.T) {
 	if key := a.RateLimitKey(cmd); key != "" {
 		t.Fatalf("expected empty rate limit key, got %q", key)
 	}
+}
+
+func requireMap(t *testing.T, value any, label string) map[string]any {
+	t.Helper()
+	m, ok := value.(map[string]any)
+	if !ok {
+		t.Fatalf("%s has type %T, want object", label, value)
+	}
+	return m
+}
+
+func requireSlice(t *testing.T, value any, label string) []any {
+	t.Helper()
+	items, ok := value.([]any)
+	if !ok {
+		t.Fatalf("%s has type %T, want array", label, value)
+	}
+	return items
 }

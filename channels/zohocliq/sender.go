@@ -110,11 +110,6 @@ func (a *Adapter) MaxDeliver() int { return cliqMaxDeliver }
 // Cliq does not impose per-conversation limits in documented rate limits.
 func (a *Adapter) RateLimitKey(_ *miov1.SendCommand) string { return "" }
 
-// cliqSendRequest is the request body for POST /api/v2/chats/{chatid}/messages.
-type cliqSendRequest struct {
-	Text string `json:"text"`
-}
-
 // Send delivers a new outbound message to Cliq.
 // Uses the bot endpoint POST /api/v2/channelsbyname/{name}/message?bot_unique_name={bot}
 // (the /chats/{id}/messages endpoint is read-only / DM-only and rejects bot posts
@@ -137,7 +132,7 @@ func (a *Adapter) Send(ctx context.Context, cmd *miov1.SendCommand) (string, err
 		return "", fmt.Errorf("cliq send: CLIQ_BOT_NAME env unset")
 	}
 
-	body := cliqSendRequest{Text: cmd.GetText()}
+	body := buildCliqSendRequest(cmd)
 	reqBody, err := json.Marshal(body)
 	if err != nil {
 		return "", fmt.Errorf("cliq send: marshal request: %w", err)

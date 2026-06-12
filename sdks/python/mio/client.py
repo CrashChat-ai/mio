@@ -181,7 +181,7 @@ class Client:
 
         Raises ValueError on verification failure; re-raises nats errors.
         """
-        from mio.proto.gen.python.mio.v1.message_pb2 import Message  # noqa: F401 (lazy import)
+        from mio.v1.message_pb2 import Message  # noqa: F401 (lazy import)
 
         # Step 1: publish-side Verify (schema version + required IDs).
         try:
@@ -317,7 +317,7 @@ class Client:
                 "durable name must not be empty; caller must supply an explicit durable"
             )
 
-        from mio.proto.gen.python.mio.v1.message_pb2 import Message
+        from mio.v1.message_pb2 import Message
 
         psub = await self._js.pull_subscribe(subject, durable=durable)
         try:
@@ -373,7 +373,7 @@ class Client:
                 "durable name must not be empty; caller must supply an explicit durable"
             )
 
-        from mio.proto.gen.python.mio.v1.send_command_pb2 import SendCommand
+        from mio.v1.send_command_pb2 import SendCommand
 
         psub = await self._js.pull_subscribe(subject, durable=durable)
         try:

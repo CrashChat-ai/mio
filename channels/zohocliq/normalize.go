@@ -15,6 +15,7 @@ package zohocliq
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
@@ -207,8 +208,26 @@ func Normalize(p *WebhookPayload) (*NormalizedMessage, error) {
 
 	// --- Thread parent ref (FINDINGS.md Q3) ---
 	if msg.RepliedMessage != nil && msg.RepliedMessage.ID != "" {
-		nm.ParentExternalID = msg.RepliedMessage.ID
-		nm.Attributes["cliq_replied_message_id"] = msg.RepliedMessage.ID
+		rm := msg.RepliedMessage
+		nm.ParentExternalID = rm.ID
+		nm.Attributes["cliq_replied_message_id"] = rm.ID
+		if rm.Text != "" {
+			nm.Attributes["cliq_replied_message_text"] = rm.Text
+		}
+		if rm.Sender != nil {
+			if rm.Sender.ID != "" {
+				nm.Attributes["cliq_replied_message_sender_id"] = rm.Sender.ID
+			}
+			if rm.Sender.Name != "" {
+				nm.Attributes["cliq_replied_message_sender_name"] = rm.Sender.Name
+			}
+		}
+		if rm.Time != 0 {
+			nm.Attributes["cliq_replied_message_time"] = strconv.FormatInt(rm.Time, 10)
+		}
+		if rm.Type != "" {
+			nm.Attributes["cliq_replied_message_type"] = rm.Type
+		}
 	}
 
 	// --- Sender (FINDINGS.md Q4) ---

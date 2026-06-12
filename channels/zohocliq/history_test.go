@@ -107,6 +107,91 @@ func TestFetchHistory_NormalizesCliqRows(t *testing.T) {
 	}
 }
 
+func TestFetchHistory_RepliedMessageSnapshot(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"data": [
+				{
+					"sender": {"name": "Alice", "id": "user-alice"},
+					"id": "msg-reply-001",
+					"time": 1781200000000,
+					"type": "text",
+					"text": "This is a thread reply",
+					"replied_message": {
+						"id": "msg-parent-001",
+						"text": "Original quoted text",
+						"sender": {"id": "user-bob", "name": "Bob"},
+						"time": 1781100000000,
+						"type": "text"
+					}
+				},
+				{
+					"sender": {"name": "Carol", "id": "user-carol"},
+					"id": "msg-plain-001",
+					"time": 1781200001000,
+					"type": "text",
+					"text": "Plain message no reply"
+				}
+			]
+		}`))
+	}))
+	defer srv.Close()
+
+	a := &Adapter{baseURL: srv.URL, httpClient: srv.Client()}
+	page, err := a.FetchHistory(context.Background(), channels.HistoryRequest{
+		Credential:   channels.Credential{AccessToken: "tok"},
+		Conversation: channels.HistoryConversation{ExternalID: "CT_test"},
+	})
+	if err != nil {
+		t.Fatalf("FetchHistory: %v", err)
+	}
+	if len(page.Messages) != 2 {
+		t.Fatalf("expected 2 messages, got %d", len(page.Messages))
+	}
+
+	reply := page.Messages[0]
+	if reply.ParentExternalID != "msg-parent-001" {
+		t.Errorf("ParentExternalID = %q, want %q", reply.ParentExternalID, "msg-parent-001")
+	}
+	wantAttrs := map[string]string{
+		"cliq_replied_message_id":          "msg-parent-001",
+		"cliq_replied_message_text":        "Original quoted text",
+		"cliq_replied_message_sender_id":   "user-bob",
+		"cliq_replied_message_sender_name": "Bob",
+		"cliq_replied_message_time":        "1781100000000",
+		"cliq_replied_message_type":        "text",
+	}
+	for k, want := range wantAttrs {
+		got, ok := reply.Attributes[k]
+		if !ok {
+			t.Errorf("reply: attribute %q missing", k)
+			continue
+		}
+		if got != want {
+			t.Errorf("reply: attribute %q = %q, want %q", k, got, want)
+		}
+	}
+
+	plain := page.Messages[1]
+	if plain.ParentExternalID != "" {
+		t.Errorf("plain message ParentExternalID = %q, want empty", plain.ParentExternalID)
+	}
+	replyAttrs := []string{
+		"cliq_replied_message_id",
+		"cliq_replied_message_text",
+		"cliq_replied_message_sender_id",
+		"cliq_replied_message_sender_name",
+		"cliq_replied_message_time",
+		"cliq_replied_message_type",
+	}
+	for _, k := range replyAttrs {
+		if _, ok := plain.Attributes[k]; ok {
+			t.Errorf("plain message must not have attribute %q", k)
+		}
+	}
+}
+
 func TestFetchHistory_ScopeMissing(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)

@@ -139,7 +139,11 @@ type cliqHistoryDimensions struct {
 }
 
 type cliqHistoryReplied struct {
-	ID string `json:"id"`
+	ID     string             `json:"id"`
+	Text   string             `json:"text,omitempty"`
+	Sender *cliqHistorySender `json:"sender,omitempty"`
+	Time   int64              `json:"time,omitempty"`
+	Type   string             `json:"type,omitempty"`
 }
 
 func (m cliqHistoryMessage) toHistoryMessage(conv channels.HistoryConversation, botName string) channels.HistoryMessage {
@@ -172,7 +176,28 @@ func (m cliqHistoryMessage) toHistoryMessage(conv channels.HistoryConversation, 
 		msg.SentAt = time.UnixMilli(m.Time)
 	}
 	if m.RepliedMessage != nil {
-		msg.ParentExternalID = m.RepliedMessage.ID
+		rm := m.RepliedMessage
+		msg.ParentExternalID = rm.ID
+		if rm.ID != "" {
+			msg.Attributes["cliq_replied_message_id"] = rm.ID
+		}
+		if rm.Text != "" {
+			msg.Attributes["cliq_replied_message_text"] = rm.Text
+		}
+		if rm.Sender != nil {
+			if rm.Sender.ID != "" {
+				msg.Attributes["cliq_replied_message_sender_id"] = rm.Sender.ID
+			}
+			if rm.Sender.Name != "" {
+				msg.Attributes["cliq_replied_message_sender_name"] = rm.Sender.Name
+			}
+		}
+		if rm.Time != 0 {
+			msg.Attributes["cliq_replied_message_time"] = strconv.FormatInt(rm.Time, 10)
+		}
+		if rm.Type != "" {
+			msg.Attributes["cliq_replied_message_type"] = rm.Type
+		}
 	}
 	if m.Content.File != nil {
 		msg.Attachments = append(msg.Attachments, cliqHistoryAttachment(m.Content.File))

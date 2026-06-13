@@ -6,7 +6,6 @@ import { auditTree } from "./routes/audit";
 import { channelTypesTree } from "./routes/channel-types";
 import { dashboardTree } from "./routes/dashboard";
 import { healthTree } from "./routes/health";
-import { legacyRoute } from "./routes/legacy";
 import { loginRoute } from "./routes/login";
 import { onboardingTree } from "./routes/onboarding";
 import { tailTree } from "./routes/tail";
@@ -22,7 +21,6 @@ const indexRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  legacyRoute,
   authedRoute.addChildren([
     indexRoute,
     dashboardTree,

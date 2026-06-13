@@ -4,8 +4,6 @@
 package slack
 
 import (
-	"context"
-	"fmt"
 	"os"
 
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
@@ -46,15 +44,4 @@ func (a *Adapter) RateLimitKey(cmd *miov1.SendCommand) string {
 		return ""
 	}
 	return cmd.GetAccountId() + ":" + conv
-}
-
-// Send is implemented in P3 (sender.go). The P1 stub keeps the adapter
-// registrable and the interface satisfied.
-func (a *Adapter) Send(context.Context, *miov1.SendCommand) (string, error) {
-	return "", fmt.Errorf("slack: Send not implemented (P3)")
-}
-
-// Edit is implemented in P3 (sender_edit.go).
-func (a *Adapter) Edit(context.Context, *miov1.SendCommand) error {
-	return fmt.Errorf("slack: Edit not implemented (P3)")
 }

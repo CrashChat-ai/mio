@@ -96,6 +96,14 @@ jobs:
       - name: Install web dependencies
         run: pnpm --dir ui/web/app install --frozen-lockfile
 
+      - name: Contract coverage (router <-> openapi)
+        run: pnpm --dir ui/web/app contract:coverage
+
+      - name: Contract drift (regenerate typed client)
+        run: |
+          pnpm --dir ui/web/app generate
+          git diff --exit-code ui/web/app/src/lib/api/generated
+
       - name: Build web app
         run: pnpm --dir ui/web/app build
 

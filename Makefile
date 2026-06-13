@@ -1,4 +1,4 @@
-.PHONY: help up down operator-web-up proto proto-gen proto-lint proto-breaking proto-roundtrip proto-stubs-python sdk-go-test sdk-py-test sink-gcs-test sink-gcs-build-local sink-gcs-build lint docs-check test clean gateway-build gateway-build-local gateway-test gateway-migrate gateway-bench-outbound admin-build admin-run admin-test tui-build tui-run tui-test ui-web-install ui-web-build ui-web-test docker-mio-web echo-up echo-logs echo-consumer-test helm-lint helm-template kind-up kind-deploy kind-smoke kind-down
+.PHONY: help up down operator-web-up proto proto-gen proto-lint proto-breaking proto-roundtrip proto-stubs-python sdk-go-test sdk-py-test sink-gcs-test sink-gcs-build-local sink-gcs-build lint docs-check test clean gateway-build gateway-build-local gateway-test gateway-migrate gateway-bench-outbound admin-build admin-run admin-test tui-build tui-run tui-test ui-web-install ui-web-build ui-web-test ui-web-contract-check ui-web-contract-coverage docker-mio-web echo-up echo-logs echo-consumer-test helm-lint helm-template kind-up kind-deploy kind-smoke kind-down
 
 COMPOSE := docker compose -f deploy/local/docker-compose.yml
 BUILD_VERSION := $(shell git describe --always --dirty 2>/dev/null || echo dev)
@@ -131,6 +131,13 @@ ui-web-test: ui-web-install ## Run web admin shell tests
 	$(BUF) generate proto
 	go test ./ui/web/... -v -count=1
 	pnpm --dir ui/web/app build
+
+ui-web-contract-check: ui-web-install ## Regenerate the typed client; fail if it drifts from the committed output
+	pnpm --dir ui/web/app generate
+	git diff --exit-code ui/web/app/src/lib/api/generated
+
+ui-web-contract-coverage: ui-web-install ## Assert every router.go route is in openapi.yaml and vice versa
+	pnpm --dir ui/web/app contract:coverage
 
 docker-mio-web: ## Build mio-web Docker image locally (no push)
 	docker build -f ui/web/Dockerfile -t mio/web:dev .

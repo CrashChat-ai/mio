@@ -32,6 +32,7 @@ import (
 	"github.com/crashchat-ai/mio/services/gateway/internal/ratelimit"
 	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
 	"github.com/crashchat-ai/mio/services/gateway/internal/server"
+	"github.com/crashchat-ai/mio/services/gateway/internal/socketrunner"
 	"github.com/crashchat-ai/mio/services/gateway/store"
 )
 
@@ -150,6 +151,18 @@ func RunGateway(logger *slog.Logger, version string) error {
 		}
 	}
 
+	accountResolver := store.NewAccountResolver(pg, logger)
+
+	if os.Getenv("SLACK_BOT_TOKEN") != "" && os.Getenv("SLACK_APP_TOKEN") != "" {
+		runnerReg := prometheus.NewRegistry()
+		go func() {
+			if err := socketrunner.StartFromEnv(poolCtx, pg, sdkClient,
+				accountResolver, cfg.TenantID, cfg.AccountID, runnerReg, logger); err != nil {
+				logger.Error("socket runner exited", "err", err)
+			}
+		}()
+	}
+
 	webhookSecrets := make(map[string][]byte, len(cfg.WebhookSecrets))
 	for channelType, secret := range cfg.WebhookSecrets {
 		webhookSecrets[channelType] = []byte(secret)
@@ -157,7 +170,7 @@ func RunGateway(logger *slog.Logger, version string) error {
 	serverCfg := server.Config{
 		TenantID:       cfg.TenantID,
 		AccountID:      cfg.AccountID,
-		Accounts:       store.NewAccountResolver(pg, logger),
+		Accounts:       accountResolver,
 		WebhookSecrets: webhookSecrets,
 		Logger:         logger,
 	}

@@ -15,6 +15,14 @@
 {{- end -}}
 {{- end -}}
 
+{{- define "mio-web.api.fullname" -}}
+{{- printf "%s-api" (include "mio-web.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "mio-web.frontend.fullname" -}}
+{{- printf "%s-frontend" (include "mio-web.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
 {{- define "mio-web.labels" -}}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" }}
 app.kubernetes.io/name: {{ include "mio-web.name" . }}
@@ -26,4 +34,14 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- define "mio-web.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "mio-web.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end -}}
+
+{{- define "mio-web.api.selectorLabels" -}}
+{{ include "mio-web.selectorLabels" . }}
+app.kubernetes.io/component: api
+{{- end -}}
+
+{{- define "mio-web.frontend.selectorLabels" -}}
+{{ include "mio-web.selectorLabels" . }}
+app.kubernetes.io/component: frontend
 {{- end -}}

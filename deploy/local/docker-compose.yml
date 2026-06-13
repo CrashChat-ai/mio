@@ -115,13 +115,11 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  mio-web:
+  mio-web-api:
     profiles: ["operator"]
     build:
       context: ../..
       dockerfile: ui/web/Dockerfile
-    ports:
-      - "${MIO_WEB_PORT:-8081}:8080"
     environment:
       MIO_WEB_ADDR: ":8080"
       MIO_WEB_PUBLIC_URL: "${MIO_WEB_PUBLIC_URL:-http://localhost:8081}"
@@ -146,6 +144,29 @@ services:
         condition: service_started
       postgres:
         condition: service_healthy
+    restart: unless-stopped
+
+  mio-web-frontend:
+    profiles: ["operator"]
+    build:
+      context: ../..
+      dockerfile: ui/web/Dockerfile.frontend
+      args:
+        VITE_API_BASE_URL: "${VITE_API_BASE_URL:-}"
+    restart: unless-stopped
+
+  mio-web-proxy:
+    profiles: ["operator"]
+    image: caddy:2.8-alpine
+    ports:
+      - "${MIO_WEB_PORT:-8081}:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      mio-web-api:
+        condition: service_started
+      mio-web-frontend:
+        condition: service_started
     restart: unless-stopped
 
   sink-gcs:

@@ -153,6 +153,66 @@ func TestManagerGoogleCallbackCreatesAllowedSession(t *testing.T) {
 	}
 }
 
+func TestStateCookieScopedToCallbackPath(t *testing.T) {
+	manager, err := NewManager(Config{
+		Mode:         ModeGoogle,
+		Provider:     fakeProvider{identity: Identity{Email: "allowed@example.com"}},
+		Store:        NewMemoryStore(),
+		Allowlist:    ParseAllowlist("allowed@example.com", ""),
+		CookieSecure: true,
+	})
+	if err != nil {
+		t.Fatalf("NewManager: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	manager.HandleLogin(rec, httptest.NewRequest(http.MethodGet, "/auth/login", nil))
+	state := findCookie(t, rec.Result().Cookies(), manager.stateCookieName)
+	if state.Path != "/auth/callback" {
+		t.Fatalf("state cookie path: %q", state.Path)
+	}
+	if state.SameSite != http.SameSiteLaxMode {
+		t.Fatalf("state cookie SameSite: %v", state.SameSite)
+	}
+	if !state.HttpOnly {
+		t.Fatal("state cookie must be HttpOnly")
+	}
+	if !state.Secure {
+		t.Fatal("state cookie Secure should follow CookieSecure")
+	}
+}
+
+func TestSessionCookieAttributes(t *testing.T) {
+	for _, secure := range []bool{false, true} {
+		manager, err := NewManager(Config{
+			Mode:         ModeDev,
+			Store:        NewMemoryStore(),
+			Allowlist:    ParseAllowlist("operator@example.com", ""),
+			DevRole:      RoleOperator,
+			DevIdentity:  Identity{Email: "operator@example.com"},
+			CookieSecure: secure,
+		})
+		if err != nil {
+			t.Fatalf("NewManager: %v", err)
+		}
+		rec := httptest.NewRecorder()
+		manager.HandleLogin(rec, httptest.NewRequest(http.MethodGet, "/auth/login", nil))
+		session := findCookie(t, rec.Result().Cookies(), manager.sessionCookieName)
+		if session.Path != "/" {
+			t.Fatalf("session cookie path: %q", session.Path)
+		}
+		if !session.HttpOnly {
+			t.Fatal("session cookie must be HttpOnly")
+		}
+		if session.SameSite != http.SameSiteLaxMode {
+			t.Fatalf("session cookie SameSite: %v", session.SameSite)
+		}
+		if session.Secure != secure {
+			t.Fatalf("session cookie Secure=%v want %v", session.Secure, secure)
+		}
+	}
+}
+
 func findCookie(t *testing.T, cookies []*http.Cookie, name string) *http.Cookie {
 	t.Helper()
 	for _, cookie := range cookies {

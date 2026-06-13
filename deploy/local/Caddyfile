@@ -1,0 +1,17 @@
+:80 {
+	handle /api/* {
+		reverse_proxy mio-web-api:8080
+	}
+
+	handle /auth/* {
+		reverse_proxy mio-web-api:8080
+	}
+
+	handle /healthz {
+		reverse_proxy mio-web-api:8080
+	}
+
+	handle /* {
+		reverse_proxy mio-web-frontend:80
+	}
+}

@@ -156,6 +156,31 @@ func (f *fakeStream) Msg() *adminv1.TailMessagesResponse {
 func (f *fakeStream) Err() error   { return nil }
 func (f *fakeStream) Close() error { return nil }
 
+func TestRootReturnsNotFound(t *testing.T) {
+	handler := newTestHandler(t)
+	for _, path := range []string{"/", "/dashboard", "/index.html"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("%s status: %d body=%s", path, rec.Code, rec.Body.String())
+		}
+		if !strings.Contains(rec.Body.String(), `"not_found"`) {
+			t.Fatalf("%s body: %s", path, rec.Body.String())
+		}
+	}
+}
+
+func TestHealthzReturnsOK(t *testing.T) {
+	handler := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("healthz status: %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestAdminRoutesRequireSession(t *testing.T) {
 	handler := newTestHandler(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/tenants", nil)
@@ -468,10 +493,9 @@ func newTestFixture(t *testing.T, role auth.Role) (http.Handler, *audit.MemoryLo
 		}},
 	}
 	return New(Config{
-		Auth:   manager,
-		Admin:  fake,
-		Audit:  auditLog,
-		Assets: http.NotFoundHandler(),
+		Auth:  manager,
+		Admin: fake,
+		Audit: auditLog,
 	}), auditLog, fake
 }
 

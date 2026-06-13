@@ -1,9 +1,22 @@
 replicaCount: 1
 
-image:
-  repository: ghcr.io/crashchat-ai/mio/web
-  tag: ""
-  pullPolicy: IfNotPresent
+api:
+  image:
+    repository: ghcr.io/crashchat-ai/mio/web-api
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    port: 8080
+  resources: {}
+
+frontend:
+  image:
+    repository: ghcr.io/crashchat-ai/mio/web-frontend
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    port: 80
+  resources: {}
 
 imagePullSecrets: []
 nameOverride: ""
@@ -27,9 +40,6 @@ securityContext:
 
 service:
   type: ClusterIP
-  port: 80
-
-resources: {}
 
 nodeSelector: {}
 tolerations: []
@@ -81,11 +91,16 @@ ingress:
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-production"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-  hosts:
-    - host: "mio-web.example.com"
-      paths:
-        - path: /
-          pathType: Prefix
+  host: "mio-web.example.com"
+  # /api, /auth, /healthz hit the API; /* hits the frontend. Specific prefixes
+  # are declared before the catch-all so the SPA never shadows auth routes.
+  apiPaths:
+    - path: /api
+      pathType: Prefix
+    - path: /auth
+      pathType: Prefix
+    - path: /healthz
+      pathType: Exact
   tls: []
   # tls:
   #   - secretName: mio-web-tls

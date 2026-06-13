@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { ApiError } from "./api/client";
+import { ApiError } from "./api/api";
 
 const RETRYABLE_STATUSES = new Set([408, 429]);
 

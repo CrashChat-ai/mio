@@ -21,7 +21,7 @@ mio/
 │   └── media-vault/      # Attachment sidecar. Fetches within platform TTL, persists to GCS.
 ├── ui/                   # Human-facing operator surfaces.
 │   ├── tui/              # Terminal UI admin client (bubbletea). Read-only v1.
-│   └── web/              # Operator web admin BFF + embedded React SPA.
+│   └── web/              # Operator web admin: API-only Go BFF (cmd/mio-web) + standalone React SPA (app/), single-origin reverse proxy.
 ├── ee/                   # Commercial overlay (build-tag-gated, //go:build ee). OSS must compile without it.
 ├── sdks/                 # Distributable client libraries.
 │   ├── go/               # Go SDK (separate module: github.com/crashchat-ai/mio/sdk-go). Thin NATS wrapper for consumers.

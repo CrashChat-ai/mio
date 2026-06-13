@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { apiUrl } from "../../lib/api/config";
 import type { TailMessage } from "../../lib/api/types";
 
 const CAP = 80;
@@ -37,7 +38,7 @@ export function useSseTail({ accountId, conversationId, paused }: Args) {
     if (conversationId && conversationId.trim() !== "") {
       params.set("conversation_id", conversationId.trim());
     }
-    const source = new EventSource(`/api/admin/messages/tail?${params.toString()}`);
+    const source = new EventSource(apiUrl(`/api/admin/messages/tail?${params.toString()}`));
     sourceRef.current = source;
     setStatus(attemptRef.current === 0 ? "streaming" : "reconnecting");
 

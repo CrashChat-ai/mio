@@ -18,18 +18,23 @@ spec:
     {{- toYaml .Values.ingress.tls | nindent 4 }}
   {{- end }}
   rules:
-    {{- range .Values.ingress.hosts }}
-    - host: {{ .host | quote }}
+    - host: {{ .Values.ingress.host | quote }}
       http:
         paths:
-          {{- range .paths }}
+          {{- range .Values.ingress.apiPaths }}
           - path: {{ .path }}
             pathType: {{ .pathType }}
             backend:
               service:
-                name: {{ include "mio-web.fullname" $ }}
+                name: {{ include "mio-web.api.fullname" $ }}
                 port:
-                  number: {{ $.Values.service.port }}
+                  number: {{ $.Values.api.service.port }}
           {{- end }}
-    {{- end }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "mio-web.frontend.fullname" $ }}
+                port:
+                  number: {{ $.Values.frontend.service.port }}
 {{- end }}

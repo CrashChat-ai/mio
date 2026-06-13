@@ -13,7 +13,7 @@ channel_types:
   - name: zoho_cliq
     status: active
   - name: slack
-    status: planned
+    status: active
   - name: telegram
     status: planned
   - name: discord

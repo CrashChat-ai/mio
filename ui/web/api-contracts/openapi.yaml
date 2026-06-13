@@ -1,0 +1,827 @@
+openapi: 3.1.0
+info:
+  title: mio-web Admin API
+  version: 0.0.0
+  description: Operator console REST API for mio-web (tenants, accounts, channels, credentials, installs, health, audit, auth/session).
+servers:
+  - url: ""
+    description: Same-origin (reverse proxy routes /api and /auth to mio-web).
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /api/session:
+    get:
+      operationId: getSession
+      summary: Current operator session
+      security: []
+      responses:
+        "200":
+          description: Session state (authenticated flag + operator when present)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+  /auth/login:
+    get:
+      operationId: authLogin
+      summary: Begin login (redirects to Google or dev session)
+      security: []
+      responses:
+        "302":
+          description: Redirect to identity provider or app root
+        "503":
+          description: Login provider not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /auth/callback:
+    get:
+      operationId: authCallback
+      summary: OAuth callback (sets session cookie, redirects to app)
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: error
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to app root on success
+        "401":
+          description: Login rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /auth/logout:
+    post:
+      operationId: authLogout
+      summary: Clear session
+      security: []
+      responses:
+        "204":
+          description: Session cleared
+  /api/admin/tenants:
+    get:
+      operationId: listTenants
+      summary: List tenants
+      responses:
+        "200":
+          description: Tenants
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tenants]
+                properties:
+                  tenants:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Tenant"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "502":
+          $ref: "#/components/responses/AdminUnavailable"
+    post:
+      operationId: createTenant
+      summary: Create tenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTenantRequest"
+      responses:
+        "201":
+          description: Created tenant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/admin/tenants/{id}:
+    get:
+      operationId: getTenant
+      summary: Get tenant by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tenant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/admin/channel-types:
+    get:
+      operationId: listChannelTypes
+      summary: List channel types
+      responses:
+        "200":
+          description: Channel types
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [channelTypes]
+                properties:
+                  channelTypes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChannelType"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/admin/accounts:
+    get:
+      operationId: listAccounts
+      summary: List accounts for a tenant
+      parameters:
+        - name: tenant_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accounts]
+                properties:
+                  accounts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Account"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      operationId: updateAccount
+      summary: Update account display name / external id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAccountRequest"
+      responses:
+        "200":
+          description: Updated account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/admin/accounts/{id}:
+    get:
+      operationId: getAccount
+      summary: Get account by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/admin/accounts/rate-limit:
+    post:
+      operationId: setRateLimit
+      summary: Set account rate limit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetRateLimitRequest"
+      responses:
+        "200":
+          description: Updated account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/admin/accounts/disable:
+    post:
+      operationId: disableAccount
+      summary: Disable an account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountIDRequest"
+      responses:
+        "204":
+          description: Account disabled
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/admin/accounts/rotate-credential:
+    post:
+      operationId: rotateCredential
+      summary: Rotate account credential
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountIDRequest"
+      responses:
+        "204":
+          description: Credential rotated
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/admin/accounts/credential-metadata:
+    get:
+      operationId: getCredentialMetadata
+      summary: Credential metadata for an account
+      parameters:
+        - name: account_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Credential metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [credential]
+                properties:
+                  credential:
+                    $ref: "#/components/schemas/CredentialMetadata"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/admin/accounts/webhook-info:
+    get:
+      operationId: getWebhookInfo
+      summary: Webhook routing info for an account
+      parameters:
+        - name: account_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Webhook info
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [webhookInfo]
+                properties:
+                  webhookInfo:
+                    $ref: "#/components/schemas/WebhookInfo"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/admin/installs/start:
+    post:
+      operationId: startInstall
+      summary: Start a channel install
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartInstallRequest"
+      responses:
+        "200":
+          description: Install started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartInstallResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/admin/installs/complete:
+    post:
+      operationId: completeInstall
+      summary: Complete a channel install
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteInstallRequest"
+      responses:
+        "200":
+          description: Account created from install
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/admin/messages/tail:
+    get:
+      operationId: tailMessages
+      summary: Server-Sent Events stream of tail messages
+      parameters:
+        - name: account_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: conversation_id
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: SSE stream (event=message, data is a TailMessage); not consumed by the typed client.
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/TailMessage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/admin/stream-health:
+    get:
+      operationId: getStreamHealth
+      summary: Consumer stream health
+      responses:
+        "200":
+          description: Consumer health
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [consumers]
+                properties:
+                  consumers:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ConsumerHealth"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/admin/audit:
+    get:
+      operationId: listAudit
+      summary: List audit events
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: Audit events
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events]
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEvent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: mio_web_session
+  security:
+    - sessionCookie: []
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: No valid session
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Insufficient role
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    AdminUnavailable:
+      description: Upstream admin service error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        required_role:
+          type: string
+    HealthResponse:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+        service:
+          type: string
+    Operator:
+      type: object
+      required: [email, name, avatarUrl, role, expiresAt]
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        avatarUrl:
+          type: string
+        role:
+          type: string
+          enum: [viewer, operator, credential-admin]
+        expiresAt:
+          type: string
+    SessionResponse:
+      type: object
+      required: [authenticated, authMode]
+      properties:
+        authenticated:
+          type: boolean
+        authMode:
+          type: string
+        operator:
+          $ref: "#/components/schemas/Operator"
+    Tenant:
+      type: object
+      required: [id, slug, displayName, status, createdAt]
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        displayName:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+        disabledAt:
+          type: string
+    TenantEnvelope:
+      type: object
+      required: [tenant]
+      properties:
+        tenant:
+          $ref: "#/components/schemas/Tenant"
+    Account:
+      type: object
+      required:
+        - id
+        - tenantId
+        - channelType
+        - provider
+        - externalId
+        - displayName
+        - rateLimitPerSecond
+        - rateLimitScope
+        - createdAt
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        channelType:
+          type: string
+        provider:
+          type: string
+        externalId:
+          type: string
+        displayName:
+          type: string
+        rateLimitPerSecond:
+          type: integer
+          format: int32
+        rateLimitScope:
+          type: string
+        createdAt:
+          type: string
+        disabledAt:
+          type: string
+    AccountEnvelope:
+      type: object
+      required: [account]
+      properties:
+        account:
+          $ref: "#/components/schemas/Account"
+    ChannelType:
+      type: object
+      required:
+        - slug
+        - status
+        - authKind
+        - supportsThreads
+        - supportsEdit
+        - supportsDelete
+        - allowedAttachmentKinds
+        - rateLimitScope
+        - rateLimitPerSecond
+        - maxTextBytes
+      properties:
+        slug:
+          type: string
+        status:
+          type: string
+        authKind:
+          type: string
+        supportsThreads:
+          type: boolean
+        supportsEdit:
+          type: boolean
+        supportsDelete:
+          type: boolean
+        allowedAttachmentKinds:
+          type: array
+          items:
+            type: string
+        rateLimitScope:
+          type: string
+        rateLimitPerSecond:
+          type: integer
+          format: int32
+        maxTextBytes:
+          type: integer
+          format: int32
+    TailMessage:
+      type: object
+      required:
+        - id
+        - tenantId
+        - accountId
+        - conversationId
+        - channelType
+        - senderDisplay
+        - text
+        - receivedAt
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        accountId:
+          type: string
+        conversationId:
+          type: string
+        channelType:
+          type: string
+        senderDisplay:
+          type: string
+        text:
+          type: string
+        receivedAt:
+          type: string
+    CredentialMetadata:
+      type: object
+      required: [accountId, hasCredential]
+      properties:
+        accountId:
+          type: string
+        hasCredential:
+          type: boolean
+        authKind:
+          type: string
+        keyVersion:
+          type: integer
+          format: int32
+        expiresAt:
+          type: string
+        rotatedAt:
+          type: string
+    WebhookInfo:
+      type: object
+      required:
+        - accountId
+        - channelType
+        - webhookUrl
+        - routeAliases
+        - authKind
+        - setupHint
+      properties:
+        accountId:
+          type: string
+        channelType:
+          type: string
+        webhookUrl:
+          type: string
+        routeAliases:
+          type: array
+          items:
+            type: string
+        authKind:
+          type: string
+        setupHint:
+          type: string
+    ConsumerHealth:
+      type: object
+      required: [consumerName, stream, numPending, numAckPending]
+      properties:
+        consumerName:
+          type: string
+        stream:
+          type: string
+        numPending:
+          type: integer
+          format: int64
+          minimum: 0
+        numAckPending:
+          type: integer
+          format: int64
+          minimum: 0
+        lastDelivered:
+          type: string
+    AuditEvent:
+      type: object
+      required:
+        - operatorEmail
+        - operatorRole
+        - action
+        - targetType
+        - targetId
+        - result
+        - createdAt
+      properties:
+        operatorEmail:
+          type: string
+        operatorRole:
+          type: string
+        action:
+          type: string
+        targetType:
+          type: string
+        targetId:
+          type: string
+        result:
+          type: string
+        error:
+          type: string
+        createdAt:
+          type: string
+    CreateTenantRequest:
+      type: object
+      required: [slug, displayName]
+      properties:
+        slug:
+          type: string
+        displayName:
+          type: string
+    UpdateAccountRequest:
+      type: object
+      required: [accountId, displayName, externalId]
+      properties:
+        accountId:
+          type: string
+        displayName:
+          type: string
+        externalId:
+          type: string
+    SetRateLimitRequest:
+      type: object
+      required: [accountId, rateLimitPerSecond, rateLimitScope]
+      properties:
+        accountId:
+          type: string
+        rateLimitPerSecond:
+          type: integer
+          format: int32
+        rateLimitScope:
+          type: string
+    AccountIDRequest:
+      type: object
+      required: [accountId]
+      properties:
+        accountId:
+          type: string
+    StartInstallRequest:
+      type: object
+      required: [tenantId, channelType, provider]
+      properties:
+        tenantId:
+          type: string
+        channelType:
+          type: string
+        provider:
+          type: string
+    StartInstallResponse:
+      type: object
+      required: [installId, oauthUrl, redirectUri]
+      properties:
+        installId:
+          type: string
+        oauthUrl:
+          type: string
+        redirectUri:
+          type: string
+    CompleteInstallRequest:
+      type: object
+      required: [installId]
+      properties:
+        installId:
+          type: string
+security:
+  - sessionCookie: []

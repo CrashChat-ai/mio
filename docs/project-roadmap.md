@@ -1,6 +1,6 @@
 # MIO — Project Roadmap
 
-**Last updated:** 2026-05-13  
+**Last updated:** 2026-06-14  
 **Current phase:** P9.5 ✅ (admin control plane + TUI scaffold shipped)  
 **Shipped in recent commits:** Admin server (connect-rpc loopback), TUI (bubbletea read-only v1), embedded NATS option, pkg/channels adapter contract, role-based monorepo layout  
 **Next focus:** P10–P12 (BigQuery sink, channel registry control plane write ops, operator web admin)
@@ -25,7 +25,7 @@
 | **P9.6** | 🚧 | Pure-gateway refactor | Dynamic inbound routing, generic secret loading, S3 backend, multi-account routing, community adapter kit | `.work/plans/260612-1626-pure-gateway-refactor/` |
 | **P10** | 🚧 | BigQuery sink / lakehouse | External tables + native warehouse table, loader pipeline | `.work/plans/260510-1102-bq-sink-lakehouse/` |
 | **P11** | 🚧 | Channel registry control plane | Additive admin RPCs for account detail/update, rate limits, and credential metadata | `.work/plans/260513-0351-channel-management-control-plane/` |
-| **P12** | 🚧 | Operator web admin | `ui/web` Go BFF + embedded React SPA with role-gated audited mutations | `.work/plans/260610-1352-issue-31-web-admin-phase0-reconcile/` |
+| **P12** | 🚧 | Operator web admin | `ui/web` Go BFF + role-gated audited mutations; decoupled into pure React SPA + API-only Go server behind a single-origin reverse proxy, OpenAPI-contracted typed client | `.work/plans/260614-0122-web-decouple/` |
 | **—** | — | Second channel adapter (Slack) | Webhook inbound, API outbound, per-channel rate limits | open |
 | **—** | — | ELT pipeline (Airflow DAG) | Scheduled Cloud Run Job for BigQuery loader | `.work/plans/260510-2333-elt-mio-airflow-dag/` |
 | **—** | — | Cliq OAuth refresh hardening | Token refresh retry/backoff, credential rotation | `.work/plans/260510-0152-cliq-oauth-token-refresh/` |

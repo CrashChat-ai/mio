@@ -120,15 +120,54 @@ and "transport" separable.
 - Inspect messages, list channels, view consumer lag
 - Write ops deferred to P6+
 
-**mio-web** (`ui/web`): Internal role-gated operator console with a Go BFF and
-embedded React SPA. Viewer operators can inspect tenants, accounts, channels,
-credential metadata, and live message tails; operator and credential-admin
-roles can perform audited mutations. Local development can front a loopback
-admin server, but cluster deploys must not rely on cross-pod loopback. The
-default cluster topology is a non-public AdminService listener behind an
-internal ClusterIP, with `MIO_ADMIN_ALLOW_CIDRS` and NetworkPolicy allowing
-only the web-admin pods to dial `:9090`. Customer-facing workspace onboarding
-remains in MIU.
+**mio-web** (`ui/web`): Internal role-gated operator console, decoupled into a
+pure React static frontend and an API-only Go BFF served behind a single-origin
+reverse proxy (hatchet model). Viewer operators can inspect tenants, accounts,
+channels, credential metadata, and live message tails; operator and
+credential-admin roles can perform audited mutations. Local development can
+front a loopback admin server, but cluster deploys must not rely on cross-pod
+loopback. The default cluster topology is a non-public AdminService listener
+behind an internal ClusterIP, with `MIO_ADMIN_ALLOW_CIDRS` and NetworkPolicy
+allowing only the web-admin pods to dial `:9090`. Customer-facing workspace
+onboarding remains in MIU. See [mio-web-deployment.md](mio-web-deployment.md)
+for the decoupled topology and env matrix.
+
+The decoupled web stack has three pieces on one public origin:
+
+- **Frontend** (`ui/web/app`): standalone Vite/React build, no `go:embed`. The
+  build emits static assets only; the SPA calls the API over a relative `/api`
+  base (configurable via `VITE_API_BASE_URL` for cross-origin deploys).
+- **API** (`cmd/mio-web`): JSON-only Go BFF. Serves `/api/*` (incl.
+  `/api/admin/*` behind `auth.Require` + role checks + audit), `/auth/*`, and
+  `/healthz`. Keeps RBAC/audit/session-cookie auth; calls AdminService loopback.
+- **Reverse proxy** (Caddy in compose, ingress in k8s): one origin routes
+  `/api`, `/auth`, `/healthz` → API and `/*` → frontend. Same origin ⇒ the
+  `SameSite=Lax` session cookie and the `Path=/auth/callback` OAuth state cookie
+  keep flowing with no CORS by default. CORS is an env-gated allowlist
+  (`MIO_WEB_CORS_ORIGINS`), off by default.
+
+**Contract + codegen:** the REST surface is described by an OpenAPI contract
+(`ui/web/app/src/lib/api/generated/schema.d.ts` generated via
+openapi-typescript); a thin typed fetch wrapper (`api.ts` + `config.ts`)
+replaces the former hand-typed `api<T>()`. The generated client is committed and
+CI drift-checks the spec against the router (regen + `git diff --exit-code` plus
+a route-coverage check).
+
+```mermaid
+flowchart LR
+  browser["Operator browser"]
+  proxy["Reverse proxy<br/>(Caddy / ingress)<br/>single origin"]
+  fe["mio-web-frontend<br/>(static React)"]
+  api["mio-web-api<br/>(Go BFF)"]
+  admin["AdminService<br/>(connect-rpc, loopback)"]
+  pg[("Postgres<br/>sessions + audit")]
+
+  browser --> proxy
+  proxy -->|"/* "| fe
+  proxy -->|"/api, /auth, /healthz"| api
+  api --> admin
+  api --> pg
+```
 
 **Embedded NATS Option:** All-in-one binary (`cmd/all-in-one`) bundles gateway + NATS JetStream (memory or file-backed).
 - Laptop demos, single-host POC, development

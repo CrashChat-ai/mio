@@ -13,6 +13,7 @@ import (
 type Admin interface {
 	CreateTenant(ctx context.Context, slug, displayName string) (*adminv1.Tenant, error)
 	ListTenants(ctx context.Context) ([]*adminv1.Tenant, error)
+	GetTenant(ctx context.Context, tenantID string) (*adminv1.Tenant, error)
 	ListChannelTypes(ctx context.Context) ([]*adminv1.ChannelTypeInfo, error)
 	StartInstall(ctx context.Context, tenantID, channelType, provider string) (*adminv1.StartInstallResponse, error)
 	CompleteInstall(ctx context.Context, installID string) (*adminv1.Account, error)
@@ -64,6 +65,16 @@ func (c *Client) CreateTenant(ctx context.Context, slug, displayName string) (*a
 	resp, err := c.c.CreateTenant(ctx, connect.NewRequest(&adminv1.CreateTenantRequest{
 		Slug:        slug,
 		DisplayName: displayName,
+	}))
+	if err != nil {
+		return nil, err
+	}
+	return resp.Msg.GetTenant(), nil
+}
+
+func (c *Client) GetTenant(ctx context.Context, tenantID string) (*adminv1.Tenant, error) {
+	resp, err := c.c.GetTenant(ctx, connect.NewRequest(&adminv1.GetTenantRequest{
+		Id: tenantID,
 	}))
 	if err != nil {
 		return nil, err

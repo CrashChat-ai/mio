@@ -44,6 +44,15 @@ func (f *fakeAdmin) ListTenants(context.Context) ([]*adminv1.Tenant, error) {
 	return f.tenants, nil
 }
 
+func (f *fakeAdmin) GetTenant(_ context.Context, tenantID string) (*adminv1.Tenant, error) {
+	for _, tenant := range f.tenants {
+		if tenant.GetId() == tenantID {
+			return tenant, nil
+		}
+	}
+	return nil, nil
+}
+
 func (f *fakeAdmin) ListChannelTypes(context.Context) ([]*adminv1.ChannelTypeInfo, error) {
 	return f.channels, nil
 }
@@ -187,6 +196,75 @@ func TestAdminReadRoutes(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `"displayName":"Cliq prod"`) {
 		t.Fatalf("accounts body: %s", rec.Body.String())
+	}
+}
+
+func TestGetTenantDetailRoute(t *testing.T) {
+	handler := newTestHandler(t)
+	cookie := loginCookie(t, handler)
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/tenants/t1", nil)
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("tenant detail status: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"slug":"acme"`) {
+		t.Fatalf("tenant detail body: %s", rec.Body.String())
+	}
+}
+
+func TestGetAccountDetailRoute(t *testing.T) {
+	handler := newTestHandler(t)
+	cookie := loginCookie(t, handler)
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/accounts/a1", nil)
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("account detail status: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"displayName":"Cliq prod"`) {
+		t.Fatalf("account detail body: %s", rec.Body.String())
+	}
+}
+
+func TestAccountIDRouteDoesNotShadowSubPaths(t *testing.T) {
+	handler, _, fake := newTestFixture(t, auth.RoleOperator)
+	cookie := loginCookie(t, handler)
+
+	rate := httptest.NewRequest(http.MethodPost, "/api/admin/accounts/rate-limit",
+		strings.NewReader(`{"accountId":"a1","rateLimitPerSecond":5,"rateLimitScope":"account"}`))
+	rate.Header.Set("Content-Type", "application/json")
+	rate.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, rate)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("rate-limit status: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if fake.accounts[0].GetRateLimitPerSecond() != 5 {
+		t.Fatalf("rate-limit not applied: %+v", fake.accounts[0])
+	}
+
+	disable := httptest.NewRequest(http.MethodPost, "/api/admin/accounts/disable",
+		strings.NewReader(`{"accountId":"a1"}`))
+	disable.Header.Set("Content-Type", "application/json")
+	disable.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, disable)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("disable status: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if fake.disabledID != "a1" {
+		t.Fatalf("disable not routed: %q", fake.disabledID)
+	}
+
+	meta := httptest.NewRequest(http.MethodGet, "/api/admin/accounts/credential-metadata?account_id=a1", nil)
+	meta.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, meta)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"keyVersion"`) {
+		t.Fatalf("credential-metadata shadowed: %d body=%s", rec.Code, rec.Body.String())
 	}
 }
 

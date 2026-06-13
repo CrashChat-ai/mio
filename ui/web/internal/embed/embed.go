@@ -40,8 +40,16 @@ func Handler() http.Handler {
 			return
 		}
 
+		w.Header().Set("Cache-Control", cacheControl(cleaned))
 		files.ServeHTTP(w, r)
 	})
+}
+
+func cacheControl(name string) string {
+	if strings.HasPrefix(name, "assets/") {
+		return "public, max-age=31536000, immutable"
+	}
+	return "no-cache"
 }
 
 func serveIndex(w http.ResponseWriter, dist fs.FS) {
@@ -52,5 +60,6 @@ func serveIndex(w http.ResponseWriter, dist fs.FS) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
 	_, _ = w.Write(index)
 }

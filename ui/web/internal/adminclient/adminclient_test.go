@@ -31,6 +31,15 @@ func (s *stubAdminServer) ListChannelTypes(context.Context, *connect.Request[adm
 	return connect.NewResponse(&adminv1.ListChannelTypesResponse{ChannelTypes: s.channels}), nil
 }
 
+func (s *stubAdminServer) GetTenant(_ context.Context, req *connect.Request[adminv1.GetTenantRequest]) (*connect.Response[adminv1.GetTenantResponse], error) {
+	for _, tenant := range s.tenants {
+		if tenant.GetId() == req.Msg.GetId() {
+			return connect.NewResponse(&adminv1.GetTenantResponse{Tenant: tenant}), nil
+		}
+	}
+	return connect.NewResponse(&adminv1.GetTenantResponse{}), nil
+}
+
 func (s *stubAdminServer) ListAccounts(_ context.Context, req *connect.Request[adminv1.ListAccountsRequest]) (*connect.Response[adminv1.ListAccountsResponse], error) {
 	out := make([]*adminv1.Account, 0, len(s.accounts))
 	for _, account := range s.accounts {
@@ -99,6 +108,14 @@ func TestClientListReads(t *testing.T) {
 	}
 	if len(accounts) != 1 || accounts[0].GetId() != "a1" {
 		t.Fatalf("accounts: %+v", accounts)
+	}
+
+	tenant, err := client.GetTenant(context.Background(), "t1")
+	if err != nil {
+		t.Fatalf("GetTenant: %v", err)
+	}
+	if tenant.GetSlug() != "acme" {
+		t.Fatalf("tenant: %+v", tenant)
 	}
 }
 

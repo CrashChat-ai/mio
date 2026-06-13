@@ -29,7 +29,10 @@ type Event struct {
 
 type Logger interface {
 	Record(ctx context.Context, event Event) error
+	List(ctx context.Context, limit int) ([]Event, error)
 }
+
+const DefaultListLimit = 100
 
 type MemoryLogger struct {
 	mu     sync.Mutex
@@ -56,6 +59,19 @@ func (m *MemoryLogger) Events() []Event {
 	out := make([]Event, len(m.events))
 	copy(out, m.events)
 	return out
+}
+
+func (m *MemoryLogger) List(_ context.Context, limit int) ([]Event, error) {
+	if limit <= 0 {
+		limit = DefaultListLimit
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]Event, 0, limit)
+	for i := len(m.events) - 1; i >= 0 && len(out) < limit; i-- {
+		out = append(out, m.events[i])
+	}
+	return out, nil
 }
 
 type PostgresLogger struct {
@@ -98,4 +114,32 @@ INSERT INTO web_operator_audit (
 		return fmt.Errorf("audit: record event: %w", err)
 	}
 	return nil
+}
+
+func (p *PostgresLogger) List(ctx context.Context, limit int) ([]Event, error) {
+	if limit <= 0 {
+		limit = DefaultListLimit
+	}
+	rows, err := p.pool.Query(ctx, `
+SELECT operator_email, operator_role, action, target_type, target_id, result, error, created_at
+FROM web_operator_audit
+ORDER BY created_at DESC
+LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("audit: list events: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]Event, 0, limit)
+	for rows.Next() {
+		var e Event
+		if err := rows.Scan(&e.OperatorEmail, &e.OperatorRole, &e.Action, &e.TargetType, &e.TargetID, &e.Result, &e.Error, &e.CreatedAt); err != nil {
+			return nil, fmt.Errorf("audit: scan event: %w", err)
+		}
+		out = append(out, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("audit: list events: %w", err)
+	}
+	return out, nil
 }

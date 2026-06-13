@@ -12,6 +12,7 @@ bin/
 dist/
 !ui/web/internal/embed/dist/
 !ui/web/internal/embed/dist/index.html
+ui/web/internal/embed/dist/assets/
 vendor/
 *.test
 *.out

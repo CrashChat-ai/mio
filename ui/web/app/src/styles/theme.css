@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0a0c10;
+  --color-surface: #0f1217;
+  --color-surface-2: #141923;
+  --color-fg: #e8ecf2;
+  --color-fg-2: #a9b2bf;
+  --color-muted: #7d8794;
+  --color-fg-faint: #4a5260;
+  --color-border: #1e242e;
+  --color-border-soft: #161b23;
+  --color-accent: #22d3ee;
+  --color-accent-on: #06181d;
+  --color-accent-hover: color-mix(in oklab, #22d3ee, white 12%);
+  --color-accent-active: color-mix(in oklab, #22d3ee, black 12%);
+  --color-success: #34d399;
+  --color-warn: #fbbf24;
+  --color-danger: #f87171;
+  --font-display: "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
+  /* mono is for IDs, timestamps, counts, code chips, eyebrows only — never body copy */
+  --font-mono: "JetBrains Mono", "SF Mono", "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --text-xs: 0.6875rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.625rem;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 9999px;
+  /* elevation contract: tiles flat + ring border, panels raised — no other combos */
+  --shadow-elev-flat: 0 0 #0000;
+  --shadow-elev-ring: 0 0 0 1px var(--color-border);
+  --shadow-elev-raised: 0 12px 32px rgba(2, 4, 8, 0.45);
+  --shadow-focus-ring: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-accent);
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    min-height: 100dvh;
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus-ring);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+}
+
+/* signature zones only: page-head + audit empty state — never two grids seaming */
+@utility grid-texture {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-border), transparent 28%) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-border), transparent 28%) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-position: -1px -1px;
+}
+
+@utility eyebrow {
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}

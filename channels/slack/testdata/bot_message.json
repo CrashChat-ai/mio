@@ -1,0 +1,14 @@
+{
+  "type": "event_callback",
+  "team_id": "T01ABCD2EFG",
+  "event_id": "Ev01BOTECHO01",
+  "event": {
+    "type": "message",
+    "subtype": "bot_message",
+    "channel": "C01PUBLIC001",
+    "channel_type": "channel",
+    "bot_id": "B01OURBOT001",
+    "text": "this is the bot's own outbound message echoed back",
+    "ts": "1700000600.001300"
+  }
+}

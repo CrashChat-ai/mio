@@ -1,0 +1,24 @@
+{
+  "type": "event_callback",
+  "team_id": "T01ABCD2EFG",
+  "event_id": "Ev01MSGCHANGE",
+  "event": {
+    "type": "message",
+    "subtype": "message_changed",
+    "channel": "C01PUBLIC001",
+    "channel_type": "channel",
+    "ts": "1700000200.000700",
+    "message": {
+      "type": "message",
+      "user": "U01SENDER001",
+      "text": "hello from a public channel (edited)",
+      "ts": "1700000000.000100"
+    },
+    "previous_message": {
+      "type": "message",
+      "user": "U01SENDER001",
+      "text": "hello from a public channel",
+      "ts": "1700000000.000100"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "type": "event_callback",
+  "team_id": "T01ABCD2EFG",
+  "event_id": "Ev01REACTRMV1",
+  "event": {
+    "type": "reaction_removed",
+    "user": "U01SENDER002",
+    "reaction": "thumbsup",
+    "ts": "1700000410.001100",
+    "item": {
+      "type": "message",
+      "channel": "C01PUBLIC001",
+      "ts": "1700000000.000100"
+    }
+  }
+}

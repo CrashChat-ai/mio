@@ -1,0 +1,15 @@
+{
+  "type": "event_callback",
+  "team_id": "T01ABCD2EFG",
+  "event_id": "Ev01THREADBC1",
+  "event": {
+    "type": "message",
+    "subtype": "thread_broadcast",
+    "channel": "C01PUBLIC001",
+    "channel_type": "channel",
+    "user": "U01SENDER002",
+    "text": "broadcasting this reply to the channel",
+    "ts": "1700000110.000600",
+    "thread_ts": "1700000000.000100"
+  }
+}

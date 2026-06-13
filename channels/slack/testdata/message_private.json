@@ -1,0 +1,13 @@
+{
+  "type": "event_callback",
+  "team_id": "T01ABCD2EFG",
+  "event_id": "Ev01PRIVMSG01",
+  "event": {
+    "type": "message",
+    "channel": "G01PRIVATE001",
+    "channel_type": "group",
+    "user": "U01SENDER001",
+    "text": "hello in a private channel",
+    "ts": "1700000030.000400"
+  }
+}

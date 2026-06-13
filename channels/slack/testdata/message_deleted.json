@@ -1,0 +1,19 @@
+{
+  "type": "event_callback",
+  "team_id": "T01ABCD2EFG",
+  "event_id": "Ev01MSGDELETE",
+  "event": {
+    "type": "message",
+    "subtype": "message_deleted",
+    "channel": "C01PUBLIC001",
+    "channel_type": "channel",
+    "ts": "1700000300.000900",
+    "deleted_ts": "1700000000.000100",
+    "previous_message": {
+      "type": "message",
+      "user": "U01SENDER001",
+      "text": "hello from a public channel",
+      "ts": "1700000000.000100"
+    }
+  }
+}

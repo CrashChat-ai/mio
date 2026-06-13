@@ -1,0 +1,25 @@
+{
+  "type": "event_callback",
+  "team_id": "T01ABCD2EFG",
+  "enterprise_id": "E01GRID00001",
+  "event_id": "Ev01FILESHARE",
+  "event": {
+    "type": "message",
+    "subtype": "file_share",
+    "channel": "C01PUBLIC001",
+    "channel_type": "channel",
+    "user": "U01SENDER001",
+    "text": "here is a screenshot",
+    "ts": "1700000500.001200",
+    "files": [
+      {
+        "id": "F01IMAGE0001",
+        "name": "screenshot.png",
+        "mimetype": "image/png",
+        "size": 20480,
+        "url_private": "https://files.slack.com/files-pri/T01ABCD2EFG-F01IMAGE0001/screenshot.png",
+        "url_private_download": "https://files.slack.com/files-pri/T01ABCD2EFG-F01IMAGE0001/download/screenshot.png"
+      }
+    ]
+  }
+}

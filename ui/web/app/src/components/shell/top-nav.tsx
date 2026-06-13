@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Monitor, Moon, Sun } from "lucide-react";
+import { apiUrl } from "../../lib/api/config";
 import { useSession } from "../../contexts/session-provider";
 import { useTheme } from "../../contexts/theme-provider";
 import { queryClient } from "../../lib/query-client";
@@ -19,7 +20,7 @@ export function TopNav() {
   const ThemeIcon = THEME_ICONS[theme];
 
   async function signOut() {
-    await fetch("/auth/logout", { method: "POST", credentials: "same-origin" });
+    await fetch(apiUrl("/auth/logout"), { method: "POST", credentials: "same-origin" });
     queryClient.removeQueries();
     await navigate({ to: "/login" });
   }

@@ -1,6 +1,7 @@
 import { createRoute, redirect } from "@tanstack/react-router";
 import { rootRoute } from "./__root";
 import { sessionQuery } from "../lib/query-keys";
+import { apiUrl } from "../lib/api/config";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 
@@ -51,7 +52,7 @@ function LoginPage() {
               : "Sign in with your Google operator account."}
           </p>
           <Button variant="primary" asChild>
-            <a href="/auth/login">{authMode === "dev" ? "Continue as dev operator" : "Continue with Google"}</a>
+            <a href={apiUrl("/auth/login")}>{authMode === "dev" ? "Continue as dev operator" : "Continue with Google"}</a>
           </Button>
         </CardContent>
       </Card>

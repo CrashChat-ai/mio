@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, jsonRequest } from "../../lib/api/client";
+import { api, jsonRequest } from "../../lib/api/api";
 import { queries } from "../../lib/query-keys";
 import { useSession } from "../../contexts/session-provider";
 import { roleAllows } from "../../lib/roles";

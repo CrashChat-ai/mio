@@ -1,6 +1,6 @@
 import { createQueryKeys, mergeQueryKeys } from "@lukemorales/query-key-factory";
 import { queryOptions } from "@tanstack/react-query";
-import { api } from "./api/client";
+import { api } from "./api/api";
 import type {
   Account,
   AuditEvent,

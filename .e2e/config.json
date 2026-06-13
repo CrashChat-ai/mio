@@ -9,17 +9,20 @@
   "health": [
     { "url": "http://localhost:18080/healthz", "expect": 200 },
     { "url": "http://localhost:19090/healthz", "expect": 200 },
-    { "url": "http://localhost:18081/healthz", "expect": 200 }
+    { "url": "http://localhost:18081/healthz", "expect": 200 },
+    { "url": "http://localhost:18081/api/session", "expect": 200 },
+    { "url": "http://localhost:18081/", "expect": 200 }
   ],
   "checks": [
     { "name": "nats", "cmd": "curl -sf http://localhost:18222/healthz" },
-    { "name": "minio", "cmd": "curl -sf http://localhost:19000/minio/health/live" }
+    { "name": "minio", "cmd": "curl -sf http://localhost:19000/minio/health/live" },
+    { "name": "auth-routing", "cmd": "curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://localhost:18081/auth/login | grep -E '^30[12] http://localhost:18081/$'" }
   ],
   "auth": {
     "strategy": "form",
-    "probeUrl": "http://localhost:18081/",
+    "probeUrl": "http://localhost:18081/api/session",
     "loginUrlPattern": "/login",
     "loginUrl": "http://localhost:18081/login",
-    "notes": "MIO_WEB_AUTH_MODE=dev — dev login button signs in as operator@localhost (credential-admin); no real credentials"
+    "notes": "Decoupled single-origin stack: Caddy proxy on :18081 routes /api, /auth, /healthz -> mio-web-api:8080 and /* -> mio-web-frontend:80. MIO_WEB_AUTH_MODE=dev — the /login page links to /auth/login which (dev mode) creates an operator@localhost (credential-admin) session and 302s back to /. No real credentials. Same origin keeps the SameSite=Lax session cookie + Path=/auth/callback OAuth state cookie flowing; no CORS."
   }
 }

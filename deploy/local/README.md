@@ -6,13 +6,17 @@ Bring up Postgres + NATS + MinIO for local development:
 make up
 ```
 
-Bring up the local operator stack (`gateway`, AdminService, and `mio-web`):
+Bring up the local operator stack (`gateway`, AdminService, and the decoupled
+`mio-web` API + static frontend behind a Caddy reverse proxy):
 
 ```bash
 make operator-web-up
 ```
 
-The local operator console defaults to http://localhost:8081 with dev auth for
+The operator console is served on one origin (http://localhost:8081) by the
+`mio-web-proxy` Caddy service, which routes `/api`, `/auth`, `/healthz` to
+`mio-web-api` and everything else to the static `mio-web-frontend`. Same origin
+keeps the session cookie flowing without CORS. Dev auth signs in
 `operator@localhost`. See `docs/mio-web-deployment.md` for Google OAuth setup.
 
 ## Environment variables
@@ -28,7 +32,7 @@ the variables below; everything else lives in `services/gateway/internal/config`
 | `MIO_ADMIN_ADDR` | `127.0.0.1:9090` | Admin connect-go listener bind. Loopback by default; widen via `MIO_ADMIN_ALLOW_CIDRS` or reverse proxy for non-local deploys. |
 | `MIO_ADMIN_PUBLIC_URL` | `http://127.0.0.1:9090` | External URL pointing at the admin listener (or its reverse proxy). Used to build `redirect_uri` for OAuth callbacks. |
 | `MIO_ADMIN_ALLOW_CIDRS` | _empty_ | Comma-separated CIDR list permitted to call admin RPCs. Loopback (`127.0.0.1`, `::1`) is always allowed; anything else returns 403. |
-| `MIO_WEB_PUBLIC_URL` | `http://localhost:8081` | Browser-facing URL for local `mio-web`; Google login redirects to `/auth/callback` under this URL. |
+| `MIO_WEB_PUBLIC_URL` | `http://localhost:8081` | Reverse-proxy origin for local `mio-web`; Google login redirects to `/auth/callback` under this URL. |
 | `MIO_WEB_AUTH_MODE` | `dev` in compose | `dev` signs in `MIO_WEB_DEV_OPERATOR_EMAIL`; deployed environments should use `google`. |
 | `MIO_WEB_OPERATOR_EMAILS` / `MIO_WEB_OPERATOR_DOMAINS` | `operator@localhost` / _empty_ | Operator allowlist enforced before admin routes are served. |
 | `MIO_WEB_OPERATOR_DEFAULT_ROLE` / `MIO_WEB_OPERATOR_ROLES` | `viewer` / `operator@localhost=credential-admin` | Role assignments for allowed operators. |

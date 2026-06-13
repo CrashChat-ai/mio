@@ -1,15 +1,5 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:26-bookworm-slim AS web
-WORKDIR /src/ui/web/app
-
-RUN npm install -g pnpm@10.33.2
-COPY ui/web/app/package.json ui/web/app/pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
-
-COPY ui/web/app/ ./
-RUN pnpm build
-
 FROM bufbuild/buf:1.69.0 AS proto
 WORKDIR /src
 COPY buf.yaml buf.gen.yaml ./
@@ -27,8 +17,6 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 COPY . .
 COPY --from=proto /src/proto/gen/ ./proto/gen/
-RUN rm -rf ui/web/internal/embed/dist && mkdir -p ui/web/internal/embed/dist
-COPY --from=web /src/ui/web/app/dist/ ./ui/web/internal/embed/dist/
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     go build -trimpath -ldflags="-s -w" -o /out/mio-web ./ui/web/cmd/mio-web

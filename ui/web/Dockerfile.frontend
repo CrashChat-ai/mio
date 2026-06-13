@@ -1,0 +1,19 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:26-bookworm-slim AS web
+WORKDIR /src/ui/web/app
+
+ARG VITE_API_BASE_URL=""
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+
+RUN npm install -g pnpm@10.33.2
+COPY ui/web/app/package.json ui/web/app/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY ui/web/app/ ./
+RUN pnpm build
+
+FROM caddy:2.8-alpine
+COPY ui/web/Caddyfile.frontend /etc/caddy/Caddyfile
+COPY --from=web /src/ui/web/app/dist/ /srv
+EXPOSE 80

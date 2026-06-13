@@ -1,0 +1,13 @@
+{
+  "type": "event_callback",
+  "team_id": "T01ABCD2EFG",
+  "event_id": "Ev01DMMSG001",
+  "event": {
+    "type": "message",
+    "channel": "D01DIRECT001",
+    "channel_type": "im",
+    "user": "U01SENDER001",
+    "text": "hello in a dm",
+    "ts": "1700000010.000200"
+  }
+}

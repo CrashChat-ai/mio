@@ -10,5 +10,6 @@
 package all
 
 import (
+	_ "github.com/crashchat-ai/mio/channels/slack"
 	_ "github.com/crashchat-ai/mio/channels/zohocliq"
 )

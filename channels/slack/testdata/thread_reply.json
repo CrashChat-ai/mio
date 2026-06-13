@@ -1,0 +1,14 @@
+{
+  "type": "event_callback",
+  "team_id": "T01ABCD2EFG",
+  "event_id": "Ev01THREADRPY",
+  "event": {
+    "type": "message",
+    "channel": "C01PUBLIC001",
+    "channel_type": "channel",
+    "user": "U01SENDER002",
+    "text": "this is a threaded reply",
+    "ts": "1700000100.000500",
+    "thread_ts": "1700000000.000100"
+  }
+}

@@ -408,12 +408,14 @@ func labelMap(m *dto.Metric) map[string]string {
 // --- Registry loader tests ---
 
 func TestKnownRegistry_ActiveOnly(t *testing.T) {
-	// zoho_cliq is active per channels.yaml
-	if !Known["zoho_cliq"] {
-		t.Error("zoho_cliq should be in Known (status: active)")
+	// active per channels.yaml
+	for _, active := range []string{"zoho_cliq", "slack"} {
+		if !Known[active] {
+			t.Errorf("%q should be in Known (status: active)", active)
+		}
 	}
 	// planned channels must NOT be in Known
-	for _, planned := range []string{"slack", "telegram", "discord"} {
+	for _, planned := range []string{"telegram", "discord"} {
 		if Known[planned] {
 			t.Errorf("planned channel %q should NOT be in Known", planned)
 		}

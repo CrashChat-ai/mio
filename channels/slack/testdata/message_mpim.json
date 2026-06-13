@@ -1,0 +1,13 @@
+{
+  "type": "event_callback",
+  "team_id": "T01ABCD2EFG",
+  "event_id": "Ev01MPIMMSG01",
+  "event": {
+    "type": "message",
+    "channel": "G01MPIM00001",
+    "channel_type": "mpim",
+    "user": "U01SENDER001",
+    "text": "hello in a multi-party dm",
+    "ts": "1700000020.000300"
+  }
+}

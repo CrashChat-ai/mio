@@ -46,12 +46,12 @@ type AdminServer struct {
 
 // Deps groups required dependencies for NewServer.
 type Deps struct {
-	Pool      *pgxpool.Pool
-	Cipher    crypto.Cipher
-	SDK       *sdk.Client
-	Registry  []channels.Adapter
-	Metrics   *AdminMetrics
-	Logger    *slog.Logger
+	Pool             *pgxpool.Pool
+	Cipher           crypto.Cipher
+	SDK              *sdk.Client
+	Registry         []channels.Adapter
+	Metrics          *AdminMetrics
+	Logger           *slog.Logger
 	PublicURL        string
 	GatewayPublicURL string
 }
@@ -63,13 +63,13 @@ func NewServer(d Deps) *AdminServer {
 		d.Logger = slog.Default()
 	}
 	return &AdminServer{
-		Pool:      d.Pool,
-		Cipher:    d.Cipher,
-		SDK:       d.SDK,
-		Registry:  d.Registry,
-		Metrics:   d.Metrics,
-		Logger:    d.Logger,
-		stash:     newInstallStash(),
+		Pool:             d.Pool,
+		Cipher:           d.Cipher,
+		SDK:              d.SDK,
+		Registry:         d.Registry,
+		Metrics:          d.Metrics,
+		Logger:           d.Logger,
+		stash:            newInstallStash(),
 		publicURL:        d.PublicURL,
 		gatewayPublicURL: d.GatewayPublicURL,
 	}

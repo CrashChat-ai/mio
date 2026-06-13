@@ -16,9 +16,9 @@ import (
 	"github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1/adminv1connect"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 
+	sdk "github.com/crashchat-ai/mio/sdk-go"
 	"github.com/crashchat-ai/mio/services/gateway/internal/nats"
 	"github.com/crashchat-ai/mio/services/gateway/store"
-	sdk "github.com/crashchat-ai/mio/sdk-go"
 )
 
 // natsRig boots embedded NATS, provisions MESSAGES_INBOUND, and returns

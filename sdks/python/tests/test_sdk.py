@@ -241,11 +241,12 @@ def test_consume_passthrough_schema_v2():
 
 
 def test_known_contains_active_only():
-    assert "zoho_cliq" in KNOWN, "zoho_cliq (status:active) must be in KNOWN"
+    for ch in ("zoho_cliq", "slack"):
+        assert ch in KNOWN, f"{ch!r} (status:active) must be in KNOWN"
 
 
 def test_known_excludes_planned():
-    for ch in ("slack", "telegram", "discord"):
+    for ch in ("telegram", "discord"):
         assert ch not in KNOWN, f"planned channel {ch!r} must NOT be in KNOWN"
 
 

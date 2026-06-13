@@ -84,4 +84,15 @@ export type ConsumerHealth = {
   lastDelivered?: string;
 };
 
+export type AuditEvent = {
+  operatorEmail: string;
+  operatorRole: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  result: string;
+  error?: string;
+  createdAt: string;
+};
+
 export type LoadState = "idle" | "loading" | "ready" | "error";

@@ -7,3 +7,10 @@ export function accountsListQuery(tenantId: string) {
     select: (data) => data.accounts,
   });
 }
+
+export function accountDetailQuery(accountId: string) {
+  return queryOptions({
+    ...queries.accounts.detail(accountId),
+    select: (data) => data.account,
+  });
+}

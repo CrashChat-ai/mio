@@ -1,7 +1,7 @@
 import { Link, createRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { accountsListQuery } from "../../queries/accounts";
-import { tenantsListQuery } from "../../queries/tenants";
+import { tenantDetailQuery } from "../../queries/tenant-detail";
 import { formatDateTime } from "../../lib/format";
 import { accountColumns } from "../../components/data-table/columns/account-columns";
 import { DataTable } from "../../components/data-table/data-table";
@@ -16,22 +16,22 @@ export const tenantDetailRoute = createRoute({
   getParentRoute: () => tenantsRoute,
   path: "$tenantId",
   staticData: { title: "Tenant detail" },
-  loader: ({ context }) => context.queryClient.ensureQueryData(tenantsListQuery),
+  loader: ({ context, params }) =>
+    context.queryClient.ensureQueryData(tenantDetailQuery(params.tenantId)),
   component: TenantDetailPage,
 });
 
 function TenantDetailPage() {
   const { tenantId } = tenantDetailRoute.useParams();
   const navigate = useNavigate();
-  const { data: tenants = [], isLoading } = useQuery(tenantsListQuery);
+  const { data: tenant, isLoading, error } = useQuery(tenantDetailQuery(tenantId));
   const accountsQuery = useQuery(accountsListQuery(tenantId));
-  const tenant = tenants.find((item) => item.id === tenantId);
 
   if (!isLoading && !tenant) {
     return (
       <EmptyState
-        title="Tenant not found"
-        description={tenantId}
+        title={error ? "Failed to load tenant" : "Tenant not found"}
+        description={error ? error.message : tenantId}
         action={
           <Button asChild>
             <Link to="/tenants">Back to tenants</Link>

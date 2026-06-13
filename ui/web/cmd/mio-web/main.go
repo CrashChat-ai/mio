@@ -36,6 +36,7 @@ func main() {
 		Audit:  cfg.Audit,
 		Logger: logger,
 	})
+	handler = auth.CORS(auth.CORSConfig{AllowedOrigins: cfg.CORSOrigins}, handler)
 
 	server := &http.Server{
 		Addr:              cfg.Addr,
@@ -81,11 +82,13 @@ type appConfig struct {
 	Auth         *auth.Manager
 	Audit        audit.Logger
 	SessionStore string
+	CORSOrigins  []string
 }
 
 func configFromEnv(ctx context.Context, logger *slog.Logger) (appConfig, func(), error) {
 	addr := env("MIO_WEB_ADDR", ":8080")
 	adminURL := env("MIO_ADMIN_URL", "http://127.0.0.1:9090")
+	corsOrigins := auth.ParseCORSOrigins(os.Getenv("MIO_WEB_CORS_ORIGINS"))
 	authMode := env("MIO_WEB_AUTH_MODE", auth.ModeGoogle)
 	publicURL := strings.TrimRight(os.Getenv("MIO_WEB_PUBLIC_URL"), "/")
 	cookieSecure := envBool("MIO_WEB_COOKIE_SECURE", strings.HasPrefix(publicURL, "https://"))
@@ -153,6 +156,7 @@ func configFromEnv(ctx context.Context, logger *slog.Logger) (appConfig, func(),
 		Auth:         manager,
 		Audit:        auditLogger,
 		SessionStore: storeName,
+		CORSOrigins:  corsOrigins,
 	}, cleanup, nil
 }
 

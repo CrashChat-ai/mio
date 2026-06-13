@@ -97,21 +97,44 @@ func (p *webhookPipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := r.Context()
+	outcome, _ := p.ingest(r.Context(), msg)
+	status, errMsg := outcomeStatus(outcome)
+	p.finish(w, start, outcome, status, errMsg)
+}
+
+// outcomeStatus maps an ingest outcome to the HTTP status + error body the
+// webhook responds with. Socket Mode (P2) calls ingest directly and routes on
+// the outcome string instead of HTTP.
+func outcomeStatus(outcome string) (status int, errMsg string) {
+	switch outcome {
+	case "db_error":
+		return http.StatusInternalServerError, "db error"
+	case "publish_error":
+		return http.StatusInternalServerError, "publish error"
+	default:
+		return http.StatusOK, ""
+	}
+}
+
+// ingest runs the produce/persist/publish tail shared by the HTTP webhook and
+// the Socket Mode runner: route to account, ensure conversation, resolve the
+// reply target, idempotent-upsert, publish. It never touches an
+// http.ResponseWriter — the caller maps the returned outcome to a transport
+// response. err carries the underlying failure for the "db_error"/"publish_error"
+// outcomes (already logged here); it is nil for the terminal-success and
+// drop outcomes.
+func (p *webhookPipeline) ingest(ctx context.Context, msg *miov1.Message) (outcome string, err error) {
 	tenantID, accountID, routed, err := p.resolveAccount(ctx, msg)
 	if err != nil {
 		p.logger.Error("webhook: account resolution failed", "channel", p.channelType, "err", err)
-		p.finish(w, start, "db_error", http.StatusInternalServerError, "db error")
-		return
+		return "db_error", err
 	}
 	if !routed {
 		p.logger.Warn("webhook: unroutable — no matching account, no env identity",
 			"channel", p.channelType,
 			"source_message_id", msg.GetSourceMessageId())
 		p.metrics.incUnroutable(p.channelType)
-		// 200 so the platform does not retry a webhook we will never route.
-		p.finish(w, start, "unroutable", http.StatusOK, "")
-		return
+		return "unroutable", nil
 	}
 	msg.TenantId = tenantID
 	msg.AccountId = accountID
@@ -128,8 +151,7 @@ func (p *webhookPipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		p.logger.Error("webhook: ensure conversation", "channel", p.channelType, "err", err)
-		p.finish(w, start, "db_error", http.StatusInternalServerError, "db error")
-		return
+		return "db_error", err
 	}
 	msg.ConversationId = conv.ID.String()
 
@@ -137,14 +159,13 @@ func (p *webhookPipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Relation.TargetExternalId; the durable ids come from the store.
 	threadRootMessageID := ""
 	if target := msg.GetRelation().GetTargetExternalId(); target != "" {
-		parentMsg, found, err := p.store.FindMessageBySource(ctx, accountID, target)
-		if err != nil {
+		parentMsg, found, ferr := p.store.FindMessageBySource(ctx, accountID, target)
+		if ferr != nil {
 			p.logger.Error("webhook: resolve replied message",
-				"channel", p.channelType, "err", err,
+				"channel", p.channelType, "err", ferr,
 				"source_message_id", msg.GetSourceMessageId(),
 				"parent_external_id", target)
-			p.finish(w, start, "db_error", http.StatusInternalServerError, "db error")
-			return
+			return "db_error", ferr
 		}
 		if found {
 			msg.Relation.TargetMessageId = parentMsg.ID.String()
@@ -172,8 +193,7 @@ func (p *webhookPipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		p.logger.Error("webhook: ensure unique message", "channel", p.channelType, "err", err)
-		p.finish(w, start, "db_error", http.StatusInternalServerError, "db error")
-		return
+		return "db_error", err
 	}
 
 	if !fresh {
@@ -182,8 +202,7 @@ func (p *webhookPipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"source_message_id", msg.GetSourceMessageId(),
 			"account_id", accountID)
 		p.metrics.incDedup(p.channelType)
-		p.finish(w, start, "dedup", http.StatusOK, "")
-		return
+		return "dedup", nil
 	}
 
 	msg.Id = dbMsgID.String()
@@ -191,11 +210,9 @@ func (p *webhookPipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := p.pub.PublishInbound(ctx, msg); err != nil {
 		p.logger.Error("webhook: publish inbound", "channel", p.channelType, "err", err,
 			"msg_id", dbMsgID, "conv_id", conv.ID)
-		p.finish(w, start, "publish_error", http.StatusInternalServerError, "publish error")
-		return
+		return "publish_error", err
 	}
 
-	p.finish(w, start, "success", http.StatusOK, "")
 	p.logger.Info("webhook: message published",
 		"channel", p.channelType,
 		"msg_id", dbMsgID,
@@ -203,8 +220,8 @@ func (p *webhookPipeline) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"kind", msg.GetConversationKind().String(),
 		"source_msg_id", msg.GetSourceMessageId(),
 		"sender", msg.GetSender().GetExternalId(),
-		"latency_ms", time.Since(start).Milliseconds(),
 	)
+	return "success", nil
 }
 
 // resolveAccount picks the routing identity: DB resolution first (workspace

@@ -118,12 +118,14 @@ tui-test: ## Run TUI unit tests
 ui-web-install: ## Install web admin app dependencies
 	pnpm --dir ui/web/app install --frozen-lockfile
 
-ui-web-build: ui-web-install ## Build the web admin shell and mio-web binary
-	$(BUF) generate proto
+ui-web-app-build: ui-web-install ## Build the standalone web admin static assets
 	pnpm --dir ui/web/app build
-	rm -rf ui/web/internal/embed/dist && mkdir -p ui/web/internal/embed/dist
-	cp -R ui/web/app/dist/. ui/web/internal/embed/dist/
+
+ui-web-api-build: ## Build the API-only mio-web binary
+	$(BUF) generate proto
 	go build -o ./bin/mio-web ./ui/web/cmd/mio-web
+
+ui-web-build: ui-web-api-build ui-web-app-build ## Build mio-web API binary and the web admin app
 
 ui-web-test: ui-web-install ## Run web admin shell tests
 	$(BUF) generate proto

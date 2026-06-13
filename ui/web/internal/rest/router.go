@@ -17,7 +17,6 @@ type Config struct {
 	Admin  adminclient.Admin
 	Auth   *auth.Manager
 	Audit  audit.Logger
-	Assets http.Handler
 	Logger *slog.Logger
 }
 
@@ -25,7 +24,6 @@ type Server struct {
 	admin  adminclient.Admin
 	auth   *auth.Manager
 	audit  audit.Logger
-	assets http.Handler
 	logger *slog.Logger
 }
 
@@ -37,7 +35,6 @@ func New(cfg Config) http.Handler {
 		admin:  cfg.Admin,
 		auth:   cfg.Auth,
 		audit:  cfg.Audit,
-		assets: cfg.Assets,
 		logger: cfg.Logger,
 	}
 	if s.audit == nil {
@@ -69,8 +66,12 @@ func New(cfg Config) http.Handler {
 	adminMux.HandleFunc("/api/admin/audit", s.method(http.MethodGet, s.handleListAudit))
 	mux.Handle("/api/admin/", s.auth.Require(adminMux))
 
-	mux.Handle("/", cfg.Assets)
+	mux.HandleFunc("/", notFound)
 	return mux
+}
+
+func notFound(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
 }
 
 func (s *Server) method(method string, handler http.HandlerFunc) http.HandlerFunc {

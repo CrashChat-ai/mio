@@ -18,7 +18,6 @@ import (
 	"github.com/crashchat-ai/mio/ui/web/internal/adminclient"
 	"github.com/crashchat-ai/mio/ui/web/internal/audit"
 	"github.com/crashchat-ai/mio/ui/web/internal/auth"
-	webembed "github.com/crashchat-ai/mio/ui/web/internal/embed"
 	"github.com/crashchat-ai/mio/ui/web/internal/rest"
 )
 
@@ -35,7 +34,6 @@ func main() {
 		Admin:  adminclient.New(cfg.AdminURL),
 		Auth:   cfg.Auth,
 		Audit:  cfg.Audit,
-		Assets: webembed.Handler(),
 		Logger: logger,
 	})
 

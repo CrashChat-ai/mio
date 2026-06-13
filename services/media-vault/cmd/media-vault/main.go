@@ -22,6 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/crashchat-ai/mio/services/media-vault/internal/config"
+	"github.com/crashchat-ai/mio/services/media-vault/internal/fetcher/slack"
 	"github.com/crashchat-ai/mio/services/media-vault/internal/fetcher/zohocliq"
 	"github.com/crashchat-ai/mio/services/media-vault/internal/publisher"
 	"github.com/crashchat-ai/mio/services/media-vault/internal/storage"
@@ -100,6 +101,7 @@ func run() error {
 
 	// Register channel fetchers.
 	zohocliq.MustRegister(cfg.CliqClientID, cfg.CliqClientSecret, cfg.CliqRefreshToken, cfg.DownloadMaxBytes, cfg.DownloadTimeout)
+	slack.MustRegister(cfg.SlackBotToken, cfg.DownloadMaxBytes, cfg.DownloadTimeout)
 
 	// Provision MESSAGES_INBOUND_ENRICHED on first boot (idempotent).
 	if err := publisher.EnsureStream(ctx, js, 1); err != nil {

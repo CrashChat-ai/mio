@@ -30,6 +30,10 @@ type Config struct {
 	CliqClientID     string
 	CliqClientSecret string
 	CliqRefreshToken string
+
+	// SlackBotToken is the static xoxb credential the Slack fetcher attaches
+	// as a bearer to url_private_download requests. No OAuth refresh.
+	SlackBotToken string
 }
 
 // FromEnv loads + validates the config. Fail-fast: required fields missing
@@ -48,6 +52,7 @@ func FromEnv() (*Config, error) {
 		CliqClientID:     os.Getenv("MIO_CLIQ_CLIENT_ID"),
 		CliqClientSecret: os.Getenv("MIO_CLIQ_CLIENT_SECRET"),
 		CliqRefreshToken: os.Getenv("MIO_CLIQ_REFRESH_TOKEN"),
+		SlackBotToken:    os.Getenv("SLACK_BOT_TOKEN"),
 	}
 
 	dlSec, err := envIntOr("MIO_DOWNLOAD_TIMEOUT_SECONDS", 60)

@@ -1,0 +1,47 @@
+openapi: 3.1.0
+info:
+  title: mio.v1
+paths: {}
+components:
+  schemas:
+    mio.v1.MessageRelation:
+      type: object
+      properties:
+        kind:
+          title: kind
+          $ref: '#/components/schemas/mio.v1.MessageRelation.Kind'
+        targetMessageId:
+          type: string
+          title: target_message_id
+          description: mio UUID of the target
+        targetExternalId:
+          type: string
+          title: target_external_id
+          description: platform-side opaque id
+        reactionEmoji:
+          type: string
+          title: reaction_emoji
+          description: populated when kind = KIND_REACTION
+      title: MessageRelation
+      additionalProperties: false
+      description: |-
+        MessageRelation links one message to another: reply, edit, delete, reaction,
+         or pin. Carried on Message (field 17) and SendCommand (field 15).
+
+         target_message_id is the mio UUID; target_external_id is the platform's id.
+         Both are populated when known; consumers should prefer target_message_id
+         when present (mio's identity is stable across renames/migrations).
+    mio.v1.MessageRelation.Kind:
+      type: string
+      title: Kind
+      enum:
+        - KIND_UNSPECIFIED
+        - KIND_REPLY
+        - KIND_EDIT
+        - KIND_DELETE
+        - KIND_REACTION
+        - KIND_PIN
+      description: |-
+        Kind classifies the relation.
+         UNSPECIFIED is the zero value — proto3 best practice and buf STANDARD lint.
+security: []

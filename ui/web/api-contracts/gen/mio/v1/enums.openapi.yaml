@@ -1,0 +1,33 @@
+openapi: 3.1.0
+info:
+  title: mio.v1
+paths: {}
+components:
+  schemas:
+    mio.v1.ConversationKind:
+      type: string
+      title: ConversationKind
+      enum:
+        - CONVERSATION_KIND_UNSPECIFIED
+        - CONVERSATION_KIND_DM
+        - CONVERSATION_KIND_GROUP_DM
+        - CONVERSATION_KIND_CHANNEL_PUBLIC
+        - CONVERSATION_KIND_CHANNEL_PRIVATE
+        - CONVERSATION_KIND_THREAD
+        - CONVERSATION_KIND_FORUM_POST
+        - CONVERSATION_KIND_BROADCAST
+      description: |-
+        ConversationKind classifies the structural shape of a conversation.
+         Used by adapters to route and by consumers for analytics/policy.
+         Enum zero-value is UNSPECIFIED per proto3 best practices (buf STANDARD lint).
+    mio.v1.PeerKind:
+      type: string
+      title: PeerKind
+      enum:
+        - PEER_KIND_UNSPECIFIED
+        - PEER_KIND_DIRECT
+        - PEER_KIND_GROUP
+      description: |-
+        PeerKind distinguishes direct vs. group senders.
+         Kept on the wire for fast policy routing without DB lookup.
+security: []

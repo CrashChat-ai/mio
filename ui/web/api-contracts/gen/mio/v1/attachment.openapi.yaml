@@ -1,0 +1,75 @@
+openapi: 3.1.0
+info:
+  title: mio.v1
+paths: {}
+components:
+  schemas:
+    mio.v1.Attachment:
+      type: object
+      properties:
+        kind:
+          title: kind
+          $ref: '#/components/schemas/mio.v1.Attachment.Kind'
+        url:
+          type: string
+          title: url
+        mime:
+          type: string
+          title: mime
+        bytes:
+          type:
+            - integer
+            - string
+          title: bytes
+          format: int64
+        filename:
+          type: string
+          title: filename
+        storageKey:
+          type: string
+          title: storage_key
+          description: |-
+            --- storage rewrite (set by attachment-downloader sidecar) ---
+             Stable object-storage key (e.g. "mio/attachments/channel_type=zoho_cliq/date=2026-05-09/{sha256[:2]}/{sha256}.png").
+             Empty until the sidecar persists bytes. Independent of `url` so consumers
+             that hold long-lived references can re-mint signed URLs from the key.
+        contentSha256:
+          type: string
+          title: content_sha256
+          description: SHA-256 of the persisted bytes (lowercase hex). Empty if not yet persisted.
+        errorCode:
+          title: error_code
+          description: Persistence outcome. ATTACHMENT_OK on success.
+          $ref: '#/components/schemas/mio.v1.Attachment.ErrorCode'
+      title: Attachment
+      additionalProperties: false
+      description: Attachment represents a file, image, link, or media item attached to a message.
+    mio.v1.Attachment.ErrorCode:
+      type: string
+      title: ErrorCode
+      enum:
+        - ERROR_CODE_UNSPECIFIED
+        - ERROR_CODE_OK
+        - ERROR_CODE_EXPIRED
+        - ERROR_CODE_FORBIDDEN
+        - ERROR_CODE_NOT_FOUND
+        - ERROR_CODE_TOO_LARGE
+        - ERROR_CODE_STORAGE
+        - ERROR_CODE_TIMEOUT
+      description: |-
+        Bounded-set error code surfaced by the attachment-downloader sidecar
+         when persistence fails. Empty/UNSPECIFIED on the gateway-publish path.
+         Downstream Message still flows; AI consumers should soft-handle
+         missing bytes when error_code != ATTACHMENT_OK.
+    mio.v1.Attachment.Kind:
+      type: string
+      title: Kind
+      enum:
+        - KIND_UNSPECIFIED
+        - KIND_IMAGE
+        - KIND_FILE
+        - KIND_AUDIO
+        - KIND_VIDEO
+        - KIND_LINK
+      description: Kind classifies the attachment for rendering and routing decisions.
+security: []

@@ -1,0 +1,449 @@
+openapi: 3.1.0
+info:
+  title: mio.v1
+paths: {}
+components:
+  schemas:
+    mio.v1.Attachment:
+      type: object
+      properties:
+        kind:
+          title: kind
+          $ref: '#/components/schemas/mio.v1.Attachment.Kind'
+        url:
+          type: string
+          title: url
+        mime:
+          type: string
+          title: mime
+        bytes:
+          type:
+            - integer
+            - string
+          title: bytes
+          format: int64
+        filename:
+          type: string
+          title: filename
+        storageKey:
+          type: string
+          title: storage_key
+          description: |-
+            --- storage rewrite (set by attachment-downloader sidecar) ---
+             Stable object-storage key (e.g. "mio/attachments/channel_type=zoho_cliq/date=2026-05-09/{sha256[:2]}/{sha256}.png").
+             Empty until the sidecar persists bytes. Independent of `url` so consumers
+             that hold long-lived references can re-mint signed URLs from the key.
+        contentSha256:
+          type: string
+          title: content_sha256
+          description: SHA-256 of the persisted bytes (lowercase hex). Empty if not yet persisted.
+        errorCode:
+          title: error_code
+          description: Persistence outcome. ATTACHMENT_OK on success.
+          $ref: '#/components/schemas/mio.v1.Attachment.ErrorCode'
+      title: Attachment
+      additionalProperties: false
+      description: Attachment represents a file, image, link, or media item attached to a message.
+    mio.v1.Attachment.ErrorCode:
+      type: string
+      title: ErrorCode
+      enum:
+        - ERROR_CODE_UNSPECIFIED
+        - ERROR_CODE_OK
+        - ERROR_CODE_EXPIRED
+        - ERROR_CODE_FORBIDDEN
+        - ERROR_CODE_NOT_FOUND
+        - ERROR_CODE_TOO_LARGE
+        - ERROR_CODE_STORAGE
+        - ERROR_CODE_TIMEOUT
+      description: |-
+        Bounded-set error code surfaced by the attachment-downloader sidecar
+         when persistence fails. Empty/UNSPECIFIED on the gateway-publish path.
+         Downstream Message still flows; AI consumers should soft-handle
+         missing bytes when error_code != ATTACHMENT_OK.
+    mio.v1.Attachment.Kind:
+      type: string
+      title: Kind
+      enum:
+        - KIND_UNSPECIFIED
+        - KIND_IMAGE
+        - KIND_FILE
+        - KIND_AUDIO
+        - KIND_VIDEO
+        - KIND_LINK
+      description: Kind classifies the attachment for rendering and routing decisions.
+    mio.v1.MessageRelation:
+      type: object
+      properties:
+        kind:
+          title: kind
+          $ref: '#/components/schemas/mio.v1.MessageRelation.Kind'
+        targetMessageId:
+          type: string
+          title: target_message_id
+          description: mio UUID of the target
+        targetExternalId:
+          type: string
+          title: target_external_id
+          description: platform-side opaque id
+        reactionEmoji:
+          type: string
+          title: reaction_emoji
+          description: populated when kind = KIND_REACTION
+      title: MessageRelation
+      additionalProperties: false
+      description: |-
+        MessageRelation links one message to another: reply, edit, delete, reaction,
+         or pin. Carried on Message (field 17) and SendCommand (field 15).
+
+         target_message_id is the mio UUID; target_external_id is the platform's id.
+         Both are populated when known; consumers should prefer target_message_id
+         when present (mio's identity is stable across renames/migrations).
+    mio.v1.MessageRelation.Kind:
+      type: string
+      title: Kind
+      enum:
+        - KIND_UNSPECIFIED
+        - KIND_REPLY
+        - KIND_EDIT
+        - KIND_DELETE
+        - KIND_REACTION
+        - KIND_PIN
+      description: |-
+        Kind classifies the relation.
+         UNSPECIFIED is the zero value — proto3 best practice and buf STANDARD lint.
+    mio.v1.RichBlock:
+      type: object
+      oneOf:
+        - type: object
+          properties:
+            images:
+              title: images
+              $ref: '#/components/schemas/mio.v1.RichImagesBlock'
+          title: images
+          required:
+            - images
+        - type: object
+          properties:
+            label:
+              title: label
+              $ref: '#/components/schemas/mio.v1.RichLabelBlock'
+          title: label
+          required:
+            - label
+        - type: object
+          properties:
+            list:
+              title: list
+              $ref: '#/components/schemas/mio.v1.RichListBlock'
+          title: list
+          required:
+            - list
+        - type: object
+          properties:
+            table:
+              title: table
+              $ref: '#/components/schemas/mio.v1.RichTableBlock'
+          title: table
+          required:
+            - table
+        - type: object
+          properties:
+            text:
+              title: text
+              $ref: '#/components/schemas/mio.v1.RichTextBlock'
+          title: text
+          required:
+            - text
+      title: RichBlock
+      additionalProperties: false
+      description: RichBlock is one portable content section.
+    mio.v1.RichButton:
+      type: object
+      properties:
+        label:
+          type: string
+          title: label
+        style:
+          title: style
+          $ref: '#/components/schemas/mio.v1.RichButton.Style'
+        key:
+          type: string
+          title: key
+        hint:
+          type: string
+          title: hint
+        action:
+          title: action
+          $ref: '#/components/schemas/mio.v1.RichButtonAction'
+      title: RichButton
+      additionalProperties: false
+    mio.v1.RichButton.Style:
+      type: string
+      title: Style
+      enum:
+        - STYLE_UNSPECIFIED
+        - STYLE_PRIMARY
+        - STYLE_DANGER
+        - STYLE_NEUTRAL
+    mio.v1.RichButtonAction:
+      type: object
+      properties:
+        kind:
+          title: kind
+          $ref: '#/components/schemas/mio.v1.RichButtonAction.Kind'
+        url:
+          type: string
+          title: url
+          description: url is used by KIND_OPEN_URL and KIND_PREVIEW_URL.
+        text:
+          type: string
+          title: text
+          description: text is used by KIND_COPY.
+        functionName:
+          type: string
+          title: function_name
+          description: function_name and function_owner are used by KIND_INVOKE_FUNCTION.
+        functionOwner:
+          type: string
+          title: function_owner
+      title: RichButtonAction
+      additionalProperties: false
+    mio.v1.RichButtonAction.Kind:
+      type: string
+      title: Kind
+      enum:
+        - KIND_UNSPECIFIED
+        - KIND_OPEN_URL
+        - KIND_PREVIEW_URL
+        - KIND_COPY
+        - KIND_INVOKE_FUNCTION
+    mio.v1.RichCard:
+      type: object
+      properties:
+        title:
+          type: string
+          title: title
+        subtitle:
+          type: string
+          title: subtitle
+        thumbnailUrl:
+          type: string
+          title: thumbnail_url
+        theme:
+          type: string
+          title: theme
+      title: RichCard
+      additionalProperties: false
+      description: RichCard carries high-level message framing.
+    mio.v1.RichContent:
+      type: object
+      properties:
+        card:
+          title: card
+          $ref: '#/components/schemas/mio.v1.RichCard'
+        blocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/mio.v1.RichBlock'
+          title: blocks
+        buttons:
+          type: array
+          items:
+            $ref: '#/components/schemas/mio.v1.RichButton'
+          title: buttons
+      title: RichContent
+      additionalProperties: false
+      description: |-
+        RichContent is a channel-agnostic outbound payload model.
+         Channel adapters map these blocks to native platform affordances such as
+         Cliq cards/slides/buttons, Slack Block Kit, or Discord embeds/components.
+    mio.v1.RichImagesBlock:
+      type: object
+      properties:
+        title:
+          type: string
+          title: title
+        urls:
+          type: array
+          items:
+            type: string
+          title: urls
+      title: RichImagesBlock
+      additionalProperties: false
+    mio.v1.RichLabel:
+      type: object
+      properties:
+        key:
+          type: string
+          title: key
+        value:
+          type: string
+          title: value
+      title: RichLabel
+      additionalProperties: false
+    mio.v1.RichLabelBlock:
+      type: object
+      properties:
+        title:
+          type: string
+          title: title
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/mio.v1.RichLabel'
+          title: labels
+      title: RichLabelBlock
+      additionalProperties: false
+    mio.v1.RichListBlock:
+      type: object
+      properties:
+        title:
+          type: string
+          title: title
+        items:
+          type: array
+          items:
+            type: string
+          title: items
+      title: RichListBlock
+      additionalProperties: false
+    mio.v1.RichTableBlock:
+      type: object
+      properties:
+        title:
+          type: string
+          title: title
+        headers:
+          type: array
+          items:
+            type: string
+          title: headers
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/mio.v1.RichTableRow'
+          title: rows
+      title: RichTableBlock
+      additionalProperties: false
+    mio.v1.RichTableRow:
+      type: object
+      properties:
+        cells:
+          type: array
+          items:
+            type: string
+          title: cells
+      title: RichTableRow
+      additionalProperties: false
+    mio.v1.RichTextBlock:
+      type: object
+      properties:
+        title:
+          type: string
+          title: title
+        text:
+          type: string
+          title: text
+      title: RichTextBlock
+      additionalProperties: false
+    mio.v1.SendCommand:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+          description: '--- identity (also the NATS Nats-Msg-Id for dedup) --- ULID'
+        schemaVersion:
+          type: integer
+          title: schema_version
+          format: int32
+          description: = 1; SDK rejects mismatch on publish
+        tenantId:
+          type: string
+          title: tenant_id
+          description: '--- four-tier scope (mirrors Message) ---'
+        accountId:
+          type: string
+          title: account_id
+        channelType:
+          type: string
+          title: channel_type
+        conversationId:
+          type: string
+          title: conversation_id
+          description: '--- where to send ---'
+        conversationExternalId:
+          type: string
+          title: conversation_external_id
+          description: 'denormalized: adapter avoids a DB lookup at send time'
+        parentConversationId:
+          type: string
+          title: parent_conversation_id
+          description: for "reply into thread" (platform models it as separate conv)
+        threadRootMessageId:
+          type: string
+          title: thread_root_message_id
+          description: for "reply in thread" (Slack-style)
+        text:
+          type: string
+          title: text
+          description: '--- payload ---'
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/mio.v1.Attachment'
+          title: attachments
+        editOfMessageId:
+          type: string
+          title: edit_of_message_id
+          description: |-
+            --- edit support ---
+             Both IDs carried so the adapter doesn't need a DB lookup at send time. mio UUID; empty unless this is an edit
+        editOfExternalId:
+          type: string
+          title: edit_of_external_id
+          description: platform message id
+        attributes:
+          type: object
+          title: attributes
+          additionalProperties:
+            type: string
+            title: value
+          description: |-
+            --- escape hatch ---
+             Channel-specific data lives here until the promotion threshold is met.
+             See CONTRIBUTING.md for promotion rule and naming convention.
+        relation:
+          title: relation
+          description: |-
+            MessageRelation drives outbound edit / reaction / delete / pin operations.
+             Empty for plain Send; populated for linked outbound commands.
+          $ref: '#/components/schemas/mio.v1.MessageRelation'
+        richContent:
+          title: rich_content
+          description: |-
+            Portable rich content. Channel adapters render this to native platform
+             constructs and fall back to text when unsupported.
+          $ref: '#/components/schemas/mio.v1.RichContent'
+      title: SendCommand
+      additionalProperties: false
+      description: |-
+        SendCommand is the canonical outbound envelope consumed from MESSAGES_OUTBOUND.
+         The MIU AI service publishes this; the gateway's sender pool consumes it and
+         makes the platform API call.
+
+         attributes promotion rule: same as Message — see CONTRIBUTING.md.
+         Use named constants (e.g. const AttrSlackTS = "slack_ts"), not string literals.
+    mio.v1.SendCommand.AttributesEntry:
+      type: object
+      properties:
+        key:
+          type: string
+          title: key
+        value:
+          type: string
+          title: value
+      title: AttributesEntry
+      additionalProperties: false
+security: []

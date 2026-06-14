@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package mio.admin.v1;
 
+import "google/api/annotations.proto";
 import "google/protobuf/timestamp.proto";
 import "mio/v1/capabilities.proto";
 
@@ -15,29 +16,83 @@ option go_package = "github.com/crashchat-ai/mio/proto/gen/go/mio/admin/v1;admin
 // enabled. Rename via `deprecated_alias` instead of in-place edits; new
 // fields must be appended.
 service AdminService {
-  rpc CreateTenant(CreateTenantRequest) returns (CreateTenantResponse);
-  rpc ListTenants(ListTenantsRequest)   returns (ListTenantsResponse);
-  rpc GetTenant(GetTenantRequest)       returns (GetTenantResponse);
+  rpc CreateTenant(CreateTenantRequest) returns (CreateTenantResponse) {
+    option (google.api.http) = {
+      post: "/api/admin/tenants"
+      body: "*"
+    };
+  }
+  rpc ListTenants(ListTenantsRequest) returns (ListTenantsResponse) {
+    option (google.api.http) = {get: "/api/admin/tenants"};
+  }
+  rpc GetTenant(GetTenantRequest) returns (GetTenantResponse) {
+    option (google.api.http) = {get: "/api/admin/tenants/{id}"};
+  }
 
-  rpc ListChannelTypes(ListChannelTypesRequest) returns (ListChannelTypesResponse);
+  rpc ListChannelTypes(ListChannelTypesRequest) returns (ListChannelTypesResponse) {
+    option (google.api.http) = {get: "/api/admin/channel-types"};
+  }
 
-  rpc StartInstall(StartInstallRequest)       returns (StartInstallResponse);
-  rpc CompleteInstall(CompleteInstallRequest) returns (CompleteInstallResponse);
+  rpc StartInstall(StartInstallRequest) returns (StartInstallResponse) {
+    option (google.api.http) = {
+      post: "/api/admin/installs/start"
+      body: "*"
+    };
+  }
+  rpc CompleteInstall(CompleteInstallRequest) returns (CompleteInstallResponse) {
+    option (google.api.http) = {
+      post: "/api/admin/installs/complete"
+      body: "*"
+    };
+  }
 
-  rpc GetAccount(GetAccountRequest)             returns (GetAccountResponse);
-  rpc UpdateAccount(UpdateAccountRequest)       returns (UpdateAccountResponse);
-  rpc SetRateLimit(SetRateLimitRequest)         returns (SetRateLimitResponse);
-  rpc GetCredentialMetadata(GetCredentialMetadataRequest) returns (GetCredentialMetadataResponse);
-  rpc ListAccounts(ListAccountsRequest)     returns (ListAccountsResponse);
-  rpc DisableAccount(DisableAccountRequest) returns (DisableAccountResponse);
-  rpc RotateCredential(RotateCredentialRequest) returns (RotateCredentialResponse);
+  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse) {
+    option (google.api.http) = {get: "/api/admin/accounts/{account_id}"};
+  }
+  rpc UpdateAccount(UpdateAccountRequest) returns (UpdateAccountResponse) {
+    option (google.api.http) = {
+      patch: "/api/admin/accounts"
+      body: "*"
+    };
+  }
+  rpc SetRateLimit(SetRateLimitRequest) returns (SetRateLimitResponse) {
+    option (google.api.http) = {
+      post: "/api/admin/accounts/rate-limit"
+      body: "*"
+    };
+  }
+  rpc GetCredentialMetadata(GetCredentialMetadataRequest) returns (GetCredentialMetadataResponse) {
+    option (google.api.http) = {get: "/api/admin/accounts/credential-metadata"};
+  }
+  rpc ListAccounts(ListAccountsRequest) returns (ListAccountsResponse) {
+    option (google.api.http) = {get: "/api/admin/accounts"};
+  }
+  rpc DisableAccount(DisableAccountRequest) returns (DisableAccountResponse) {
+    option (google.api.http) = {
+      post: "/api/admin/accounts/disable"
+      body: "*"
+    };
+  }
+  rpc RotateCredential(RotateCredentialRequest) returns (RotateCredentialResponse) {
+    option (google.api.http) = {
+      post: "/api/admin/accounts/rotate-credential"
+      body: "*"
+    };
+  }
 
   // TailMessages opens a server-stream of canonical mio messages for a
   // given account. Server-side filtering on conversation_id is optional.
-  rpc TailMessages(TailMessagesRequest) returns (stream TailMessagesResponse);
+  // REST seam: served by a hand-written SSE handler, not the generated route.
+  rpc TailMessages(TailMessagesRequest) returns (stream TailMessagesResponse) {
+    option (google.api.http) = {get: "/api/admin/messages/tail"};
+  }
 
-  rpc GetWebhookInfo(GetWebhookInfoRequest) returns (GetWebhookInfoResponse);
-  rpc GetStreamHealth(GetStreamHealthRequest) returns (GetStreamHealthResponse);
+  rpc GetWebhookInfo(GetWebhookInfoRequest) returns (GetWebhookInfoResponse) {
+    option (google.api.http) = {get: "/api/admin/accounts/webhook-info"};
+  }
+  rpc GetStreamHealth(GetStreamHealthRequest) returns (GetStreamHealthResponse) {
+    option (google.api.http) = {get: "/api/admin/stream-health"};
+  }
 }
 
 // --- Tenants ---

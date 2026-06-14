@@ -1,0 +1,242 @@
+openapi: 3.1.0
+info:
+  title: mio.v1
+paths: {}
+components:
+  schemas:
+    mio.v1.RichBlock:
+      type: object
+      oneOf:
+        - type: object
+          properties:
+            images:
+              title: images
+              $ref: '#/components/schemas/mio.v1.RichImagesBlock'
+          title: images
+          required:
+            - images
+        - type: object
+          properties:
+            label:
+              title: label
+              $ref: '#/components/schemas/mio.v1.RichLabelBlock'
+          title: label
+          required:
+            - label
+        - type: object
+          properties:
+            list:
+              title: list
+              $ref: '#/components/schemas/mio.v1.RichListBlock'
+          title: list
+          required:
+            - list
+        - type: object
+          properties:
+            table:
+              title: table
+              $ref: '#/components/schemas/mio.v1.RichTableBlock'
+          title: table
+          required:
+            - table
+        - type: object
+          properties:
+            text:
+              title: text
+              $ref: '#/components/schemas/mio.v1.RichTextBlock'
+          title: text
+          required:
+            - text
+      title: RichBlock
+      additionalProperties: false
+      description: RichBlock is one portable content section.
+    mio.v1.RichButton:
+      type: object
+      properties:
+        label:
+          type: string
+          title: label
+        style:
+          title: style
+          $ref: '#/components/schemas/mio.v1.RichButton.Style'
+        key:
+          type: string
+          title: key
+        hint:
+          type: string
+          title: hint
+        action:
+          title: action
+          $ref: '#/components/schemas/mio.v1.RichButtonAction'
+      title: RichButton
+      additionalProperties: false
+    mio.v1.RichButton.Style:
+      type: string
+      title: Style
+      enum:
+        - STYLE_UNSPECIFIED
+        - STYLE_PRIMARY
+        - STYLE_DANGER
+        - STYLE_NEUTRAL
+    mio.v1.RichButtonAction:
+      type: object
+      properties:
+        kind:
+          title: kind
+          $ref: '#/components/schemas/mio.v1.RichButtonAction.Kind'
+        url:
+          type: string
+          title: url
+          description: url is used by KIND_OPEN_URL and KIND_PREVIEW_URL.
+        text:
+          type: string
+          title: text
+          description: text is used by KIND_COPY.
+        functionName:
+          type: string
+          title: function_name
+          description: function_name and function_owner are used by KIND_INVOKE_FUNCTION.
+        functionOwner:
+          type: string
+          title: function_owner
+      title: RichButtonAction
+      additionalProperties: false
+    mio.v1.RichButtonAction.Kind:
+      type: string
+      title: Kind
+      enum:
+        - KIND_UNSPECIFIED
+        - KIND_OPEN_URL
+        - KIND_PREVIEW_URL
+        - KIND_COPY
+        - KIND_INVOKE_FUNCTION
+    mio.v1.RichCard:
+      type: object
+      properties:
+        title:
+          type: string
+          title: title
+        subtitle:
+          type: string
+          title: subtitle
+        thumbnailUrl:
+          type: string
+          title: thumbnail_url
+        theme:
+          type: string
+          title: theme
+      title: RichCard
+      additionalProperties: false
+      description: RichCard carries high-level message framing.
+    mio.v1.RichContent:
+      type: object
+      properties:
+        card:
+          title: card
+          $ref: '#/components/schemas/mio.v1.RichCard'
+        blocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/mio.v1.RichBlock'
+          title: blocks
+        buttons:
+          type: array
+          items:
+            $ref: '#/components/schemas/mio.v1.RichButton'
+          title: buttons
+      title: RichContent
+      additionalProperties: false
+      description: |-
+        RichContent is a channel-agnostic outbound payload model.
+         Channel adapters map these blocks to native platform affordances such as
+         Cliq cards/slides/buttons, Slack Block Kit, or Discord embeds/components.
+    mio.v1.RichImagesBlock:
+      type: object
+      properties:
+        title:
+          type: string
+          title: title
+        urls:
+          type: array
+          items:
+            type: string
+          title: urls
+      title: RichImagesBlock
+      additionalProperties: false
+    mio.v1.RichLabel:
+      type: object
+      properties:
+        key:
+          type: string
+          title: key
+        value:
+          type: string
+          title: value
+      title: RichLabel
+      additionalProperties: false
+    mio.v1.RichLabelBlock:
+      type: object
+      properties:
+        title:
+          type: string
+          title: title
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/mio.v1.RichLabel'
+          title: labels
+      title: RichLabelBlock
+      additionalProperties: false
+    mio.v1.RichListBlock:
+      type: object
+      properties:
+        title:
+          type: string
+          title: title
+        items:
+          type: array
+          items:
+            type: string
+          title: items
+      title: RichListBlock
+      additionalProperties: false
+    mio.v1.RichTableBlock:
+      type: object
+      properties:
+        title:
+          type: string
+          title: title
+        headers:
+          type: array
+          items:
+            type: string
+          title: headers
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/mio.v1.RichTableRow'
+          title: rows
+      title: RichTableBlock
+      additionalProperties: false
+    mio.v1.RichTableRow:
+      type: object
+      properties:
+        cells:
+          type: array
+          items:
+            type: string
+          title: cells
+      title: RichTableRow
+      additionalProperties: false
+    mio.v1.RichTextBlock:
+      type: object
+      properties:
+        title:
+          type: string
+          title: title
+        text:
+          type: string
+          title: text
+      title: RichTextBlock
+      additionalProperties: false
+security: []

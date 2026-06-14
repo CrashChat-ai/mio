@@ -16,3 +16,12 @@ plugins:
     out: proto/gen/go
     opt:
       - paths=source_relative
+
+  # Proto-derived OpenAPI spec for drift-detection only — NOT the hand contract.
+  # Reads google.api.http annotations; reference spec committed for diff-visibility.
+  - remote: buf.build/community/sudorandom-connect-openapi
+    out: ui/web/api-contracts/gen
+    opt:
+      - features=google.api.http
+      - allow-get
+      - format=yaml

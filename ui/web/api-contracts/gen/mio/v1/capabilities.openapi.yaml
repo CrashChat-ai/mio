@@ -1,0 +1,97 @@
+openapi: 3.1.0
+info:
+  title: mio.v1
+paths: {}
+components:
+  schemas:
+    mio.v1.Attachment.Kind:
+      type: string
+      title: Kind
+      enum:
+        - KIND_UNSPECIFIED
+        - KIND_IMAGE
+        - KIND_FILE
+        - KIND_AUDIO
+        - KIND_VIDEO
+        - KIND_LINK
+      description: Kind classifies the attachment for rendering and routing decisions.
+    mio.v1.ChannelCapabilities:
+      type: object
+      properties:
+        supportsEdit:
+          type: boolean
+          title: supports_edit
+          description: '--- feature flags ---'
+        supportsDelete:
+          type: boolean
+          title: supports_delete
+        supportsReactions:
+          type: boolean
+          title: supports_reactions
+        supportsThreads:
+          type: boolean
+          title: supports_threads
+        supportsTyping:
+          type: boolean
+          title: supports_typing
+        supportsPresence:
+          type: boolean
+          title: supports_presence
+        allowedAttachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/mio.v1.Attachment.Kind'
+          title: allowed_attachments
+          description: |-
+            --- attachment policy ---
+             Empty allowed_attachments means the adapter does not handle attachments;
+             include explicit kinds (IMAGE, FILE, AUDIO, VIDEO, LINK) when supported.
+        maxTextBytes:
+          type: integer
+          title: max_text_bytes
+          format: int32
+          description: |-
+            --- limits ---
+             max_text_bytes is the platform's hard limit; admin UI surfaces this as
+             a hint before send.
+        rateLimitPerSecond:
+          type: integer
+          title: rate_limit_per_second
+          format: int32
+          description: |-
+            rate_limit_per_second is a per-bucket cap; bucket key is given by
+             rate_limit_scope (one of "account", "account:conversation").
+        rateLimitScope:
+          type: string
+          title: rate_limit_scope
+        authKind:
+          type: string
+          title: auth_kind
+          description: |-
+            --- auth flavor ---
+             auth_kind names the credential model: "oauth2_refresh" (Cliq, Slack),
+             "bot_token" (Telegram), "hmac_webhook" (inbound-only signed webhooks).
+             CredentialAdapter implementations branch on this.
+        editWindowSeconds:
+          type: integer
+          title: edit_window_seconds
+          format: int32
+          description: |-
+            --- edit / delete windows ---
+             edit_window_seconds is how long after Send a message may be edited;
+             0 = no platform-enforced limit. delete_window_seconds is analogous.
+        deleteWindowSeconds:
+          type: integer
+          title: delete_window_seconds
+          format: int32
+      title: ChannelCapabilities
+      additionalProperties: false
+      description: |-
+        ChannelCapabilities advertises what a single channel adapter can do, so the
+         admin API (and UI/TUI) can render install flows and feature toggles without
+         hardcoding per-channel knowledge. Returned by Adapter.Capabilities().
+
+         Hard-coded in each adapter package (Cliq's lives in zohocliq/sender.go).
+         A regression test asserts the struct matches expectation verbatim — stale
+         capability advertisement is caught loudly instead of drifting silently.
+security: []

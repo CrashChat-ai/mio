@@ -1,0 +1,943 @@
+openapi: 3.1.0
+info:
+  title: mio.admin.v1
+paths:
+  /api/admin/accounts:
+    get:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: ListAccounts
+      operationId: mio.admin.v1.AdminService.ListAccounts
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+            title: tenant_id
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.ListAccountsResponse'
+    patch:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: UpdateAccount
+      operationId: mio.admin.v1.AdminService.UpdateAccount
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/mio.admin.v1.UpdateAccountRequest'
+        required: true
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.UpdateAccountResponse'
+  /api/admin/accounts/credential-metadata:
+    get:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: GetCredentialMetadata
+      operationId: mio.admin.v1.AdminService.GetCredentialMetadata
+      parameters:
+        - name: accountId
+          in: query
+          schema:
+            type: string
+            title: account_id
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.GetCredentialMetadataResponse'
+  /api/admin/accounts/disable:
+    post:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: DisableAccount
+      operationId: mio.admin.v1.AdminService.DisableAccount
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/mio.admin.v1.DisableAccountRequest'
+        required: true
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.DisableAccountResponse'
+  /api/admin/accounts/rate-limit:
+    post:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: SetRateLimit
+      operationId: mio.admin.v1.AdminService.SetRateLimit
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/mio.admin.v1.SetRateLimitRequest'
+        required: true
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.SetRateLimitResponse'
+  /api/admin/accounts/rotate-credential:
+    post:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: RotateCredential
+      operationId: mio.admin.v1.AdminService.RotateCredential
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/mio.admin.v1.RotateCredentialRequest'
+        required: true
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.RotateCredentialResponse'
+  /api/admin/accounts/webhook-info:
+    get:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: GetWebhookInfo
+      operationId: mio.admin.v1.AdminService.GetWebhookInfo
+      parameters:
+        - name: accountId
+          in: query
+          schema:
+            type: string
+            title: account_id
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.GetWebhookInfoResponse'
+  /api/admin/accounts/{account_id}:
+    get:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: GetAccount
+      operationId: mio.admin.v1.AdminService.GetAccount
+      parameters:
+        - name: account_id
+          in: path
+          required: true
+          schema:
+            type: string
+            title: account_id
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.GetAccountResponse'
+  /api/admin/channel-types:
+    get:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: ListChannelTypes
+      operationId: mio.admin.v1.AdminService.ListChannelTypes
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.ListChannelTypesResponse'
+  /api/admin/installs/complete:
+    post:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: CompleteInstall
+      operationId: mio.admin.v1.AdminService.CompleteInstall
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/mio.admin.v1.CompleteInstallRequest'
+        required: true
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.CompleteInstallResponse'
+  /api/admin/installs/start:
+    post:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: StartInstall
+      operationId: mio.admin.v1.AdminService.StartInstall
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/mio.admin.v1.StartInstallRequest'
+        required: true
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.StartInstallResponse'
+  /api/admin/messages/tail:
+    get:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: TailMessages
+      description: |-
+        TailMessages opens a server-stream of canonical mio messages for a
+         given account. Server-side filtering on conversation_id is optional.
+         REST seam: served by a hand-written SSE handler, not the generated route.
+      operationId: mio.admin.v1.AdminService.TailMessages
+      parameters:
+        - name: accountId
+          in: query
+          schema:
+            type: string
+            title: account_id
+        - name: conversationId
+          in: query
+          description: optional filter
+          schema:
+            type: string
+            title: conversation_id
+            description: optional filter
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.TailMessagesResponse'
+  /api/admin/stream-health:
+    get:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: GetStreamHealth
+      operationId: mio.admin.v1.AdminService.GetStreamHealth
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.GetStreamHealthResponse'
+  /api/admin/tenants:
+    get:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: ListTenants
+      operationId: mio.admin.v1.AdminService.ListTenants
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.ListTenantsResponse'
+    post:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: CreateTenant
+      operationId: mio.admin.v1.AdminService.CreateTenant
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/mio.admin.v1.CreateTenantRequest'
+        required: true
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.CreateTenantResponse'
+  /api/admin/tenants/{id}:
+    get:
+      tags:
+        - mio.admin.v1.AdminService
+      summary: GetTenant
+      operationId: mio.admin.v1.AdminService.GetTenant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            title: id
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/mio.admin.v1.GetTenantResponse'
+components:
+  schemas:
+    google.protobuf.Timestamp:
+      type: string
+      examples:
+        - "2023-01-15T01:30:15.01Z"
+        - "2024-12-25T12:00:00Z"
+      format: date-time
+      description: |-
+        A Timestamp represents a point in time independent of any time zone or local
+         calendar, encoded as a count of seconds and fractions of seconds at
+         nanosecond resolution. The count is relative to an epoch at UTC midnight on
+         January 1, 1970, in the proleptic Gregorian calendar which extends the
+         Gregorian calendar backwards to year one.
+
+         All minutes are 60 seconds long. Leap seconds are "smeared" so that no leap
+         second table is needed for interpretation, using a [24-hour linear
+         smear](https://developers.google.com/time/smear).
+
+         The range is from 0001-01-01T00:00:00Z to 9999-12-31T23:59:59.999999999Z. By
+         restricting to that range, we ensure that we can convert to and from [RFC
+         3339](https://www.ietf.org/rfc/rfc3339.txt) date strings.
+
+         # Examples
+
+         Example 1: Compute Timestamp from POSIX `time()`.
+
+             Timestamp timestamp;
+             timestamp.set_seconds(time(NULL));
+             timestamp.set_nanos(0);
+
+         Example 2: Compute Timestamp from POSIX `gettimeofday()`.
+
+             struct timeval tv;
+             gettimeofday(&tv, NULL);
+
+             Timestamp timestamp;
+             timestamp.set_seconds(tv.tv_sec);
+             timestamp.set_nanos(tv.tv_usec * 1000);
+
+         Example 3: Compute Timestamp from Win32 `GetSystemTimeAsFileTime()`.
+
+             FILETIME ft;
+             GetSystemTimeAsFileTime(&ft);
+             UINT64 ticks = (((UINT64)ft.dwHighDateTime) << 32) | ft.dwLowDateTime;
+
+             // A Windows tick is 100 nanoseconds. Windows epoch 1601-01-01T00:00:00Z
+             // is 11644473600 seconds before Unix epoch 1970-01-01T00:00:00Z.
+             Timestamp timestamp;
+             timestamp.set_seconds((INT64) ((ticks / 10000000) - 11644473600LL));
+             timestamp.set_nanos((INT32) ((ticks % 10000000) * 100));
+
+         Example 4: Compute Timestamp from Java `System.currentTimeMillis()`.
+
+             long millis = System.currentTimeMillis();
+
+             Timestamp timestamp = Timestamp.newBuilder().setSeconds(millis / 1000)
+                 .setNanos((int) ((millis % 1000) * 1000000)).build();
+
+         Example 5: Compute Timestamp from Java `Instant.now()`.
+
+             Instant now = Instant.now();
+
+             Timestamp timestamp =
+                 Timestamp.newBuilder().setSeconds(now.getEpochSecond())
+                     .setNanos(now.getNano()).build();
+
+         Example 6: Compute Timestamp from current time in Python.
+
+             timestamp = Timestamp()
+             timestamp.GetCurrentTime()
+
+         # JSON Mapping
+
+         In JSON format, the Timestamp type is encoded as a string in the
+         [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format. That is, the
+         format is "{year}-{month}-{day}T{hour}:{min}:{sec}[.{frac_sec}]Z"
+         where {year} is always expressed using four digits while {month}, {day},
+         {hour}, {min}, and {sec} are zero-padded to two digits each. The fractional
+         seconds, which can go up to 9 digits (i.e. up to 1 nanosecond resolution),
+         are optional. The "Z" suffix indicates the timezone ("UTC"); the timezone
+         is required. A proto3 JSON serializer should always use UTC (as indicated by
+         "Z") when printing the Timestamp type and a proto3 JSON parser should be
+         able to accept both UTC and other timezones (as indicated by an offset).
+
+         For example, "2017-01-15T01:30:15.01Z" encodes 15.01 seconds past
+         01:30 UTC on January 15, 2017.
+
+         In JavaScript, one can convert a Date object to this format using the
+         standard
+         [toISOString()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/toISOString)
+         method. In Python, a standard `datetime.datetime` object can be converted
+         to this format using
+         [`strftime`](https://docs.python.org/2/library/time.html#time.strftime) with
+         the time format spec '%Y-%m-%dT%H:%M:%S.%fZ'. Likewise, in Java, one can use
+         the Joda Time's [`ISODateTimeFormat.dateTime()`](
+         http://joda-time.sourceforge.net/apidocs/org/joda/time/format/ISODateTimeFormat.html#dateTime()
+         ) to obtain a formatter capable of generating timestamps in this format.
+    mio.admin.v1.Account:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+        tenantId:
+          type: string
+          title: tenant_id
+        channelType:
+          type: string
+          title: channel_type
+        provider:
+          type: string
+          title: provider
+        externalId:
+          type: string
+          title: external_id
+        displayName:
+          type: string
+          title: display_name
+        createdAt:
+          title: created_at
+          $ref: '#/components/schemas/google.protobuf.Timestamp'
+        disabledAt:
+          title: disabled_at
+          $ref: '#/components/schemas/google.protobuf.Timestamp'
+        rateLimitPerSecond:
+          type: integer
+          title: rate_limit_per_second
+          format: int32
+        rateLimitScope:
+          type: string
+          title: rate_limit_scope
+      title: Account
+      additionalProperties: false
+    mio.admin.v1.ChannelTypeInfo:
+      type: object
+      properties:
+        slug:
+          type: string
+          title: slug
+        capabilities:
+          title: capabilities
+          $ref: '#/components/schemas/mio.v1.ChannelCapabilities'
+        status:
+          type: string
+          title: status
+          description: '"active" | "experimental"'
+      title: ChannelTypeInfo
+      additionalProperties: false
+    mio.admin.v1.CompleteInstallRequest:
+      type: object
+      properties:
+        installId:
+          type: string
+          title: install_id
+      title: CompleteInstallRequest
+      additionalProperties: false
+    mio.admin.v1.CompleteInstallResponse:
+      type: object
+      properties:
+        account:
+          title: account
+          $ref: '#/components/schemas/mio.admin.v1.Account'
+      title: CompleteInstallResponse
+      additionalProperties: false
+    mio.admin.v1.ConsumerHealth:
+      type: object
+      properties:
+        consumerName:
+          type: string
+          title: consumer_name
+        stream:
+          type: string
+          title: stream
+        numPending:
+          type:
+            - integer
+            - string
+          title: num_pending
+          format: int64
+        numAckPending:
+          type:
+            - integer
+            - string
+          title: num_ack_pending
+          format: int64
+        lastDelivered:
+          title: last_delivered
+          description: may be unset
+          $ref: '#/components/schemas/google.protobuf.Timestamp'
+      title: ConsumerHealth
+      additionalProperties: false
+    mio.admin.v1.CreateTenantRequest:
+      type: object
+      properties:
+        slug:
+          type: string
+          title: slug
+        displayName:
+          type: string
+          title: display_name
+      title: CreateTenantRequest
+      additionalProperties: false
+    mio.admin.v1.CreateTenantResponse:
+      type: object
+      properties:
+        tenant:
+          title: tenant
+          $ref: '#/components/schemas/mio.admin.v1.Tenant'
+      title: CreateTenantResponse
+      additionalProperties: false
+    mio.admin.v1.DisableAccountRequest:
+      type: object
+      properties:
+        accountId:
+          type: string
+          title: account_id
+      title: DisableAccountRequest
+      additionalProperties: false
+    mio.admin.v1.DisableAccountResponse:
+      type: object
+      title: DisableAccountResponse
+      additionalProperties: false
+    mio.admin.v1.GetAccountRequest:
+      type: object
+      properties:
+        accountId:
+          type: string
+          title: account_id
+      title: GetAccountRequest
+      additionalProperties: false
+    mio.admin.v1.GetAccountResponse:
+      type: object
+      properties:
+        account:
+          title: account
+          $ref: '#/components/schemas/mio.admin.v1.Account'
+      title: GetAccountResponse
+      additionalProperties: false
+    mio.admin.v1.GetCredentialMetadataRequest:
+      type: object
+      properties:
+        accountId:
+          type: string
+          title: account_id
+      title: GetCredentialMetadataRequest
+      additionalProperties: false
+    mio.admin.v1.GetCredentialMetadataResponse:
+      type: object
+      properties:
+        accountId:
+          type: string
+          title: account_id
+        hasCredential:
+          type: boolean
+          title: has_credential
+        authKind:
+          type: string
+          title: auth_kind
+        keyVersion:
+          type: integer
+          title: key_version
+          format: int32
+        expiresAt:
+          title: expires_at
+          $ref: '#/components/schemas/google.protobuf.Timestamp'
+        rotatedAt:
+          title: rotated_at
+          $ref: '#/components/schemas/google.protobuf.Timestamp'
+      title: GetCredentialMetadataResponse
+      additionalProperties: false
+    mio.admin.v1.GetStreamHealthRequest:
+      type: object
+      title: GetStreamHealthRequest
+      additionalProperties: false
+    mio.admin.v1.GetStreamHealthResponse:
+      type: object
+      properties:
+        consumers:
+          type: array
+          items:
+            $ref: '#/components/schemas/mio.admin.v1.ConsumerHealth'
+          title: consumers
+      title: GetStreamHealthResponse
+      additionalProperties: false
+    mio.admin.v1.GetTenantRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+      title: GetTenantRequest
+      additionalProperties: false
+    mio.admin.v1.GetTenantResponse:
+      type: object
+      properties:
+        tenant:
+          title: tenant
+          $ref: '#/components/schemas/mio.admin.v1.Tenant'
+      title: GetTenantResponse
+      additionalProperties: false
+    mio.admin.v1.GetWebhookInfoRequest:
+      type: object
+      properties:
+        accountId:
+          type: string
+          title: account_id
+      title: GetWebhookInfoRequest
+      additionalProperties: false
+    mio.admin.v1.GetWebhookInfoResponse:
+      type: object
+      properties:
+        accountId:
+          type: string
+          title: account_id
+        channelType:
+          type: string
+          title: channel_type
+        webhookUrl:
+          type: string
+          title: webhook_url
+          description: primary URL (public_base_url + /webhooks/<slug>)
+        routeAliases:
+          type: array
+          items:
+            type: string
+          title: route_aliases
+          description: e.g. ["/cliq"] if adapter exposes aliases
+        authKind:
+          type: string
+          title: auth_kind
+          description: from capabilities
+        setupHint:
+          type: string
+          title: setup_hint
+          description: human-readable next step
+      title: GetWebhookInfoResponse
+      additionalProperties: false
+    mio.admin.v1.ListAccountsRequest:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          title: tenant_id
+      title: ListAccountsRequest
+      additionalProperties: false
+    mio.admin.v1.ListAccountsResponse:
+      type: object
+      properties:
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/mio.admin.v1.Account'
+          title: accounts
+      title: ListAccountsResponse
+      additionalProperties: false
+    mio.admin.v1.ListChannelTypesRequest:
+      type: object
+      title: ListChannelTypesRequest
+      additionalProperties: false
+    mio.admin.v1.ListChannelTypesResponse:
+      type: object
+      properties:
+        channelTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/mio.admin.v1.ChannelTypeInfo'
+          title: channel_types
+      title: ListChannelTypesResponse
+      additionalProperties: false
+    mio.admin.v1.ListTenantsRequest:
+      type: object
+      title: ListTenantsRequest
+      additionalProperties: false
+    mio.admin.v1.ListTenantsResponse:
+      type: object
+      properties:
+        tenants:
+          type: array
+          items:
+            $ref: '#/components/schemas/mio.admin.v1.Tenant'
+          title: tenants
+      title: ListTenantsResponse
+      additionalProperties: false
+    mio.admin.v1.RotateCredentialRequest:
+      type: object
+      properties:
+        accountId:
+          type: string
+          title: account_id
+      title: RotateCredentialRequest
+      additionalProperties: false
+    mio.admin.v1.RotateCredentialResponse:
+      type: object
+      title: RotateCredentialResponse
+      additionalProperties: false
+    mio.admin.v1.SetRateLimitRequest:
+      type: object
+      properties:
+        accountId:
+          type: string
+          title: account_id
+        rateLimitPerSecond:
+          type: integer
+          title: rate_limit_per_second
+          format: int32
+        rateLimitScope:
+          type: string
+          title: rate_limit_scope
+      title: SetRateLimitRequest
+      additionalProperties: false
+    mio.admin.v1.SetRateLimitResponse:
+      type: object
+      properties:
+        account:
+          title: account
+          $ref: '#/components/schemas/mio.admin.v1.Account'
+      title: SetRateLimitResponse
+      additionalProperties: false
+    mio.admin.v1.StartInstallRequest:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          title: tenant_id
+        channelType:
+          type: string
+          title: channel_type
+        provider:
+          type: string
+          title: provider
+          description: optional; defaults to "default"
+      title: StartInstallRequest
+      additionalProperties: false
+    mio.admin.v1.StartInstallResponse:
+      type: object
+      properties:
+        installId:
+          type: string
+          title: install_id
+        oauthUrl:
+          type: string
+          title: oauth_url
+          description: operator opens this URL
+        redirectUri:
+          type: string
+          title: redirect_uri
+          description: for the operator to confirm matches the platform's registered URI
+      title: StartInstallResponse
+      additionalProperties: false
+    mio.admin.v1.TailMessagesRequest:
+      type: object
+      properties:
+        accountId:
+          type: string
+          title: account_id
+        conversationId:
+          type: string
+          title: conversation_id
+          description: optional filter
+      title: TailMessagesRequest
+      additionalProperties: false
+    mio.admin.v1.TailMessagesResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+          description: |-
+            Subset of mio.v1.Message useful for UI; not the full canonical envelope
+             because rendering doesn't need attributes / attachments here. Future
+             versions can carry the full Message — additive only.
+        tenantId:
+          type: string
+          title: tenant_id
+        accountId:
+          type: string
+          title: account_id
+        conversationId:
+          type: string
+          title: conversation_id
+        channelType:
+          type: string
+          title: channel_type
+        senderDisplay:
+          type: string
+          title: sender_display
+        text:
+          type: string
+          title: text
+        receivedAt:
+          title: received_at
+          $ref: '#/components/schemas/google.protobuf.Timestamp'
+      title: TailMessagesResponse
+      additionalProperties: false
+    mio.admin.v1.Tenant:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+        slug:
+          type: string
+          title: slug
+        displayName:
+          type: string
+          title: display_name
+        status:
+          type: string
+          title: status
+        createdAt:
+          title: created_at
+          $ref: '#/components/schemas/google.protobuf.Timestamp'
+        disabledAt:
+          title: disabled_at
+          description: empty unless disabled
+          $ref: '#/components/schemas/google.protobuf.Timestamp'
+      title: Tenant
+      additionalProperties: false
+    mio.admin.v1.UpdateAccountRequest:
+      type: object
+      properties:
+        accountId:
+          type: string
+          title: account_id
+        displayName:
+          type: string
+          title: display_name
+        externalId:
+          type: string
+          title: external_id
+      title: UpdateAccountRequest
+      additionalProperties: false
+    mio.admin.v1.UpdateAccountResponse:
+      type: object
+      properties:
+        account:
+          title: account
+          $ref: '#/components/schemas/mio.admin.v1.Account'
+      title: UpdateAccountResponse
+      additionalProperties: false
+    mio.v1.Attachment.Kind:
+      type: string
+      title: Kind
+      enum:
+        - KIND_UNSPECIFIED
+        - KIND_IMAGE
+        - KIND_FILE
+        - KIND_AUDIO
+        - KIND_VIDEO
+        - KIND_LINK
+      description: Kind classifies the attachment for rendering and routing decisions.
+    mio.v1.ChannelCapabilities:
+      type: object
+      properties:
+        supportsEdit:
+          type: boolean
+          title: supports_edit
+          description: '--- feature flags ---'
+        supportsDelete:
+          type: boolean
+          title: supports_delete
+        supportsReactions:
+          type: boolean
+          title: supports_reactions
+        supportsThreads:
+          type: boolean
+          title: supports_threads
+        supportsTyping:
+          type: boolean
+          title: supports_typing
+        supportsPresence:
+          type: boolean
+          title: supports_presence
+        allowedAttachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/mio.v1.Attachment.Kind'
+          title: allowed_attachments
+          description: |-
+            --- attachment policy ---
+             Empty allowed_attachments means the adapter does not handle attachments;
+             include explicit kinds (IMAGE, FILE, AUDIO, VIDEO, LINK) when supported.
+        maxTextBytes:
+          type: integer
+          title: max_text_bytes
+          format: int32
+          description: |-
+            --- limits ---
+             max_text_bytes is the platform's hard limit; admin UI surfaces this as
+             a hint before send.
+        rateLimitPerSecond:
+          type: integer
+          title: rate_limit_per_second
+          format: int32
+          description: |-
+            rate_limit_per_second is a per-bucket cap; bucket key is given by
+             rate_limit_scope (one of "account", "account:conversation").
+        rateLimitScope:
+          type: string
+          title: rate_limit_scope
+        authKind:
+          type: string
+          title: auth_kind
+          description: |-
+            --- auth flavor ---
+             auth_kind names the credential model: "oauth2_refresh" (Cliq, Slack),
+             "bot_token" (Telegram), "hmac_webhook" (inbound-only signed webhooks).
+             CredentialAdapter implementations branch on this.
+        editWindowSeconds:
+          type: integer
+          title: edit_window_seconds
+          format: int32
+          description: |-
+            --- edit / delete windows ---
+             edit_window_seconds is how long after Send a message may be edited;
+             0 = no platform-enforced limit. delete_window_seconds is analogous.
+        deleteWindowSeconds:
+          type: integer
+          title: delete_window_seconds
+          format: int32
+      title: ChannelCapabilities
+      additionalProperties: false
+      description: |-
+        ChannelCapabilities advertises what a single channel adapter can do, so the
+         admin API (and UI/TUI) can render install flows and feature toggles without
+         hardcoding per-channel knowledge. Returned by Adapter.Capabilities().
+
+         Hard-coded in each adapter package (Cliq's lives in zohocliq/sender.go).
+         A regression test asserts the struct matches expectation verbatim — stale
+         capability advertisement is caught loudly instead of drifting silently.
+security: []
+tags:
+  - name: mio.admin.v1.AdminService
+    description: |-
+      AdminService is the control-plane API: tenants, channel installs, message
+       inspection. Internal-only by default — the admin binary binds 127.0.0.1
+       and the auth middleware allowlists loopback + MIO_ADMIN_ALLOW_CIDRS.
+
+       Wire stability: the surrounding buf module has WIRE_JSON breaking checks
+       enabled. Rename via `deprecated_alias` instead of in-place edits; new
+       fields must be appended.

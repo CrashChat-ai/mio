@@ -113,6 +113,9 @@ jobs:
       - name: Test mio-web
         run: go test ./ui/web/... -count=1
 
+      - name: Contract parity (RPC↔REST routes + auth/audit coverage)
+        run: make ui-web-contract-parity
+
   # ── Proto lint + breaking check ────────────────────────────────────────────
   test-proto:
     needs: changes

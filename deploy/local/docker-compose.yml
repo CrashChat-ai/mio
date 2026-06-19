@@ -115,8 +115,10 @@ services:
     restart: unless-stopped
 
   # Seeds the env-identity tenant + account once the gateway has migrated the
-  # schema. Retries until the tables exist; idempotent. Without it, inbound
-  # persist fails the tenant/account FKs and the Cliq loop never starts.
+  # schema. Without it, inbound persist fails the tenant/account FKs and the Cliq
+  # loop never starts. `make cliq-up` blocks on this (compose wait) so no inbound
+  # races ahead of the seed. Polls for the schema, then runs seed.sql ONCE and
+  # fails fast (exit 1) on a real seed error instead of looping forever.
   db-seed:
     image: postgres:16-alpine
     depends_on:
@@ -130,9 +132,16 @@ services:
       - sh
       - -c
       - |
-        until psql -h postgres -U mio_app -d mio -v ON_ERROR_STOP=1 -f /seed.sql; do
-          echo "db-seed: schema not ready (gateway migrating), retry in 2s"; sleep 2;
-        done; echo "db-seed: done"
+        for i in $$(seq 1 60); do
+          if psql -h postgres -U mio_app -d mio -tAc "select to_regclass('public.accounts')" 2>/dev/null | grep -q .; then
+            if psql -h postgres -U mio_app -d mio -v ON_ERROR_STOP=1 -f /seed.sql; then
+              echo "db-seed: done"; exit 0
+            fi
+            echo "db-seed: seed.sql FAILED (see error above)" >&2; exit 1
+          fi
+          echo "db-seed: schema not ready (gateway migrating) [$$i/60]"; sleep 2
+        done
+        echo "db-seed: gave up after 120s waiting for schema" >&2; exit 1
     restart: "no"
 
   admin:

@@ -12,7 +12,8 @@ See **[docs/local-dev-mio-cliq.md](../../docs/local-dev-mio-cliq.md)** for the f
 walkthrough (the round-trip, the `body_json`/signature contract, channel-pulse hookup,
 and the optional `make ingest-prod` real-data path).
 
-Bring up just the infra (Postgres + NATS + MinIO + gateway) for local development:
+Bring up the default stack (Postgres, NATS, MinIO, gateway, cliq-mock, db-seed,
+sink-gcs) — the `media` and `operator` profiles stay down:
 
 ```bash
 make up

@@ -8,7 +8,7 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' | sort
 
-up: ## Start local infra (NATS + Postgres + MinIO)
+up: ## Start the default stack (NATS, Postgres, MinIO, gateway, cliq-mock, db-seed, sink-gcs)
 	$(COMPOSE) up -d
 
 down: ## Stop local infra
@@ -16,8 +16,15 @@ down: ## Stop local infra
 
 cliq-up: ## Turnkey MIO + Zoho Cliq loop (gateway + cliq-mock + media-vault enrich + echo); no real Zoho needed
 	$(COMPOSE) --profile media up -d --build
+	@echo "cliq-up: waiting for db-seed (dev tenant/account) so replay never races the FK…"
+	@for i in $$(seq 1 60); do \
+	  if $(COMPOSE) exec -T postgres psql -U mio_app -d mio -tAc "select 1 from accounts limit 1" 2>/dev/null | grep -q 1; then \
+	    echo "cliq-up: seeded ✓ — ready"; exit 0; \
+	  fi; sleep 1; \
+	done; \
+	echo "cliq-up: db-seed did not complete in 60s (see: make cliq-logs)" >&2; exit 1
 
-cliq-replay: ## Drive a synthetic Cliq inbound message (FIXTURE=dm-to-bot by default)
+cliq-replay: ## Drive a synthetic Cliq inbound message (FIXTURE=channel-text by default)
 	FIXTURE="$(FIXTURE)" ./scripts/cliq-replay.sh
 
 cliq-smoke: ## Replay a fixture and assert the outbound leg hit cliq-mock (204)

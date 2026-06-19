@@ -26,6 +26,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Configure Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true   # self-enable Pages (build_type=workflow) on first run
       - name: Build with Astro
         uses: withastro/action@v6
         with:

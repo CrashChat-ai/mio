@@ -6,7 +6,7 @@ import starlightLlmsTxt from 'starlight-llms-txt';
 import remarkGfm from 'remark-gfm';
 
 export default defineConfig({
-  site: 'https://mio.crashchatapp.com',
+  site: 'https://mio.crashchat.net',
   // GFM (tables, strikethrough) for MDX — .mdx does not get it by default.
   markdown: { remarkPlugins: [remarkGfm] },
   integrations: [

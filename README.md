@@ -31,7 +31,7 @@ the receiver.
 ## Components
 
 The repo is organised by role (services / ui / sdks / channels / shared libs).
-Migration history: see `.work/plans/260513-0833-repo-layout-option-b/`.
+Migration history: see `.workbench/plans/260513-0833-repo-layout-option-b/`.
 
 | Component | Lang | Role |
 |---|---|---|

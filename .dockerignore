@@ -17,7 +17,7 @@ proto/gen/
 hack/
 plans/
 docs/
-.work/
+.workbench/
 .claude/
 prototypes/
 playground/

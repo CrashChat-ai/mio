@@ -56,7 +56,8 @@ prototypes/channel-pulse-stack/backend/real_*.json
 docs/journals
 
 # Local planning artifacts (vd umbrella)
-.work/
+.workbench/
+.worktrees/
 .claude/
 
 repomix-output.xml

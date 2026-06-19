@@ -20,10 +20,10 @@ check_no_matches() {
   rm -f "$tmp"
 }
 
-if [ -d .work ]; then
+if [ -d .workbench ]; then
   check_no_matches \
-    "legacy planning paths found; use .work/{plans,reports,journals,visuals,state}" \
-    '(?<!\.work/)plans/(reports|goals|journals|visuals|[0-9])' \
+    "legacy planning paths found; use .workbench/{plans,reports,journals,visuals,state}" \
+    '(?<!\.workbench/)plans/(reports|goals|journals|visuals|[0-9])' \
     README.md docs .github Makefile scripts
 fi
 

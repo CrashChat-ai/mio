@@ -4,12 +4,16 @@ import starlight from '@astrojs/starlight';
 import react from '@astrojs/react';
 import starlightLlmsTxt from 'starlight-llms-txt';
 import remarkGfm from 'remark-gfm';
+import mermaid from 'astro-mermaid';
 
 export default defineConfig({
   site: 'https://mio.crashchat.net',
   // GFM (tables, strikethrough) for MDX — .mdx does not get it by default.
   markdown: { remarkPlugins: [remarkGfm] },
   integrations: [
+    // Must come BEFORE starlight: renders ```mermaid fences (client-side,
+    // autoTheme follows Starlight's light/dark).
+    mermaid({ autoTheme: true }),
     starlight({
       title: 'MIO',
       description:

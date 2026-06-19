@@ -64,7 +64,8 @@ type Adapter struct {
 // comes from encrypted storage.
 //
 // Optional:
-//   - CLIQ_API_BASE_URL: override Cliq base URL for tests
+//   - CLIQ_API_BASE_URL: override Cliq REST base URL (tests + local cliq-mock)
+//   - CLIQ_OAUTH_URL: override the OAuth token endpoint (tests + local cliq-mock)
 //
 // If ALL three OAuth vars are absent, tokens remains nil — Send/Edit will
 // return an explicit error. This keeps test imports of the package working
@@ -92,7 +93,11 @@ func NewAdapter() *Adapter {
 
 	var tokens *tokenSource
 	if setCount == 3 {
-		tokens = newTokenSource(clientID, clientSecret, refreshToken)
+		var opts []tokenSourceOpt
+		if u := os.Getenv("CLIQ_OAUTH_URL"); u != "" {
+			opts = append(opts, withOAuthURL(u))
+		}
+		tokens = newTokenSource(clientID, clientSecret, refreshToken, opts...)
 	}
 
 	baseURL := os.Getenv("CLIQ_API_BASE_URL")

@@ -75,13 +75,27 @@ services:
     environment:
       MIO_PORT: "8080"
       MIO_LOG_LEVEL: "info"
-      MIO_TENANT_ID: "${MIO_TENANT_ID:-00000000-0000-0000-0000-000000000001}"
-      MIO_ACCOUNT_ID: "${MIO_ACCOUNT_ID:-00000000-0000-0000-0000-000000000002}"
+      # Literal dev UUIDs (NOT ${MIO_TENANT_ID:-...}): .mise.toml exports
+      # MIO_TENANT_ID=tenant-dev, a non-UUID that would otherwise leak in and
+      # break env-identity inbound persist (conversations.tenant_id is uuid).
+      MIO_TENANT_ID: "00000000-0000-0000-0000-000000000001"
+      MIO_ACCOUNT_ID: "00000000-0000-0000-0000-000000000002"
       MIO_NATS_URLS: "nats://nats:4222"
       MIO_POSTGRES_DSN: "postgres://mio_app:dev_password@postgres:5432/mio?sslmode=disable"
       MIO_MIGRATE_ON_START: "true"
       MIO_PGX_MAX_CONNS: "5"
       MIO_GRACEFUL_SHUTDOWN_SECS: "15"
+      # Zoho Cliq outbound — dev defaults point at the local cliq-mock so the
+      # outbound leg works with no real Zoho org. All three OAuth vars MUST be
+      # set together (NewAdapter panics on partial config). Override any to hit
+      # real Zoho. CLIQ_OAUTH_URL is the full token endpoint; CLIQ_API_BASE_URL
+      # is host-only (sender appends /api/v2/...).
+      CLIQ_BOT_NAME: "${CLIQ_BOT_NAME:-dev-bot}"
+      CLIQ_CLIENT_ID: "${CLIQ_CLIENT_ID:-dev-client-id}"
+      CLIQ_CLIENT_SECRET: "${CLIQ_CLIENT_SECRET:-dev-client-secret}"
+      CLIQ_REFRESH_TOKEN: "${CLIQ_REFRESH_TOKEN:-dev-refresh-token}"
+      CLIQ_API_BASE_URL: "${CLIQ_API_BASE_URL:-http://cliq-mock:8080}"
+      CLIQ_OAUTH_URL: "${CLIQ_OAUTH_URL:-http://cliq-mock:8080/oauth/v2/token}"
     volumes:
       - ./secrets:/etc/mio/secrets:ro
     depends_on:
@@ -89,7 +103,37 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      cliq-mock:
+        condition: service_started
     restart: unless-stopped
+
+  cliq-mock:
+    build:
+      context: ./cliq-mock
+    ports:
+      - "${CLIQ_MOCK_PORT:-8090}:8080"
+    restart: unless-stopped
+
+  # Seeds the env-identity tenant + account once the gateway has migrated the
+  # schema. Retries until the tables exist; idempotent. Without it, inbound
+  # persist fails the tenant/account FKs and the Cliq loop never starts.
+  db-seed:
+    image: postgres:16-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: dev_password
+    volumes:
+      - ./seed.sql:/seed.sql:ro
+    entrypoint:
+      - sh
+      - -c
+      - |
+        until psql -h postgres -U mio_app -d mio -v ON_ERROR_STOP=1 -f /seed.sql; do
+          echo "db-seed: schema not ready (gateway migrating), retry in 2s"; sleep 2;
+        done; echo "db-seed: done"
+    restart: "no"
 
   admin:
     profiles: ["operator"]
@@ -196,8 +240,9 @@ services:
       dockerfile: services/media-vault/Dockerfile
     environment:
       MIO_NATS_URLS: nats://nats:4222
-      MIO_TENANT_ID: "${MIO_TENANT_ID:-00000000-0000-0000-0000-000000000001}"
-      MIO_ACCOUNT_ID: "${MIO_ACCOUNT_ID:-00000000-0000-0000-0000-000000000002}"
+      # Literal dev UUIDs — see gateway block (mise exports a non-UUID MIO_TENANT_ID).
+      MIO_TENANT_ID: "00000000-0000-0000-0000-000000000001"
+      MIO_ACCOUNT_ID: "00000000-0000-0000-0000-000000000002"
       MIO_STORAGE_BACKEND: s3
       MIO_STORAGE_BUCKET: "${MIO_STORAGE_BUCKET:-mio-attachments}"
       MIO_STORAGE_S3_ENDPOINT: http://minio:9000

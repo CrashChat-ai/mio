@@ -1,6 +1,18 @@
 # Local deploy
 
-Bring up Postgres + NATS + MinIO for local development:
+**Turnkey Zoho Cliq loop (no real Zoho org, no cluster):**
+
+```bash
+make cliq-up        # gateway + cliq-mock + media-vault enrich + echo + db-seed
+make cliq-replay    # synthetic Cliq inbound (channel-text) → full round-trip
+make cliq-smoke     # assert outbound reached cliq-mock (204)
+```
+
+See **[docs/local-dev-mio-cliq.md](../../docs/local-dev-mio-cliq.md)** for the full
+walkthrough (the round-trip, the `body_json`/signature contract, channel-pulse hookup,
+and the optional `make ingest-prod` real-data path).
+
+Bring up just the infra (Postgres + NATS + MinIO + gateway) for local development:
 
 ```bash
 make up

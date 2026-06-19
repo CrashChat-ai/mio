@@ -1,4 +1,4 @@
-.PHONY: help up down operator-web-up proto proto-gen proto-lint proto-breaking proto-roundtrip proto-stubs-python sdk-go-test sdk-py-test sink-gcs-test sink-gcs-build-local sink-gcs-build lint docs-check test clean gateway-build gateway-build-local gateway-test gateway-migrate gateway-bench-outbound admin-build admin-run admin-test tui-build tui-run tui-test ui-web-install ui-web-build ui-web-test ui-web-contract-check ui-web-contract-coverage ui-web-contract-parity docker-mio-web docker-mio-web-api docker-mio-web-frontend echo-up echo-logs echo-consumer-test helm-lint helm-template kind-up kind-deploy kind-smoke kind-down
+.PHONY: help up down cliq-up cliq-replay cliq-smoke cliq-logs cliq-down ingest-prod operator-web-up proto proto-gen proto-lint proto-breaking proto-roundtrip proto-stubs-python sdk-go-test sdk-py-test sink-gcs-test sink-gcs-build-local sink-gcs-build lint docs-check test clean gateway-build gateway-build-local gateway-test gateway-migrate gateway-bench-outbound admin-build admin-run admin-test tui-build tui-run tui-test ui-web-install ui-web-build ui-web-test ui-web-contract-check ui-web-contract-coverage ui-web-contract-parity docker-mio-web docker-mio-web-api docker-mio-web-frontend echo-up echo-logs echo-consumer-test helm-lint helm-template kind-up kind-deploy kind-smoke kind-down
 
 COMPOSE := docker compose -f deploy/local/docker-compose.yml
 BUILD_VERSION := $(shell git describe --always --dirty 2>/dev/null || echo dev)
@@ -13,6 +13,26 @@ up: ## Start local infra (NATS + Postgres + MinIO)
 
 down: ## Stop local infra
 	$(COMPOSE) down
+
+cliq-up: ## Turnkey MIO + Zoho Cliq loop (gateway + cliq-mock + media-vault enrich + echo); no real Zoho needed
+	$(COMPOSE) --profile media up -d --build
+
+cliq-replay: ## Drive a synthetic Cliq inbound message (FIXTURE=dm-to-bot by default)
+	FIXTURE="$(FIXTURE)" ./scripts/cliq-replay.sh
+
+cliq-smoke: ## Replay a fixture and assert the outbound leg hit cliq-mock (204)
+	FIXTURE="$(FIXTURE)" ./scripts/cliq-smoke.sh
+
+cliq-logs: ## Tail gateway + cliq-mock + media-vault + echo-consumer logs
+	$(COMPOSE) --profile media logs -f gateway cliq-mock media-vault echo-consumer
+
+cliq-down: ## Stop the local Cliq stack
+	$(COMPOSE) --profile media down
+
+ingest-prod: ## [opt-in] Port-forward real ABS dev mio-nats to localhost:4225 (needs prod GKE RBAC)
+	@echo "Real ABS data path → point your consumer at nats://localhost:4225"
+	@echo "ALWAYS set a personal durable (e.g. MIO_DURABLE=mio-local-$$USER) so you don't steal the shared channel-pulse-dev cursor."
+	kubectl --context $(or $(PROD_CONTEXT),dp-prod-7e26) -n mio port-forward svc/mio-nats 4225:4222
 
 operator-web-up: ## Run gateway + admin + mio-web (api+frontend+proxy) locally (operator profile)
 	$(COMPOSE) --profile operator up --build gateway admin mio-web-api mio-web-frontend mio-web-proxy

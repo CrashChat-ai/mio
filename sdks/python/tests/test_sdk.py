@@ -371,6 +371,18 @@ def test_consume_outbound_empty_durable():
     asyncio.run(_run())
 
 
+def test_stream_for_subject_mapping():
+    """Subject→stream mapping; enriched must win over the inbound prefix."""
+    from mio.client import _stream_for_subject
+
+    assert _stream_for_subject("mio.inbound.zoho_cliq.a.c") == "MESSAGES_INBOUND"
+    assert _stream_for_subject("mio.inbound.>") == "MESSAGES_INBOUND"
+    assert _stream_for_subject("mio.inbound_enriched.>") == "MESSAGES_INBOUND_ENRICHED"
+    assert _stream_for_subject("mio.outbound.>") == "MESSAGES_OUTBOUND"
+    with pytest.raises(ValueError, match="no JetStream stream"):
+        _stream_for_subject("mio.bogus.>")
+
+
 # ---------------------------------------------------------------------------
 # Idempotency key builder (inline, no separate module for simplicity)
 # ---------------------------------------------------------------------------

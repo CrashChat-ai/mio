@@ -1,12 +1,10 @@
 name: Deploy docs to GitHub Pages
 
+# Manual-only: the crashchat-ai org currently disables Pages creation
+# ("GitHub organization administrators disabled Pages creation"), so this can't
+# auto-publish. Re-add the `push:` trigger once an org admin enables Pages
+# (Settings → Pages → allow), or repoint the build at another static host.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'website/**'
-      - 'docs/**'
-      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:

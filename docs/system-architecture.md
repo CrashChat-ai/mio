@@ -1,3 +1,8 @@
+---
+title: System Architecture
+description: How MIO normalizes every chat surface into one canonical envelope for the MIU AI service.
+---
+
 # MIO — System Architecture
 
 > Status: design doc, locked-in for the POC. Last updated 2026-05-10 (P9 attachment-persistence shipped).

@@ -1,3 +1,8 @@
+---
+title: Self-Host Quickstart
+description: Run MIO locally without a GCP account — via docker compose or the all-in-one binary with embedded NATS.
+---
+
 # Self-Host Quickstart
 
 Run MIO locally without any GCP account. Two options: **docker compose** (full stack) or **all-in-one binary** (embedded NATS).

@@ -1,3 +1,8 @@
+---
+title: "ADR 0001: Web backend placement"
+description: Architecture decision record on where the operator-console web backend lives across MIO's data plane, control plane, and BFF.
+---
+
 # ADR 0001: Web backend placement
 
 - Status: Accepted (2026-06-14)

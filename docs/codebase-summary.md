@@ -1,3 +1,8 @@
+---
+title: Codebase Summary
+description: Repository layout and role-based monorepo structure of github.com/crashchat-ai/mio.
+---
+
 # MIO — Codebase Summary
 
 **Last updated:** 2026-05-13 | **Module:** github.com/crashchat-ai/mio | **License:** Apache-2.0

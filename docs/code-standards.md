@@ -1,3 +1,8 @@
+---
+title: Code Standards & Governance
+description: Language and tool versions, conventions, and CI-enforced quality gates for Go, Python, Protobuf, shell, and Helm across MIO.
+---
+
 # MIO — Code Standards & Governance
 
 **Last updated:** 2026-05-13  

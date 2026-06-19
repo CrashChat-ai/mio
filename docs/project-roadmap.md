@@ -1,3 +1,8 @@
+---
+title: Project Roadmap
+description: Current phase, recently shipped work, and the next focus areas for MIO.
+---
+
 # MIO — Project Roadmap
 
 **Last updated:** 2026-06-14  

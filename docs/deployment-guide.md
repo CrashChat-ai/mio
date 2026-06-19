@@ -1,3 +1,8 @@
+---
+title: Deployment Guide
+description: GKE POC reference, local dev, all-in-one binary, and admin server bootstrap for deploying MIO.
+---
+
 # MIO — Deployment Guide
 
 **Last updated:** 2026-05-13  

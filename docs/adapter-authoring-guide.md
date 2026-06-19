@@ -1,3 +1,8 @@
+---
+title: Adapter Authoring Guide
+description: Build a production-ready MIO channel adapter end-to-end, verified against the pkg/channels contract and the reference Zoho Cliq implementation.
+---
+
 # Adapter Authoring Guide
 
 This guide walks through building a production-ready channel adapter for MIO by implementing a hypothetical Slack adapter. Every code reference is verified against the actual contract in `pkg/channels/` and the reference Zoho Cliq implementation in `channels/zohocliq/`.

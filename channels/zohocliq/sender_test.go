@@ -478,6 +478,32 @@ func TestNewAdapter_AllEmptyReturnsNilTokens(t *testing.T) {
 	}
 }
 
+// TestNewAdapter_HonoursCliqOAuthURL verifies the local-dev knob: when
+// CLIQ_OAUTH_URL is set, NewAdapter wires it into the token source so OAuth
+// refresh hits the override (the local cliq-mock) instead of accounts.zoho.com.
+func TestNewAdapter_HonoursCliqOAuthURL(t *testing.T) {
+	srv, count := stubOAuthServer(t, "mock-token", 3600)
+	t.Setenv("CLIQ_CLIENT_ID", "dev-client-id")
+	t.Setenv("CLIQ_CLIENT_SECRET", "dev-client-secret")
+	t.Setenv("CLIQ_REFRESH_TOKEN", "dev-refresh-token")
+	t.Setenv("CLIQ_OAUTH_URL", srv.URL)
+
+	a := NewAdapter()
+	if a.tokens == nil {
+		t.Fatal("expected tokens configured when all three OAuth vars set")
+	}
+	tok, err := a.tokens.Get(context.Background())
+	if err != nil {
+		t.Fatalf("Get: unexpected error: %v", err)
+	}
+	if tok != "mock-token" {
+		t.Fatalf("expected mock-token from override endpoint, got %q", tok)
+	}
+	if got := count.Load(); got != 1 {
+		t.Fatalf("expected CLIQ_OAUTH_URL endpoint hit once, got %d", got)
+	}
+}
+
 func TestEdit_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPatch {

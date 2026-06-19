@@ -4,7 +4,7 @@ Verifies the TanStack-routed MIO operator console served by the **decoupled
 stack** (pure React frontend + API-only Go server) behind a single Caddy proxy
 origin. Everything is reached through one base URL (ports per /tmp/mio-e2e.env:
 proxy/web :18081, admin :19090, gateway :18080). Styling reference:
-.work/visuals/mio-console/mio-console-dashboard.html.
+.workbench/visuals/mio-console/mio-console-dashboard.html.
 
 ## Topology under test (single origin :18081)
 

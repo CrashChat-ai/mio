@@ -1,3 +1,8 @@
+---
+title: Project Roadmap
+description: Current phase, recently shipped work, and the next focus areas for MIO.
+---
+
 # MIO — Project Roadmap
 
 **Last updated:** 2026-06-14  
@@ -11,7 +16,7 @@
 
 | Phase | Status | Title | Description | Plan Ref |
 |---|---|---|---|---|
-| **P0** | ✅ | Repo scaffold | Initialize monorepo, Makefile, docker-compose | `.work/plans/260507-0904-mio-bootstrap/` |
+| **P0** | ✅ | Repo scaffold | Initialize monorepo, Makefile, docker-compose | `.workbench/plans/260507-0904-mio-bootstrap/` |
 | **P1** | ✅ | Proto v1 envelope | Define Message, SendCommand, Attachment, Capabilities | — |
 | **P2** | ✅ | SDKs (Go + Python) | Implement sdk-go and sdk-py with OTel + Prometheus | — |
 | **P3** | ✅ | Gateway + Cliq inbound | Webhook handler, HMAC verify, normalize to Message | — |
@@ -19,16 +24,16 @@
 | **P5** | ✅ | Outbound path → Cliq | SendCommand dispatch, rate limiting, edit support | — |
 | **P6** | ✅ | Sink-GCS archiver | Consumer that writes raw payloads to GCS (cold storage) | — |
 | **P7** | ✅ | Helm charts + NATS | 6 Helm charts, NATS StatefulSet, JetStream bootstrap | — |
-| **P8** | ✅ | POC deploy on GKE | Reference Kubernetes topology, CNPG Postgres, Flux reconciliation | `.work/plans/260509-2125-p8-poc-deploy-gke/` |
-| **P9** | ✅ | Attachment persistence | Media-vault sidecar, content-addressed storage, 7-day TTL | `.work/plans/260509-2328-attachment-persistence/` |
+| **P8** | ✅ | POC deploy on GKE | Reference Kubernetes topology, CNPG Postgres, Flux reconciliation | `.workbench/plans/260509-2125-p8-poc-deploy-gke/` |
+| **P9** | ✅ | Attachment persistence | Media-vault sidecar, content-addressed storage, 7-day TTL | `.workbench/plans/260509-2328-attachment-persistence/` |
 | **P9.5** | ✅ | Admin control plane + TUI scaffold | Admin server (connect-rpc), TUI (bubbletea, read-only v1), embedded NATS option | Recent |
-| **P9.6** | 🚧 | Pure-gateway refactor | Dynamic inbound routing, generic secret loading, S3 backend, multi-account routing, community adapter kit | `.work/plans/260612-1626-pure-gateway-refactor/` |
-| **P10** | 🚧 | BigQuery sink / lakehouse | External tables + native warehouse table, loader pipeline | `.work/plans/260510-1102-bq-sink-lakehouse/` |
-| **P11** | 🚧 | Channel registry control plane | Additive admin RPCs for account detail/update, rate limits, and credential metadata | `.work/plans/260513-0351-channel-management-control-plane/` |
-| **P12** | 🚧 | Operator web admin | `ui/web` Go BFF + role-gated audited mutations; decoupled into pure React SPA + API-only Go server behind a single-origin reverse proxy, OpenAPI-contracted typed client | `.work/plans/260614-0122-web-decouple/` |
+| **P9.6** | 🚧 | Pure-gateway refactor | Dynamic inbound routing, generic secret loading, S3 backend, multi-account routing, community adapter kit | `.workbench/plans/260612-1626-pure-gateway-refactor/` |
+| **P10** | 🚧 | BigQuery sink / lakehouse | External tables + native warehouse table, loader pipeline | `.workbench/plans/260510-1102-bq-sink-lakehouse/` |
+| **P11** | 🚧 | Channel registry control plane | Additive admin RPCs for account detail/update, rate limits, and credential metadata | `.workbench/plans/260513-0351-channel-management-control-plane/` |
+| **P12** | 🚧 | Operator web admin | `ui/web` Go BFF + role-gated audited mutations; decoupled into pure React SPA + API-only Go server behind a single-origin reverse proxy, OpenAPI-contracted typed client | `.workbench/plans/260614-0122-web-decouple/` |
 | **—** | — | Second channel adapter (Slack) | Webhook inbound, API outbound, per-channel rate limits | open |
-| **—** | — | ELT pipeline (Airflow DAG) | Scheduled Cloud Run Job for BigQuery loader | `.work/plans/260510-2333-elt-mio-airflow-dag/` |
-| **—** | — | Cliq OAuth refresh hardening | Token refresh retry/backoff, credential rotation | `.work/plans/260510-0152-cliq-oauth-token-refresh/` |
+| **—** | — | ELT pipeline (Airflow DAG) | Scheduled Cloud Run Job for BigQuery loader | `.workbench/plans/260510-2333-elt-mio-airflow-dag/` |
+| **—** | — | Cliq OAuth refresh hardening | Token refresh retry/backoff, credential rotation | `.workbench/plans/260510-0152-cliq-oauth-token-refresh/` |
 | **—** | — | TUI write operations | Admin TUI: create tenants, manage channels, set credentials | open |
 | **—** | — | NATS HA upgrade | 3-replica cluster + PVC storage, stream replication | see deployment-guide |
 
@@ -81,7 +86,7 @@
 - Per-account rate limiting (unaffected) ✅
 
 **Code:** `services/media-vault/`, `deploy/charts/mio-media-vault`  
-**Report:** `.work/reports/Cook-260509-2328-attachment-persistence.md`
+**Report:** `.workbench/reports/Cook-260509-2328-attachment-persistence.md`
 
 ### P8: POC Deploy on GKE
 
@@ -100,7 +105,7 @@
 - ingress-nginx + cert-manager (HTTP-01 via Cloud DNS)
 
 **Code:** `deploy/charts/`, `deploy/fluxcd/`  
-**Report:** `.work/reports/Cook-260509-2125-p8-poc-deploy-gke.md`
+**Report:** `.workbench/reports/Cook-260509-2125-p8-poc-deploy-gke.md`
 
 ---
 
@@ -124,7 +129,7 @@
 
 **Code:** `services/sink-gcs/sql/{messages_schema.json, check-proto-drift.sh}` (producer-side); loader lives in deployer's infra repo
 
-**Plan:** `.work/plans/260510-1102-bq-sink-lakehouse/`
+**Plan:** `.workbench/plans/260510-1102-bq-sink-lakehouse/`
 
 ### P11: Channel Registry Control Plane
 
@@ -143,7 +148,7 @@
 
 **Code:** `services/gateway/internal/admin/`, `ui/tui/`
 
-**Plan:** `.work/plans/260513-0351-channel-management-control-plane/`
+**Plan:** `.workbench/plans/260513-0351-channel-management-control-plane/`
 
 ---
 
@@ -202,14 +207,14 @@ Option B (future): N consumers, each watches mio.inbound_enriched.<channel>.<acc
 **Status:** 🚧 Research phase  
 **Goal:** Hardened token refresh with retry/backoff
 
-**Plan:** `.work/plans/260510-0152-cliq-oauth-token-refresh/`
+**Plan:** `.workbench/plans/260510-0152-cliq-oauth-token-refresh/`
 
 ### ELT Pipeline (Airflow DAG)
 
 **Status:** 🚧 Design phase  
 **Goal:** Scheduled Cloud Run Job for BigQuery loader
 
-**Plan:** `.work/plans/260510-2333-elt-mio-airflow-dag/`
+**Plan:** `.workbench/plans/260510-2333-elt-mio-airflow-dag/`
 
 ---
 
@@ -262,5 +267,5 @@ Option B (future): N consumers, each watches mio.inbound_enriched.<channel>.<acc
 - [System Architecture](system-architecture.md) — Design invariants, open questions detail
 - [Deployment Guide](deployment-guide.md) — Kubernetes reference, HA paths
 - [Code Standards](code-standards.md) — Governance rules, adapter pattern
-- `.work/plans/` — Detailed phase plans and research reports
+- `.workbench/plans/` — Detailed phase plans and research reports
 - `README.md` — Status table

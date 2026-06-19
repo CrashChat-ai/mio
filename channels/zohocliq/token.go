@@ -64,7 +64,8 @@ type tokenSource struct {
 // constructor signature stable while allowing test overrides.
 type tokenSourceOpt func(*tokenSource)
 
-// withOAuthURL overrides the OAuth token endpoint. Test-only.
+// withOAuthURL overrides the OAuth token endpoint. Used by tests and by
+// NewAdapter for local dev via the CLIQ_OAUTH_URL env (points at cliq-mock).
 func withOAuthURL(u string) tokenSourceOpt {
 	return func(t *tokenSource) { t.oauthURL = u }
 }

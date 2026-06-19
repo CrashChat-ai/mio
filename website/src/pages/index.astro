@@ -1,0 +1,54 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'MIO',
+    description:
+      'The messaging I/O platform that normalizes every chat surface into one canonical envelope — start with a full local dev loop.',
+    template: 'splash',
+    hero: {
+      tagline:
+        "Channels are messy; agents shouldn't care. MIO normalizes every chat surface into one canonical envelope.",
+      actions: [
+        {
+          text: 'Local Dev (MIO + Zoho Cliq)',
+          link: '/local-dev-mio-cliq/',
+          icon: 'right-arrow',
+          variant: 'primary',
+        },
+        {
+          text: 'System Architecture',
+          link: '/system-architecture/',
+          icon: 'open-book',
+          variant: 'minimal',
+        },
+      ],
+    },
+  }}
+>
+  <CardGrid>
+    <LinkCard
+      title="Local Dev: MIO + Zoho Cliq"
+      href="/local-dev-mio-cliq/"
+      description="Run a full inbound→process→outbound Zoho Cliq loop on your laptop — no Zoho org, no cluster, no PHI."
+    />
+    <LinkCard
+      title="System Architecture"
+      href="/system-architecture/"
+      description="How MIO normalizes chat surfaces into one canonical envelope for the MIU AI service."
+    />
+    <LinkCard
+      title="Codebase Summary"
+      href="/codebase-summary/"
+      description="Repository layout and the role-based monorepo structure of github.com/crashchat-ai/mio."
+    />
+    <LinkCard
+      title="Roadmap"
+      href="/project-roadmap/"
+      description="Current phase, shipped work, and what's next."
+    />
+  </CardGrid>
+</StarlightPage>

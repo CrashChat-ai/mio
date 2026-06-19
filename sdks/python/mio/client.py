@@ -319,7 +319,9 @@ class Client:
 
         from mio.v1.message_pb2 import Message
 
-        psub = await self._js.pull_subscribe(subject, durable=durable)
+        psub = await self._js.pull_subscribe(
+            subject, durable=durable, stream=_stream_for_subject(subject)
+        )
         try:
             while True:
                 try:
@@ -375,7 +377,9 @@ class Client:
 
         from mio.v1.send_command_pb2 import SendCommand
 
-        psub = await self._js.pull_subscribe(subject, durable=durable)
+        psub = await self._js.pull_subscribe(
+            subject, durable=durable, stream=_stream_for_subject(subject)
+        )
         try:
             while True:
                 try:
@@ -422,3 +426,21 @@ def _channel_type_from_subject(subject: str) -> str:
     if len(parts) >= 3:
         return parts[2]
     return "unknown"
+
+
+def _stream_for_subject(subject: str) -> str:
+    """Map a consume subject to its JetStream stream name.
+
+    nats-py resolves the stream from the subject via find_stream_name_by_subject,
+    which raises NotFoundError on a wildcard subject when the durable does not yet
+    exist (a fresh stream — exactly the local-dev case). Passing stream= explicitly
+    skips that lookup so a consumer can create its durable on a brand-new stream.
+    Order matters: inbound_enriched is a prefix-superset of inbound.
+    """
+    if subject.startswith("mio.inbound_enriched"):
+        return "MESSAGES_INBOUND_ENRICHED"
+    if subject.startswith("mio.inbound"):
+        return "MESSAGES_INBOUND"
+    if subject.startswith("mio.outbound"):
+        return "MESSAGES_OUTBOUND"
+    raise ValueError(f"no JetStream stream maps to subject {subject!r}")

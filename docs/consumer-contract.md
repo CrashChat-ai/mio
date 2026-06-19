@@ -1,3 +1,8 @@
+---
+title: Consumer Contract v1
+description: The authoritative, frozen specification for downstream consumers of the MIO gateway.
+---
+
 # MIO Consumer Contract v1
 
 **Status:** frozen | **Effective:** 2026-06-12 | **Schema version:** 1

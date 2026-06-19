@@ -1,3 +1,8 @@
+---
+title: System Architecture
+description: How MIO normalizes every chat surface into one canonical envelope for the MIU AI service.
+---
+
 # MIO — System Architecture
 
 > Status: design doc, locked-in for the POC. Last updated 2026-05-10 (P9 attachment-persistence shipped).
@@ -9,7 +14,7 @@ canonical envelope so MIU's AI service receives a `Message` and returns
 a `SendCommand` — without ever importing a channel SDK.
 
 This document is the source of truth for **what MIO is**. The phased
-build plan and morning journal live in `.work/plans/plan.md` (local-only).
+build plan and morning journal live in `.workbench/plans/plan.md` (local-only).
 
 ---
 

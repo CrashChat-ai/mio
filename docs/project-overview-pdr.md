@@ -1,3 +1,8 @@
+---
+title: Project Overview & PDR
+description: Problem, motivation, and product development requirements for the MIO messaging I/O platform.
+---
+
 # MIO — Project Overview & Product Development Requirements
 
 **Last updated:** 2026-05-13 (P9.5 admin control plane + TUI shipped)  

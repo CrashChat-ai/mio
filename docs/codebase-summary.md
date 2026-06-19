@@ -1,3 +1,8 @@
+---
+title: Codebase Summary
+description: Repository layout and role-based monorepo structure of github.com/crashchat-ai/mio.
+---
+
 # MIO — Codebase Summary
 
 **Last updated:** 2026-05-13 | **Module:** github.com/crashchat-ai/mio | **License:** Apache-2.0
@@ -38,7 +43,7 @@ mio/
 │   └── appdata/          # Persistent storage for local dev (NATS, Postgres).
 ├── hack/                 # Dev-only scratch. Not shipped, not tested. playground/ is gitignored.
 ├── docs/                 # Documentation (architecture, deployment, journals, roadmap, standards).
-├── .work/                # Local planning artifacts: plans, reports, journals (P0–P11+).
+├── .workbench/                # Local planning artifacts: plans, reports, journals (P0–P11+).
 ├── Makefile              # 40+ build, test, lint, deploy targets.
 ├── go.work               # Go 1.25 workspace (root + sdks/go).
 ├── .env.example          # Environment variables template.

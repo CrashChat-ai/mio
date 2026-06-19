@@ -1,3 +1,8 @@
+---
+title: mio-web Deployment
+description: Deploying the internal operator console — Go BFF API and static React frontend behind a single public origin.
+---
+
 # mio-web Deployment
 
 `mio-web` is the internal operator console, decoupled into two processes behind

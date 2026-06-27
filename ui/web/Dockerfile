@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM bufbuild/buf:1.69.0 AS proto
+FROM bufbuild/buf:1.71.0 AS proto
 WORKDIR /src
 COPY buf.yaml buf.gen.yaml ./
 COPY proto/ ./proto/

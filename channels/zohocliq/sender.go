@@ -195,6 +195,9 @@ func (a *Adapter) Send(ctx context.Context, cmd *miov1.SendCommand) (string, err
 }
 
 // sendEndpoints returns ordered Cliq POST URLs for this command.
+//
+// For rich payloads, prefer the Cliq chat id (conversation_external_id, usually
+// CT_…) — conversation_id is often an internal UUID and will 400/404.
 func (a *Adapter) sendEndpoints(cmd *miov1.SendCommand, channelName string, rich bool) []string {
 	botEndpoint := fmt.Sprintf("%s/api/v2/channelsbyname/%s/message?bot_unique_name=%s",
 		a.baseURL, url.PathEscape(channelName), url.QueryEscape(a.botName))
@@ -202,14 +205,25 @@ func (a *Adapter) sendEndpoints(cmd *miov1.SendCommand, channelName string, rich
 		return []string{botEndpoint}
 	}
 	out := make([]string, 0, 3)
-	if chatID := cmd.GetConversationId(); chatID != "" {
+	if chatID := cliqChatID(cmd); chatID != "" {
 		out = append(out, fmt.Sprintf("%s/api/v2/chats/%s/message",
 			a.baseURL, url.PathEscape(chatID)))
 	}
-	out = append(out, fmt.Sprintf("%s/api/v2/channels/%s/message",
+	// OAuth channel post (no bot_unique_name) — documented card path shape.
+	out = append(out, fmt.Sprintf("%s/api/v2/channelsbyname/%s/message",
 		a.baseURL, url.PathEscape(channelName)))
 	out = append(out, botEndpoint)
 	return out
+}
+
+func cliqChatID(cmd *miov1.SendCommand) string {
+	if ext := cmd.GetConversationExternalId(); ext != "" {
+		return ext
+	}
+	if id := cmd.GetConversationId(); id != "" {
+		return id
+	}
+	return ""
 }
 
 // doWithSelfHeal performs a single Cliq REST call with one-shot 401 recovery.

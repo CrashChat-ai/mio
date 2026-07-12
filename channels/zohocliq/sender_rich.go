@@ -34,11 +34,13 @@ type cliqSlide struct {
 type cliqTableData struct {
 	Headers []string            `json:"headers"`
 	Rows    []map[string]string `json:"rows"`
+	Style   *cliqTableStyles    `json:"style,omitempty"`
 	Styles  *cliqTableStyles    `json:"styles,omitempty"`
 }
 
-// cliqTableStyles maps to Cliq message-card / widget table styles.
-// text_align defaults to left so Question columns are not center-aligned.
+// cliqTableStyles maps to Cliq widget tables (style) and message-card slides (styles).
+// Widget docs use style.text_align; message-card docs only list styles.width/sticky —
+// emit both keys so Cliq honours left alignment when supported.
 type cliqTableStyles struct {
 	Width     []int    `json:"width,omitempty"`
 	TextAlign []string `json:"text_align,omitempty"`
@@ -121,13 +123,15 @@ func richBlockToCliqSlide(block *miov1.RichBlock) (cliqSlide, bool) {
 			return cliqSlide{}, false
 		}
 		headers := table.GetHeaders()
+		tableStyle := cliqDefaultTableStyles(len(headers))
 		return cliqSlide{
 			Type:  "table",
 			Title: table.GetTitle(),
 			Data: cliqTableData{
 				Headers: headers,
 				Rows:    cliqTableRows(headers, table.GetRows()),
-				Styles:  cliqDefaultTableStyles(len(headers)),
+				Style:   tableStyle,
+				Styles:  tableStyle,
 			},
 		}, true
 	case block.GetLabel() != nil:
@@ -181,7 +185,31 @@ func cliqDefaultTableStyles(nCols int) *cliqTableStyles {
 	for i := range align {
 		align[i] = "left"
 	}
-	return &cliqTableStyles{TextAlign: align}
+	return &cliqTableStyles{Width: cliqDefaultTableWidths(nCols), TextAlign: align}
+}
+
+func cliqDefaultTableWidths(nCols int) []int {
+	switch nCols {
+	case 1:
+		return []int{100}
+	case 2:
+		return []int{35, 65}
+	case 3:
+		return []int{18, 64, 18}
+	default:
+		base := 100 / nCols
+		width := make([]int, nCols)
+		rem := 100
+		for i := range width {
+			if i == nCols-1 {
+				width[i] = rem
+			} else {
+				width[i] = base
+				rem -= base
+			}
+		}
+		return width
+	}
 }
 
 func cliqLabelData(labels []*miov1.RichLabel) []map[string]string {

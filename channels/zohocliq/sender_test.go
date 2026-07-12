@@ -92,8 +92,12 @@ func TestSend_TextOnlyPayloadUnchanged(t *testing.T) {
 }
 
 func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
-	var payload map[string]any
+	var (
+		payload map[string]any
+		gotPath string
+	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Errorf("decode request: %v", err)
 		}
@@ -103,6 +107,7 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 
 	a, _ := newTestAdapter(t, srv.URL)
 	cmd := testCmd("cmd-rich", "Daily digest")
+	cmd.ConversationId = "CT_chat_123"
 	cmd.RichContent = &miov1.RichContent{
 		Card: &miov1.RichCard{
 			Title:        "Digest",
@@ -148,6 +153,9 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 	if _, err := a.Send(context.Background(), cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if gotPath != "/api/v2/chats/CT_chat_123/message" {
+		t.Fatalf("rich send path = %q, want /api/v2/chats/CT_chat_123/message", gotPath)
+	}
 
 	card := requireMap(t, payload["card"], "card")
 	if got := card["title"]; got != "Digest" {
@@ -155,6 +163,10 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 	}
 	if got := card["theme"]; got != "modern-inline" {
 		t.Fatalf("card.theme = %v, want modern-inline", got)
+	}
+	bot := requireMap(t, payload["bot"], "bot")
+	if got := bot["name"]; got != "test-bot" {
+		t.Fatalf("bot.name = %v, want test-bot", got)
 	}
 
 	slides := requireSlice(t, payload["slides"], "slides")
@@ -198,7 +210,7 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 	}
 }
 
-func TestSend_AttachmentsRenderCliqSlides(t *testing.T) {
+func TestSend_LabelBlocksBecomeCardSections(t *testing.T) {
 	var payload map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -209,7 +221,111 @@ func TestSend_AttachmentsRenderCliqSlides(t *testing.T) {
 	defer srv.Close()
 
 	a, _ := newTestAdapter(t, srv.URL)
+	cmd := testCmd("cmd-sections", "Channel Pull")
+	cmd.ConversationId = "CT_ducdev"
+	cmd.RichContent = &miov1.RichContent{
+		Card: &miov1.RichCard{Title: "📡 Channel Pull · this window", Theme: "modern-inline"},
+		Blocks: []*miov1.RichBlock{
+			{
+				Content: &miov1.RichBlock_Label{Label: &miov1.RichLabelBlock{
+					Title: "Channels",
+					Labels: []*miov1.RichLabel{
+						{Key: "#seniorchatch", Value: "12 msgs · 🟢 Up"},
+						{Key: "#cadaytoday", Value: "3 msgs · 🔴 Care"},
+					},
+				}},
+			},
+			{
+				Content: &miov1.RichBlock_List{List: &miov1.RichListBlock{
+					Title: "Needs reply",
+					Items: []string{"#cadaytoday · Jane — coverage? · 7h"},
+				}},
+			},
+		},
+	}
+
+	if _, err := a.Send(context.Background(), cmd); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	card := requireMap(t, payload["card"], "card")
+	sections := requireSlice(t, card["sections"], "card.sections")
+	if len(sections) != 1 {
+		t.Fatalf("sections len = %d, want 1; payload=%+v", len(sections), payload)
+	}
+	section := requireMap(t, sections[0], "sections[0]")
+	if got := section["title"]; got != "Channels" {
+		t.Fatalf("section title = %v", got)
+	}
+	fields := requireSlice(t, section["fields"], "section fields")
+	first := requireMap(t, fields[0], "fields[0]")
+	if got := first["title"]; got != "#seniorchatch" {
+		t.Fatalf("field title = %v", got)
+	}
+	if got := first["value"]; got != "12 msgs · 🟢 Up" {
+		t.Fatalf("field value = %v", got)
+	}
+
+	slides := requireSlice(t, payload["slides"], "slides")
+	if len(slides) != 1 {
+		t.Fatalf("slides len = %d, want 1 (list only); payload=%+v", len(slides), payload)
+	}
+	if got := requireMap(t, slides[0], "slides[0]")["type"]; got != "list" {
+		t.Fatalf("slides[0].type = %v, want list", got)
+	}
+}
+
+func TestSend_RichFallsBackWhenChatEndpointFails(t *testing.T) {
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path+"?"+r.URL.RawQuery)
+		if r.URL.Path == "/api/v2/chats/CT_fail/message" {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"nope"}`))
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	a, _ := newTestAdapter(t, srv.URL)
+	cmd := testCmd("cmd-fallback", "fallback")
+	cmd.ConversationId = "CT_fail"
+	cmd.RichContent = &miov1.RichContent{
+		Card: &miov1.RichCard{Title: "T", Theme: "modern-inline"},
+	}
+
+	if _, err := a.Send(context.Background(), cmd); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(paths) < 2 {
+		t.Fatalf("expected chat then channels fallback, got %v", paths)
+	}
+	if paths[0] != "/api/v2/chats/CT_fail/message?" {
+		t.Fatalf("first path = %q", paths[0])
+	}
+	if paths[1] != "/api/v2/channels/test-channel/message?" {
+		t.Fatalf("second path = %q", paths[1])
+	}
+}
+
+func TestSend_AttachmentsRenderCliqSlides(t *testing.T) {
+	var (
+		payload map[string]any
+		gotPath string
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	a, _ := newTestAdapter(t, srv.URL)
 	cmd := testCmd("cmd-attachments", "Attachments")
+	cmd.ConversationId = "CT_attach"
 	cmd.Attachments = []*miov1.Attachment{
 		{
 			Kind: miov1.Attachment_KIND_IMAGE,
@@ -224,6 +340,9 @@ func TestSend_AttachmentsRenderCliqSlides(t *testing.T) {
 
 	if _, err := a.Send(context.Background(), cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotPath != "/api/v2/chats/CT_attach/message" {
+		t.Fatalf("attachment send path = %q", gotPath)
 	}
 
 	slides := requireSlice(t, payload["slides"], "slides")

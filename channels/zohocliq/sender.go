@@ -126,15 +126,23 @@ func (a *Adapter) MaxDeliver() int { return cliqMaxDeliver }
 func (a *Adapter) RateLimitKey(_ *miov1.SendCommand) string { return "" }
 
 // Send delivers a new outbound message to Cliq.
-// Uses the bot endpoint POST /api/v2/channelsbyname/{name}/message?bot_unique_name={bot}
-// (the /chats/{id}/messages endpoint is read-only / DM-only and rejects bot posts
-// with request_method_invalid). Channel name must come from cmd.attributes
-// "cliq_channel_name" (echo / MIU sets this from msg.conversation_display_name).
 //
-// Returns: best-effort message id. Cliq returns 204 No Content on success, so
-// we synthesise from cmd.id — edit/replace flows that rely on the returned id
-// will need an explicit lookup once Cliq exposes a write endpoint that returns
-// the message id.
+// Text-only posts use the bot endpoint:
+//
+//	POST /api/v2/channelsbyname/{name}/message?bot_unique_name={bot}
+//
+// RichContent (card/slides/buttons) uses Cliq's documented message-card
+// endpoints first — the bot channelsbyname path accepts card JSON but
+// silently drops it and only renders `text` (plain bullet walls). Order:
+//
+//  1. POST /api/v2/chats/{conversation_id}/message  (preferred for cards)
+//  2. POST /api/v2/channels/{channel_unique_name}/message
+//  3. bot channelsbyname fallback (last resort)
+//
+// Channel name must come from cmd.attributes "cliq_channel_name".
+//
+// Returns: best-effort message id. Cliq often returns 204 No Content, so
+// we synthesise from cmd.id when the body has no id.
 func (a *Adapter) Send(ctx context.Context, cmd *miov1.SendCommand) (string, error) {
 	channelName := ""
 	if attrs := cmd.GetAttributes(); attrs != nil {
@@ -147,34 +155,61 @@ func (a *Adapter) Send(ctx context.Context, cmd *miov1.SendCommand) (string, err
 		return "", fmt.Errorf("cliq send: CLIQ_BOT_NAME env unset")
 	}
 
-	body := buildCliqSendRequest(cmd)
+	body := buildCliqSendRequest(cmd, a.botName)
 	reqBody, err := json.Marshal(body)
 	if err != nil {
 		return "", fmt.Errorf("cliq send: marshal request: %w", err)
 	}
 
-	// Escape user-controlled segments — channel names with special chars
-	// would otherwise corrupt the path. botName is operator-set so safe,
-	// but escape for symmetry / future-proofing against rename.
-	endpoint := fmt.Sprintf("%s/api/v2/channelsbyname/%s/message?bot_unique_name=%s",
-		a.baseURL, url.PathEscape(channelName), url.QueryEscape(a.botName))
-
-	resp, err := a.doWithSelfHeal(ctx, http.MethodPost, endpoint, reqBody)
-	if err != nil {
-		return "", err
+	endpoints := a.sendEndpoints(cmd, channelName, hasRichPayload(body))
+	var (
+		resp    *http.Response
+		lastErr error
+		used    string
+	)
+	for _, endpoint := range endpoints {
+		resp, lastErr = a.doWithSelfHeal(ctx, http.MethodPost, endpoint, reqBody)
+		if lastErr == nil {
+			used = endpoint
+			break
+		}
+		a.logger.Warn("cliq: send endpoint failed, trying next",
+			"endpoint", endpoint,
+			"error", lastErr,
+		)
+	}
+	if lastErr != nil {
+		return "", lastErr
 	}
 
-	// Bot endpoint returns 204 No Content on success — no message id available.
-	// Fall back to cmd.id so callers have something to log; edit-flow callers
-	// must look up the actual id separately (out of POC scope).
 	syntheticID := cmd.GetId()
 	a.logger.Info("cliq: sent outbound message",
 		"cmd_id", cmd.GetId(),
 		"channel_name", channelName,
+		"endpoint", used,
 		"http_status", resp.StatusCode,
 		"synthetic_id", syntheticID,
+		"rich", hasRichPayload(body),
 	)
 	return syntheticID, nil
+}
+
+// sendEndpoints returns ordered Cliq POST URLs for this command.
+func (a *Adapter) sendEndpoints(cmd *miov1.SendCommand, channelName string, rich bool) []string {
+	botEndpoint := fmt.Sprintf("%s/api/v2/channelsbyname/%s/message?bot_unique_name=%s",
+		a.baseURL, url.PathEscape(channelName), url.QueryEscape(a.botName))
+	if !rich {
+		return []string{botEndpoint}
+	}
+	out := make([]string, 0, 3)
+	if chatID := cmd.GetConversationId(); chatID != "" {
+		out = append(out, fmt.Sprintf("%s/api/v2/chats/%s/message",
+			a.baseURL, url.PathEscape(chatID)))
+	}
+	out = append(out, fmt.Sprintf("%s/api/v2/channels/%s/message",
+		a.baseURL, url.PathEscape(channelName)))
+	out = append(out, botEndpoint)
+	return out
 }
 
 // doWithSelfHeal performs a single Cliq REST call with one-shot 401 recovery.

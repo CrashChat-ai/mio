@@ -2,18 +2,38 @@ package zohocliq
 
 import miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 
-// cliqSendRequest is the request body for the Cliq bot channel message endpoint.
+// cliqSendRequest is the request body for Cliq message / message-card endpoints.
 type cliqSendRequest struct {
 	Text    string       `json:"text"`
+	Bot     *cliqBot     `json:"bot,omitempty"`
 	Card    *cliqCard    `json:"card,omitempty"`
 	Slides  []cliqSlide  `json:"slides,omitempty"`
 	Buttons []cliqButton `json:"buttons,omitempty"`
 }
 
+type cliqBot struct {
+	Name  string `json:"name,omitempty"`
+	Image string `json:"image,omitempty"`
+}
+
 type cliqCard struct {
-	Title     string `json:"title,omitempty"`
-	Theme     string `json:"theme,omitempty"`
-	Thumbnail string `json:"thumbnail,omitempty"`
+	Title     string             `json:"title,omitempty"`
+	Theme     string             `json:"theme,omitempty"`
+	Thumbnail string             `json:"thumbnail,omitempty"`
+	Sections  []cliqCardSection  `json:"sections,omitempty"`
+}
+
+// cliqCardSection is the modern-inline card body (labeled field rows).
+// Zoho docs: card.sections[].fields[].{title,value} — this is the chrome
+// that makes Channel Pull look like a card instead of a bullet wall.
+type cliqCardSection struct {
+	Title  string          `json:"title,omitempty"`
+	Fields []cliqCardField `json:"fields"`
+}
+
+type cliqCardField struct {
+	Title string `json:"title"`
+	Value string `json:"value"`
 }
 
 type cliqSlide struct {
@@ -40,13 +60,20 @@ type cliqButtonAction struct {
 	Data map[string]any `json:"data"`
 }
 
-func buildCliqSendRequest(cmd *miov1.SendCommand) cliqSendRequest {
+func buildCliqSendRequest(cmd *miov1.SendCommand, botName string) cliqSendRequest {
 	body := cliqSendRequest{Text: cmd.GetText()}
 	if rich := cmd.GetRichContent(); rich != nil {
 		applyRichContent(&body, rich)
 	}
 	applyAttachmentSlides(&body, cmd.GetAttachments())
+	if hasRichPayload(body) && botName != "" {
+		body.Bot = &cliqBot{Name: botName}
+	}
 	return body
+}
+
+func hasRichPayload(body cliqSendRequest) bool {
+	return body.Card != nil || len(body.Slides) > 0 || len(body.Buttons) > 0
 }
 
 func applyRichContent(body *cliqSendRequest, rich *miov1.RichContent) {
@@ -58,6 +85,11 @@ func applyRichContent(body *cliqSendRequest, rich *miov1.RichContent) {
 		}
 	}
 	for _, block := range rich.GetBlocks() {
+		if section, ok := richLabelToCardSection(block); ok {
+			ensureCard(body)
+			body.Card.Sections = append(body.Card.Sections, section)
+			continue
+		}
 		if slide, ok := richBlockToCliqSlide(block); ok {
 			body.Slides = append(body.Slides, slide)
 		}
@@ -67,6 +99,39 @@ func applyRichContent(body *cliqSendRequest, rich *miov1.RichContent) {
 			body.Buttons = append(body.Buttons, b)
 		}
 	}
+}
+
+func ensureCard(body *cliqSendRequest) {
+	if body.Card == nil {
+		body.Card = &cliqCard{Theme: "modern-inline"}
+	}
+	if body.Card.Theme == "" {
+		body.Card.Theme = "modern-inline"
+	}
+}
+
+func richLabelToCardSection(block *miov1.RichBlock) (cliqCardSection, bool) {
+	label := block.GetLabel()
+	if label == nil {
+		return cliqCardSection{}, false
+	}
+	fields := make([]cliqCardField, 0, len(label.GetLabels()))
+	for _, item := range label.GetLabels() {
+		if item.GetKey() == "" && item.GetValue() == "" {
+			continue
+		}
+		fields = append(fields, cliqCardField{
+			Title: item.GetKey(),
+			Value: item.GetValue(),
+		})
+	}
+	if len(fields) == 0 {
+		return cliqCardSection{}, false
+	}
+	return cliqCardSection{
+		Title:  label.GetTitle(),
+		Fields: fields,
+	}, true
 }
 
 func richBlockToCliqSlide(block *miov1.RichBlock) (cliqSlide, bool) {
@@ -105,6 +170,8 @@ func richBlockToCliqSlide(block *miov1.RichBlock) (cliqSlide, bool) {
 			},
 		}, true
 	case block.GetLabel() != nil:
+		// Labels prefer card.sections (see richLabelToCardSection). Keep slide
+		// fallback only when applyRichContent did not already consume them.
 		label := block.GetLabel()
 		data := cliqLabelData(label.GetLabels())
 		if len(data) == 0 {

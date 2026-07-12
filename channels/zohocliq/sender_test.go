@@ -209,6 +209,11 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 	if got := firstRow["Name"]; got != "Alice" {
 		t.Fatalf("table first row Name = %v, want Alice", got)
 	}
+	styles := requireMap(t, tableData["styles"], "table styles")
+	align := requireSlice(t, styles["text_align"], "table styles.text_align")
+	if len(align) != 2 || align[0] != "left" || align[1] != "left" {
+		t.Fatalf("table text_align = %v, want [left left]", align)
+	}
 
 	buttons := requireSlice(t, payload["buttons"], "buttons")
 	firstButton := requireMap(t, buttons[0], "buttons[0]")

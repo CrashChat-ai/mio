@@ -34,6 +34,14 @@ type cliqSlide struct {
 type cliqTableData struct {
 	Headers []string            `json:"headers"`
 	Rows    []map[string]string `json:"rows"`
+	Styles  *cliqTableStyles    `json:"styles,omitempty"`
+}
+
+// cliqTableStyles maps to Cliq message-card / widget table styles.
+// text_align defaults to left so Question columns are not center-aligned.
+type cliqTableStyles struct {
+	Width     []int    `json:"width,omitempty"`
+	TextAlign []string `json:"text_align,omitempty"`
 }
 
 type cliqButton struct {
@@ -112,12 +120,14 @@ func richBlockToCliqSlide(block *miov1.RichBlock) (cliqSlide, bool) {
 		if len(table.GetHeaders()) == 0 || len(table.GetRows()) == 0 {
 			return cliqSlide{}, false
 		}
+		headers := table.GetHeaders()
 		return cliqSlide{
 			Type:  "table",
 			Title: table.GetTitle(),
 			Data: cliqTableData{
-				Headers: table.GetHeaders(),
-				Rows:    cliqTableRows(table.GetHeaders(), table.GetRows()),
+				Headers: headers,
+				Rows:    cliqTableRows(headers, table.GetRows()),
+				Styles:  cliqDefaultTableStyles(len(headers)),
 			},
 		}, true
 	case block.GetLabel() != nil:
@@ -161,6 +171,17 @@ func cliqTableRows(headers []string, rows []*miov1.RichTableRow) []map[string]st
 		out = append(out, item)
 	}
 	return out
+}
+
+func cliqDefaultTableStyles(nCols int) *cliqTableStyles {
+	if nCols <= 0 {
+		return nil
+	}
+	align := make([]string, nCols)
+	for i := range align {
+		align[i] = "left"
+	}
+	return &cliqTableStyles{TextAlign: align}
 }
 
 func cliqLabelData(labels []*miov1.RichLabel) []map[string]string {

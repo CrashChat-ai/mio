@@ -107,7 +107,8 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 
 	a, _ := newTestAdapter(t, srv.URL)
 	cmd := testCmd("cmd-rich", "Daily digest")
-	cmd.ConversationId = "CT_chat_123"
+	cmd.ConversationId = "internal-uuid"
+	cmd.ConversationExternalId = "CT_chat_123"
 	cmd.RichContent = &miov1.RichContent{
 		Card: &miov1.RichCard{
 			Title:        "Digest",
@@ -115,6 +116,14 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 			ThumbnailUrl: "https://example.com/thumb.png",
 		},
 		Blocks: []*miov1.RichBlock{
+			{
+				Content: &miov1.RichBlock_Label{Label: &miov1.RichLabelBlock{
+					Title: "Channels",
+					Labels: []*miov1.RichLabel{
+						{Key: "#seniorchatch", Value: "12 msgs · 🟢 Up"},
+					},
+				}},
+			},
 			{
 				Content: &miov1.RichBlock_Text{Text: &miov1.RichTextBlock{
 					Title: "Summary",
@@ -156,6 +165,9 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 	if gotPath != "/api/v2/chats/CT_chat_123/message" {
 		t.Fatalf("rich send path = %q, want /api/v2/chats/CT_chat_123/message", gotPath)
 	}
+	if _, ok := payload["card"].(map[string]any)["sections"]; ok {
+		t.Fatalf("card must not include sections; payload=%+v", payload)
+	}
 
 	card := requireMap(t, payload["card"], "card")
 	if got := card["title"]; got != "Digest" {
@@ -170,25 +182,28 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 	}
 
 	slides := requireSlice(t, payload["slides"], "slides")
-	if len(slides) != 3 {
-		t.Fatalf("slides len = %d, want 3; payload=%+v", len(slides), payload)
+	if len(slides) != 4 {
+		t.Fatalf("slides len = %d, want 4; payload=%+v", len(slides), payload)
 	}
-	if got := requireMap(t, slides[0], "slides[0]")["type"]; got != "text" {
-		t.Fatalf("slides[0].type = %v, want text", got)
+	if got := requireMap(t, slides[0], "slides[0]")["type"]; got != "label" {
+		t.Fatalf("slides[0].type = %v, want label", got)
 	}
-	listSlide := requireMap(t, slides[1], "slides[1]")
+	if got := requireMap(t, slides[1], "slides[1]")["type"]; got != "text" {
+		t.Fatalf("slides[1].type = %v, want text", got)
+	}
+	listSlide := requireMap(t, slides[2], "slides[2]")
 	if got := listSlide["type"]; got != "list" {
-		t.Fatalf("slides[1].type = %v, want list", got)
+		t.Fatalf("slides[2].type = %v, want list", got)
 	}
-	items := requireSlice(t, listSlide["data"], "slides[1].data")
+	items := requireSlice(t, listSlide["data"], "slides[2].data")
 	if got := items[0]; got != "Alice shipped API" {
 		t.Fatalf("first list item = %v", got)
 	}
-	tableSlide := requireMap(t, slides[2], "slides[2]")
+	tableSlide := requireMap(t, slides[3], "slides[3]")
 	if got := tableSlide["type"]; got != "table" {
-		t.Fatalf("slides[2].type = %v, want table", got)
+		t.Fatalf("slides[3].type = %v, want table", got)
 	}
-	tableData := requireMap(t, tableSlide["data"], "slides[2].data")
+	tableData := requireMap(t, tableSlide["data"], "slides[3].data")
 	rows := requireSlice(t, tableData["rows"], "table rows")
 	firstRow := requireMap(t, rows[0], "table rows[0]")
 	if got := firstRow["Name"]; got != "Alice" {
@@ -210,71 +225,6 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 	}
 }
 
-func TestSend_LabelBlocksBecomeCardSections(t *testing.T) {
-	var payload map[string]any
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			t.Errorf("decode request: %v", err)
-		}
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer srv.Close()
-
-	a, _ := newTestAdapter(t, srv.URL)
-	cmd := testCmd("cmd-sections", "Channel Pull")
-	cmd.ConversationId = "CT_ducdev"
-	cmd.RichContent = &miov1.RichContent{
-		Card: &miov1.RichCard{Title: "📡 Channel Pull · this window", Theme: "modern-inline"},
-		Blocks: []*miov1.RichBlock{
-			{
-				Content: &miov1.RichBlock_Label{Label: &miov1.RichLabelBlock{
-					Title: "Channels",
-					Labels: []*miov1.RichLabel{
-						{Key: "#seniorchatch", Value: "12 msgs · 🟢 Up"},
-						{Key: "#cadaytoday", Value: "3 msgs · 🔴 Care"},
-					},
-				}},
-			},
-			{
-				Content: &miov1.RichBlock_List{List: &miov1.RichListBlock{
-					Title: "Needs reply",
-					Items: []string{"#cadaytoday · Jane — coverage? · 7h"},
-				}},
-			},
-		},
-	}
-
-	if _, err := a.Send(context.Background(), cmd); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	card := requireMap(t, payload["card"], "card")
-	sections := requireSlice(t, card["sections"], "card.sections")
-	if len(sections) != 1 {
-		t.Fatalf("sections len = %d, want 1; payload=%+v", len(sections), payload)
-	}
-	section := requireMap(t, sections[0], "sections[0]")
-	if got := section["title"]; got != "Channels" {
-		t.Fatalf("section title = %v", got)
-	}
-	fields := requireSlice(t, section["fields"], "section fields")
-	first := requireMap(t, fields[0], "fields[0]")
-	if got := first["title"]; got != "#seniorchatch" {
-		t.Fatalf("field title = %v", got)
-	}
-	if got := first["value"]; got != "12 msgs · 🟢 Up" {
-		t.Fatalf("field value = %v", got)
-	}
-
-	slides := requireSlice(t, payload["slides"], "slides")
-	if len(slides) != 1 {
-		t.Fatalf("slides len = %d, want 1 (list only); payload=%+v", len(slides), payload)
-	}
-	if got := requireMap(t, slides[0], "slides[0]")["type"]; got != "list" {
-		t.Fatalf("slides[0].type = %v, want list", got)
-	}
-}
-
 func TestSend_RichFallsBackWhenChatEndpointFails(t *testing.T) {
 	var paths []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -290,7 +240,7 @@ func TestSend_RichFallsBackWhenChatEndpointFails(t *testing.T) {
 
 	a, _ := newTestAdapter(t, srv.URL)
 	cmd := testCmd("cmd-fallback", "fallback")
-	cmd.ConversationId = "CT_fail"
+	cmd.ConversationExternalId = "CT_fail"
 	cmd.RichContent = &miov1.RichContent{
 		Card: &miov1.RichCard{Title: "T", Theme: "modern-inline"},
 	}
@@ -299,12 +249,12 @@ func TestSend_RichFallsBackWhenChatEndpointFails(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(paths) < 2 {
-		t.Fatalf("expected chat then channels fallback, got %v", paths)
+		t.Fatalf("expected chat then channelsbyname fallback, got %v", paths)
 	}
 	if paths[0] != "/api/v2/chats/CT_fail/message?" {
 		t.Fatalf("first path = %q", paths[0])
 	}
-	if paths[1] != "/api/v2/channels/test-channel/message?" {
+	if paths[1] != "/api/v2/channelsbyname/test-channel/message?" {
 		t.Fatalf("second path = %q", paths[1])
 	}
 }
@@ -325,7 +275,7 @@ func TestSend_AttachmentsRenderCliqSlides(t *testing.T) {
 
 	a, _ := newTestAdapter(t, srv.URL)
 	cmd := testCmd("cmd-attachments", "Attachments")
-	cmd.ConversationId = "CT_attach"
+	cmd.ConversationExternalId = "CT_attach"
 	cmd.Attachments = []*miov1.Attachment{
 		{
 			Kind: miov1.Attachment_KIND_IMAGE,

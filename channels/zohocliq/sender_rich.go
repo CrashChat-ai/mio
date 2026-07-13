@@ -2,7 +2,6 @@ package zohocliq
 
 import (
 	"fmt"
-	"strings"
 
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 )
@@ -175,25 +174,12 @@ func cliqTableRows(headers []string, rows []*miov1.RichTableRow) []map[string]st
 			if i < len(cells) {
 				value = cells[i]
 			}
-			item[header] = cliqLeftAlignCell(value)
+			// Plain text only — message-card tables show HTML tags literally.
+			item[header] = value
 		}
 		out = append(out, item)
 	}
 	return out
-}
-
-// cliqLeftAlignCell wraps plain cell text so message-card tables (which ignore
-// styles.text_align) still render left when Cliq honours HTML align attributes.
-// Markdown links pass through unwrapped so Cliq still hyperlinks them.
-func cliqLeftAlignCell(value string) string {
-	s := strings.TrimSpace(value)
-	if s == "" {
-		return value
-	}
-	if strings.HasPrefix(s, "<") || strings.Contains(s, "](") {
-		return value
-	}
-	return fmt.Sprintf(`<div align="left">%s</div>`, s)
 }
 
 func cliqDefaultTableStyles(nCols int) *cliqTableStyles {

@@ -206,8 +206,8 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 	tableData := requireMap(t, tableSlide["data"], "slides[3].data")
 	rows := requireSlice(t, tableData["rows"], "table rows")
 	firstRow := requireMap(t, rows[0], "table rows[0]")
-	if got := firstRow["Name"]; got != "Alice" {
-		t.Fatalf("table first row Name = %v, want Alice", got)
+	if got := firstRow["Name"]; got != `<div align="left">Alice</div>` {
+		t.Fatalf("table first row Name = %v, want left-aligned Alice", got)
 	}
 	for _, key := range []string{"style", "styles"} {
 		block := requireMap(t, tableData[key], "table "+key)
@@ -218,6 +218,9 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 		width := requireSlice(t, block["width"], "table "+key+".width")
 		if len(width) != 2 {
 			t.Fatalf("table %s width = %v, want len 2", key, width)
+		}
+		if _, ok := width[0].(string); !ok {
+			t.Fatalf("table %s width[0] = %T (%v), want string", key, width[0], width[0])
 		}
 	}
 

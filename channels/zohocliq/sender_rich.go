@@ -1,6 +1,11 @@
 package zohocliq
 
-import miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
+import (
+	"fmt"
+	"strings"
+
+	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
+)
 
 // cliqSendRequest is the request body for Cliq message / message-card endpoints.
 type cliqSendRequest struct {
@@ -39,10 +44,10 @@ type cliqTableData struct {
 }
 
 // cliqTableStyles maps to Cliq widget tables (style) and message-card slides (styles).
-// Widget docs use style.text_align; message-card docs only list styles.width/sticky —
-// emit both keys so Cliq honours left alignment when supported.
+// Message-card docs only list styles.width/sticky; widget tables use style.text_align
+// with string widths. Emit both keys + string widths so Cliq can honour left align.
 type cliqTableStyles struct {
-	Width     []int    `json:"width,omitempty"`
+	Width     []any    `json:"width,omitempty"`
 	TextAlign []string `json:"text_align,omitempty"`
 }
 
@@ -170,11 +175,25 @@ func cliqTableRows(headers []string, rows []*miov1.RichTableRow) []map[string]st
 			if i < len(cells) {
 				value = cells[i]
 			}
-			item[header] = value
+			item[header] = cliqLeftAlignCell(value)
 		}
 		out = append(out, item)
 	}
 	return out
+}
+
+// cliqLeftAlignCell wraps plain cell text so message-card tables (which ignore
+// styles.text_align) still render left when Cliq honours HTML align attributes.
+// Markdown links pass through unwrapped so Cliq still hyperlinks them.
+func cliqLeftAlignCell(value string) string {
+	s := strings.TrimSpace(value)
+	if s == "" {
+		return value
+	}
+	if strings.HasPrefix(s, "<") || strings.Contains(s, "](") {
+		return value
+	}
+	return fmt.Sprintf(`<div align="left">%s</div>`, s)
 }
 
 func cliqDefaultTableStyles(nCols int) *cliqTableStyles {
@@ -188,28 +207,37 @@ func cliqDefaultTableStyles(nCols int) *cliqTableStyles {
 	return &cliqTableStyles{Width: cliqDefaultTableWidths(nCols), TextAlign: align}
 }
 
-func cliqDefaultTableWidths(nCols int) []int {
+func cliqDefaultTableWidths(nCols int) []any {
+	var ints []int
 	switch nCols {
 	case 1:
-		return []int{100}
+		ints = []int{100}
 	case 2:
-		return []int{35, 65}
+		ints = []int{35, 65}
 	case 3:
-		return []int{18, 64, 18}
+		ints = []int{22, 58, 20}
+	case 4:
+		ints = []int{18, 52, 12, 18}
 	default:
 		base := 100 / nCols
-		width := make([]int, nCols)
+		ints = make([]int, nCols)
 		rem := 100
-		for i := range width {
+		for i := range ints {
 			if i == nCols-1 {
-				width[i] = rem
+				ints[i] = rem
 			} else {
-				width[i] = base
+				ints[i] = base
 				rem -= base
 			}
 		}
-		return width
 	}
+	// Widget tables document widths as strings; message cards use ints. Emit
+	// strings so the widget-compatible parser path can apply text_align.
+	out := make([]any, len(ints))
+	for i, w := range ints {
+		out[i] = fmt.Sprintf("%d", w)
+	}
+	return out
 }
 
 func cliqLabelData(labels []*miov1.RichLabel) []map[string]string {

@@ -206,8 +206,8 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 	tableData := requireMap(t, tableSlide["data"], "slides[3].data")
 	rows := requireSlice(t, tableData["rows"], "table rows")
 	firstRow := requireMap(t, rows[0], "table rows[0]")
-	if got := firstRow["Name"]; got != `<div align="left">Alice</div>` {
-		t.Fatalf("table first row Name = %v, want left-aligned Alice", got)
+	if got := firstRow["Name"]; got != "Alice" {
+		t.Fatalf("table first row Name = %v, want Alice (plain text, no HTML)", got)
 	}
 	for _, key := range []string{"style", "styles"} {
 		block := requireMap(t, tableData[key], "table "+key)

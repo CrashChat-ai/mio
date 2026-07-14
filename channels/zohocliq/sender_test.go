@@ -219,8 +219,11 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 		if len(width) != 2 {
 			t.Fatalf("table %s width = %v, want len 2", key, width)
 		}
-		if _, ok := width[0].(string); !ok {
-			t.Fatalf("table %s width[0] = %T (%v), want string", key, width[0], width[0])
+		// Message-card docs: integer percentages summing to 100 (JSON → float64).
+		got0, ok0 := width[0].(float64)
+		got1, ok1 := width[1].(float64)
+		if !ok0 || !ok1 || int(got0) != 28 || int(got1) != 72 {
+			t.Fatalf("table %s width = %v (%T,%T), want [28 72] numbers", key, width, width[0], width[1])
 		}
 	}
 

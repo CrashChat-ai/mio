@@ -1,8 +1,6 @@
 package zohocliq
 
 import (
-	"fmt"
-
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 )
 
@@ -43,8 +41,8 @@ type cliqTableData struct {
 }
 
 // cliqTableStyles maps to Cliq widget tables (style) and message-card slides (styles).
-// Message-card docs only list styles.width/sticky; widget tables use style.text_align
-// with string widths. Emit both keys + string widths so Cliq can honour left align.
+// Message-card docs: styles.width = int percentages summing to 100; styles.sticky optional.
+// Widget tables also accept style.text_align. Emit both style+styles so either parser path wins.
 type cliqTableStyles struct {
 	Width     []any    `json:"width,omitempty"`
 	TextAlign []string `json:"text_align,omitempty"`
@@ -194,16 +192,21 @@ func cliqDefaultTableStyles(nCols int) *cliqTableStyles {
 }
 
 func cliqDefaultTableWidths(nCols int) []any {
+	// Message-card docs require integer percentages that sum to 100.
+	// Bias toward the content column (2nd col when present) so digest tables
+	// stretch to the card chrome Cliq already grants — there is no card-level width API.
 	var ints []int
 	switch nCols {
 	case 1:
 		ints = []int{100}
 	case 2:
-		ints = []int{35, 65}
+		// Label-like key|value feel: narrow Who / wide Question
+		ints = []int{28, 72}
 	case 3:
-		ints = []int{22, 58, 20}
+		ints = []int{18, 64, 18}
 	case 4:
-		ints = []int{18, 52, 12, 18}
+		// Who | Question | Age | Link — maximize Question
+		ints = []int{14, 62, 10, 14}
 	default:
 		base := 100 / nCols
 		ints = make([]int, nCols)
@@ -217,11 +220,9 @@ func cliqDefaultTableWidths(nCols int) []any {
 			}
 		}
 	}
-	// Widget tables document widths as strings; message cards use ints. Emit
-	// strings so the widget-compatible parser path can apply text_align.
 	out := make([]any, len(ints))
 	for i, w := range ints {
-		out[i] = fmt.Sprintf("%d", w)
+		out[i] = w
 	}
 	return out
 }

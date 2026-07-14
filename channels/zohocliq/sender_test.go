@@ -222,8 +222,8 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 		// Message-card docs: integer percentages summing to 100 (JSON → float64).
 		got0, ok0 := width[0].(float64)
 		got1, ok1 := width[1].(float64)
-		if !ok0 || !ok1 || int(got0) != 28 || int(got1) != 72 {
-			t.Fatalf("table %s width = %v (%T,%T), want [28 72] numbers", key, width, width[0], width[1])
+		if !ok0 || !ok1 || int(got0) != 50 || int(got1) != 50 {
+			t.Fatalf("table %s width = %v (%T,%T), want [50 50] numbers for equal-col headers", key, width, width[0], width[1])
 		}
 	}
 
@@ -239,6 +239,49 @@ func TestSend_RichContentRendersCliqCardSlidesAndButtons(t *testing.T) {
 	data := requireMap(t, action["data"], "button action data")
 	if got := data["web"]; got != "https://example.com/dashboard" {
 		t.Fatalf("button web url = %v", got)
+	}
+}
+
+func TestSend_WhoQuestionTableUsesNarrowWideWidths(t *testing.T) {
+	var payload map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	a, _ := newTestAdapter(t, srv.URL)
+	cmd := testCmd("cmd-who-q", "·")
+	cmd.ConversationExternalId = "CT_chat_who"
+	cmd.RichContent = &miov1.RichContent{
+		Card: &miov1.RichCard{Title: "Pull", Theme: "modern-inline"},
+		Blocks: []*miov1.RichBlock{
+			{
+				Content: &miov1.RichBlock_Table{Table: &miov1.RichTableBlock{
+					Title:   "#seniorchatch · Needs reply",
+					Headers: []string{"Who · Age", "Question"},
+					Rows: []*miov1.RichTableRow{
+						{Cells: []string{"Jane · 7h", "need coverage?"}},
+					},
+				}},
+			},
+		},
+	}
+	if _, err := a.Send(context.Background(), cmd); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	slides := requireSlice(t, payload["slides"], "slides")
+	tableData := requireMap(t, requireMap(t, slides[0], "slides[0]")["data"], "table data")
+	for _, key := range []string{"style", "styles"} {
+		block := requireMap(t, tableData[key], "table "+key)
+		width := requireSlice(t, block["width"], "table "+key+".width")
+		got0, ok0 := width[0].(float64)
+		got1, ok1 := width[1].(float64)
+		if !ok0 || !ok1 || int(got0) != 28 || int(got1) != 72 {
+			t.Fatalf("table %s width = %v, want [28 72] for Who·Age|Question", key, width)
+		}
 	}
 }
 

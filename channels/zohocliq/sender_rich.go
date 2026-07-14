@@ -1,6 +1,8 @@
 package zohocliq
 
 import (
+	"strings"
+
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
 )
 
@@ -125,7 +127,7 @@ func richBlockToCliqSlide(block *miov1.RichBlock) (cliqSlide, bool) {
 			return cliqSlide{}, false
 		}
 		headers := table.GetHeaders()
-		tableStyle := cliqDefaultTableStyles(len(headers))
+		tableStyle := cliqDefaultTableStyles(headers)
 		return cliqSlide{
 			Type:  "table",
 			Title: table.GetTitle(),
@@ -180,7 +182,8 @@ func cliqTableRows(headers []string, rows []*miov1.RichTableRow) []map[string]st
 	return out
 }
 
-func cliqDefaultTableStyles(nCols int) *cliqTableStyles {
+func cliqDefaultTableStyles(headers []string) *cliqTableStyles {
+	nCols := len(headers)
 	if nCols <= 0 {
 		return nil
 	}
@@ -188,20 +191,25 @@ func cliqDefaultTableStyles(nCols int) *cliqTableStyles {
 	for i := range align {
 		align[i] = "left"
 	}
-	return &cliqTableStyles{Width: cliqDefaultTableWidths(nCols), TextAlign: align}
+	return &cliqTableStyles{Width: cliqDefaultTableWidths(headers), TextAlign: align}
 }
 
-func cliqDefaultTableWidths(nCols int) []any {
+func cliqDefaultTableWidths(headers []string) []any {
 	// Message-card docs require integer percentages that sum to 100.
-	// Bias toward the content column (2nd col when present) so digest tables
-	// stretch to the card chrome Cliq already grants — there is no card-level width API.
+	// There is no card-level width API; table column % is the stretch lever.
+	nCols := len(headers)
 	var ints []int
 	switch nCols {
 	case 1:
 		ints = []int{100}
 	case 2:
-		// Label-like key|value feel: narrow Who / wide Question
-		ints = []int{28, 72}
+		if cliqWhoQuestionHeaders(headers) {
+			// Needs-reply: narrow Who · Age / wide Question
+			ints = []int{28, 72}
+		} else {
+			// Side-by-side channel digests (and other equal-col tables)
+			ints = []int{50, 50}
+		}
 	case 3:
 		ints = []int{18, 64, 18}
 	case 4:
@@ -225,6 +233,13 @@ func cliqDefaultTableWidths(nCols int) []any {
 		out[i] = w
 	}
 	return out
+}
+
+func cliqWhoQuestionHeaders(headers []string) bool {
+	if len(headers) == 0 {
+		return false
+	}
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(headers[0])), "who")
 }
 
 func cliqLabelData(labels []*miov1.RichLabel) []map[string]string {

@@ -22,10 +22,18 @@ spec:
       serviceAccountName: {{ include "mio-jetstream-bootstrap.fullname" . }}
       automountServiceAccountToken: false
       restartPolicy: Never
+      # Explicit writable /tmp: jreq stages stderr there, and a future
+      # readOnlyRootFilesystem policy must not silently break the gate.
+      volumes:
+        - name: tmp
+          emptyDir: {}
       containers:
         - name: verify
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           env:
             - name: NATS_URL
               value: {{ .Values.natsUrl | quote }}
@@ -45,18 +53,23 @@ spec:
               # owning service. This script is a post-install assertion gate.
               # ---------------------------------------------------------------
 
-              # Every check opens a fresh NATS connection; observed transient per-call
-              # failures (~1 in 10-20 on prod GKE) compound across the ~12 calls into a
-              # coin-flip job with backoffLimit 0. njs retries each call before treating
-              # the result as an assertion failure; output goes to NJS_OUT either way.
-              njs() {
+              # Query the JS API directly (request-reply) instead of the CLI's jsm
+              # wrapper — the wrapper's picker fallback + schema validation flaked
+              # intermittently on prod. Capture STDOUT ONLY on success: the CLI writes
+              # reconnect/warning chrome to stderr, and merging it corrupts the JSON
+              # payload. Require parseable JSON; retry otherwise; surface stderr only
+              # when retries are exhausted.
+              jreq() {
                 _try=0
                 while :; do
                   _try=$((_try + 1))
-                  if NJS_OUT=$(nats --server="$NATS_URL" "$@" 2>&1); then
+                  if NJS_OUT=$(nats --server="$NATS_URL" request --raw "$1" '' 2>/tmp/njs.err) \
+                     && echo "$NJS_OUT" | jq -e . >/dev/null 2>&1; then
                     return 0
                   fi
                   if [ "$_try" -ge 3 ]; then
+                    NJS_OUT="$NJS_OUT
+              $(cat /tmp/njs.err 2>/dev/null)"
                     return 1
                   fi
                   sleep 2
@@ -123,16 +136,15 @@ spec:
               {{ range .Values.expectedStreams }}
               {{ $streamName := .name }}
               echo -n "    Checking stream {{ $streamName }}... "
-              if ! njs stream info {{ $streamName }}; then
-                echo "MISSING"
-                echo "ERROR: stream {{ $streamName }} check failed — owning service did not provision it, or:"
+              if ! jreq '$JS.API.STREAM.INFO.{{ $streamName }}'; then
+                echo "UNREACHABLE"
+                echo "ERROR: stream {{ $streamName }} info request failed:"
                 echo "$NJS_OUT" | head -3
                 exit 1
               fi
-              # Verify replica count.
-              if ! njs stream info {{ $streamName }} --json; then
-                echo "ERROR: could not fetch stream {{ $streamName }} config:"
-                echo "$NJS_OUT" | head -3
+              if echo "$NJS_OUT" | jq -e '.error' >/dev/null; then
+                echo "MISSING"
+                echo "ERROR: MISSING stream {{ $streamName }} — owning service did not provision it: $(echo "$NJS_OUT" | jq -c '.error')"
                 exit 1
               fi
               STREAM_JSON=$NJS_OUT
@@ -164,15 +176,15 @@ spec:
               {{ $streamName := .stream }}
               {{ $durableName := .durable }}
               echo -n "    Checking consumer {{ $durableName }} on {{ $streamName }}... "
-              if ! njs consumer info {{ $streamName }} {{ $durableName }}; then
-                echo "MISSING"
-                echo "ERROR: consumer {{ $durableName }} on stream {{ $streamName }} check failed — owning service did not create it on startup, or:"
+              if ! jreq '$JS.API.CONSUMER.INFO.{{ $streamName }}.{{ $durableName }}'; then
+                echo "UNREACHABLE"
+                echo "ERROR: consumer {{ $durableName }} on {{ $streamName }} info request failed:"
                 echo "$NJS_OUT" | head -3
                 exit 1
               fi
-              if ! njs consumer info {{ $streamName }} {{ $durableName }} --json; then
-                echo "ERROR: could not fetch consumer {{ $durableName }} config on {{ $streamName }}:"
-                echo "$NJS_OUT" | head -3
+              if echo "$NJS_OUT" | jq -e '.error' >/dev/null; then
+                echo "MISSING"
+                echo "ERROR: MISSING consumer {{ $durableName }} on stream {{ $streamName }} — owning service did not create it on startup: $(echo "$NJS_OUT" | jq -c '.error')"
                 exit 1
               fi
               CONSUMER_JSON=$NJS_OUT

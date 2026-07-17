@@ -415,7 +415,7 @@ func TestKnownRegistry_ActiveOnly(t *testing.T) {
 		}
 	}
 	// planned channels must NOT be in Known
-	for _, planned := range []string{"telegram", "discord"} {
+	for _, planned := range []string{"telegram"} {
 		if Known[planned] {
 			t.Errorf("planned channel %q should NOT be in Known", planned)
 		}

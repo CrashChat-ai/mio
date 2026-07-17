@@ -1,0 +1,11 @@
+{
+  "t": "MESSAGE_CREATE",
+  "d": {
+    "id": "1210000000000000001",
+    "channel_id": "1200000000000000001",
+    "guild_id": "1190000000000000001",
+    "author": {"id": "980000000000000001", "username": "alice", "global_name": "Alice", "bot": false},
+    "content": "hello from a guild channel",
+    "timestamp": "2026-07-01T12:00:00.000000+00:00"
+  }
+}

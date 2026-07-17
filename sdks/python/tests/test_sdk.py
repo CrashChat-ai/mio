@@ -246,7 +246,7 @@ def test_known_contains_active_only():
 
 
 def test_known_excludes_planned():
-    for ch in ("telegram", "discord"):
+    for ch in ("telegram",):
         assert ch not in KNOWN, f"planned channel {ch!r} must NOT be in KNOWN"
 
 

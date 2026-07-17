@@ -1,0 +1,12 @@
+{
+  "t": "MESSAGE_CREATE",
+  "d": {
+    "id": "1210000000000000004",
+    "channel_id": "1200000000000000001",
+    "guild_id": "1190000000000000001",
+    "author": {"id": "980000000000000002", "username": "bob", "bot": false},
+    "content": "replying to alice",
+    "timestamp": "2026-07-01T12:03:00.000000+00:00",
+    "message_reference": {"message_id": "1210000000000000001", "channel_id": "1200000000000000001"}
+  }
+}

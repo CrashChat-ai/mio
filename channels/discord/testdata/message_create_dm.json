@@ -1,0 +1,10 @@
+{
+  "t": "MESSAGE_CREATE",
+  "d": {
+    "id": "1210000000000000002",
+    "channel_id": "1200000000000000002",
+    "author": {"id": "980000000000000001", "username": "alice", "global_name": "Alice", "bot": false},
+    "content": "hello via dm",
+    "timestamp": "2026-07-01T12:01:00.000000+00:00"
+  }
+}

@@ -17,7 +17,7 @@ channel_types:
   - name: telegram
     status: planned
   - name: discord
-    status: planned
+    status: active
 
 # deprecated_aliases maps old slug → current slug.
 # Add here when a channel is renamed; the SDK will accept both during migration.

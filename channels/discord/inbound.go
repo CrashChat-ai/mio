@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/crashchat-ai/mio/pkg/channels"
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
@@ -17,6 +19,12 @@ import (
 // handshakeBodyCap mirrors the gateway's inbound LimitReader so the dormant
 // handshake probe cannot read an unbounded body.
 const handshakeBodyCap = 1 << 20
+
+// signatureMaxSkew rejects requests whose X-Signature-Timestamp is more than
+// 5 minutes from now (replay protection, mirroring slack's window). Discord
+// signs timestamp||body, so a stale-but-valid signature replays verbatim
+// without this check.
+const signatureMaxSkew = 5 * time.Minute
 
 // discordInbound satisfies channels.InboundAdapter. Normalize is the shared
 // seam the gateway-WS runner feeds envelope bytes to; VerifySignature and
@@ -56,21 +64,36 @@ func (d *discordInbound) VerifySignature(headers http.Header, rawBody []byte) er
 	if d.secret == nil {
 		return ErrSecretNotConfigured
 	}
-	pub := make([]byte, hex.DecodedLen(len(d.secret)))
-	n, err := hex.Decode(pub, d.secret)
-	if err != nil || n != ed25519.PublicKeySize {
-		return fmt.Errorf("discord: webhook secret is not a hex ed25519 public key: %w", err)
+	pub, err := hex.DecodeString(string(d.secret))
+	if err != nil {
+		return fmt.Errorf("discord: webhook secret is not hex: %w", err)
+	}
+	if len(pub) != ed25519.PublicKeySize {
+		return fmt.Errorf("discord: webhook secret decodes to %d bytes, want ed25519 public key size %d", len(pub), ed25519.PublicKeySize)
 	}
 	sigHex := headers.Get("X-Signature-Ed25519")
 	ts := headers.Get("X-Signature-Timestamp")
 	if sigHex == "" || ts == "" {
 		return ErrBadSignature
 	}
+	return verifyEd25519(pub, rawBody, sigHex, ts, time.Now())
+}
+
+// verifyEd25519 checks freshness then the signature; split out with an
+// injected clock so replay-window tests need no sleeping.
+func verifyEd25519(pub ed25519.PublicKey, body []byte, sigHex, tsHeader string, now time.Time) error {
+	ts, err := strconv.ParseInt(tsHeader, 10, 64)
+	if err != nil {
+		return ErrBadSignature
+	}
+	if delta := now.Sub(time.Unix(ts, 0)); delta > signatureMaxSkew || delta < -signatureMaxSkew {
+		return ErrBadSignature
+	}
 	sig, err := hex.DecodeString(sigHex)
 	if err != nil || len(sig) != ed25519.SignatureSize {
 		return ErrBadSignature
 	}
-	if !ed25519.Verify(pub, append([]byte(ts), rawBody...), sig) {
+	if !ed25519.Verify(pub, append([]byte(tsHeader), body...), sig) {
 		return ErrBadSignature
 	}
 	return nil

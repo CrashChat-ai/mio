@@ -55,7 +55,7 @@ spec:
                 _try=0
                 while :; do
                   _try=$((_try + 1))
-                  if NJS_OUT=$(nats --server="$NATS_URL" request "$1" '' 2>/tmp/njs.err) \
+                  if NJS_OUT=$(nats --server="$NATS_URL" request --raw "$1" '' 2>/tmp/njs.err) \
                      && echo "$NJS_OUT" | jq -e . >/dev/null 2>&1; then
                     return 0
                   fi

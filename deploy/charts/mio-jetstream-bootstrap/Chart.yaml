@@ -6,5 +6,5 @@ description: >
   Does NOT create or mutate any streams/consumers — gateway startup is the
   single authoritative writer (P3 AddOrUpdateStream).
 type: application
-version: 0.1.4
+version: 0.1.5
 appVersion: "2.10.24"

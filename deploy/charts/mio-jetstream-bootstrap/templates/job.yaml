@@ -35,6 +35,15 @@ spec:
             - name: tmp
               mountPath: /tmp
           env:
+            # Admission policy forces readOnlyRootFilesystem onto these hook pods
+            # (observed on prod GKE; invisible in this template) — point every CLI
+            # config/cache write at the emptyDir.
+            - name: HOME
+              value: /tmp
+            - name: XDG_CONFIG_HOME
+              value: /tmp
+            - name: XDG_CACHE_HOME
+              value: /tmp
             - name: NATS_URL
               value: {{ .Values.natsUrl | quote }}
             - name: RETRY_COUNT

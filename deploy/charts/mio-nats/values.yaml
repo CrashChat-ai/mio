@@ -23,7 +23,6 @@ nats:
     merge:
       # Expose Prometheus metrics on port 7777.
       http_port: 8222
-      server_name: $POD_NAME
 
   podTemplate:
     topologySpreadConstraints:

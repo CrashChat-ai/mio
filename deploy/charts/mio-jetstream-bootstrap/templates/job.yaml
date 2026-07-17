@@ -22,19 +22,20 @@ spec:
       serviceAccountName: {{ include "mio-jetstream-bootstrap.fullname" . }}
       automountServiceAccountToken: false
       restartPolicy: Never
-      # Explicit writable /tmp: jreq stages stderr there, and a future
-      # readOnlyRootFilesystem policy must not silently break the gate.
-      volumes:
-        - name: tmp
-          emptyDir: {}
       containers:
         - name: verify
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          volumeMounts:
-            - name: tmp
-              mountPath: /tmp
           env:
+            # readOnlyRootFilesystem + runAsUser 65532 (securityContext below): the
+            # CLI's config/cache writes and jreq's stderr staging must land on the
+            # tmp emptyDir.
+            - name: HOME
+              value: /tmp
+            - name: XDG_CONFIG_HOME
+              value: /tmp
+            - name: XDG_CACHE_HOME
+              value: /tmp
             - name: NATS_URL
               value: {{ .Values.natsUrl | quote }}
             - name: RETRY_COUNT
@@ -236,6 +237,11 @@ spec:
             - name: spec
               mountPath: /etc/mio-js-spec
               readOnly: true
+            # Writable scratch: readOnlyRootFilesystem is set below, and both the
+            # nats CLI (schema/config cache) and jreq (stderr staging) need writes;
+            # HOME/XDG env point here.
+            - name: tmp
+              mountPath: /tmp
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -247,3 +253,5 @@ spec:
         - name: spec
           configMap:
             name: {{ include "mio-jetstream-bootstrap.fullname" . }}-spec
+        - name: tmp
+          emptyDir: {}

@@ -43,6 +43,23 @@ spec:
               # owning service. This script is a post-install assertion gate.
               # ---------------------------------------------------------------
 
+              # Preflight: prove NATS is reachable with the error VISIBLE, retrying —
+              # a fresh hook pod can race DNS/conntrack readiness, and the assertion
+              # checks below would misreport any connect failure as MISSING.
+              echo "==> Preflight: NATS reachability ($NATS_URL)"
+              ATTEMPT=0
+              until RTT_OUT=$(nats --server="$NATS_URL" rtt 2>&1); do
+                ATTEMPT=$((ATTEMPT + 1))
+                if [ "$ATTEMPT" -ge "$RETRY_COUNT" ]; then
+                  echo "ERROR: NATS unreachable after $RETRY_COUNT attempts:"
+                  echo "$RTT_OUT" | head -3
+                  exit 1
+                fi
+                echo "    not reachable yet (attempt $ATTEMPT/$RETRY_COUNT): $(echo "$RTT_OUT" | head -1)"
+                sleep "$RETRY_SLEEP"
+              done
+              echo "$RTT_OUT" | head -2
+
               QUORUM={{ .Values.quorumReplicas | int }}
               if [ "$QUORUM" -le 1 ]; then
                 # Single-node JetStream has no raft group — `stream cluster info`
@@ -86,9 +103,10 @@ spec:
               {{ range .Values.expectedStreams }}
               {{ $streamName := .name }}
               echo -n "    Checking stream {{ $streamName }}... "
-              if ! nats --server="$NATS_URL" stream info {{ $streamName }} > /dev/null 2>&1; then
+              if ! INFO_OUT=$(nats --server="$NATS_URL" stream info {{ $streamName }} 2>&1); then
                 echo "MISSING"
-                echo "ERROR: MISSING stream {{ $streamName }} — owning service did not provision it"
+                echo "ERROR: stream {{ $streamName }} check failed — owning service did not provision it, or:"
+                echo "$INFO_OUT" | head -3
                 exit 1
               fi
               # Verify replica count.

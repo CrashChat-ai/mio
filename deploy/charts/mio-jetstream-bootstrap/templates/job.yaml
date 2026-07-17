@@ -130,7 +130,11 @@ spec:
                 exit 1
               fi
               # Verify replica count.
-              njs stream info {{ $streamName }} --json || true
+              if ! njs stream info {{ $streamName }} --json; then
+                echo "ERROR: could not fetch stream {{ $streamName }} config:"
+                echo "$NJS_OUT" | head -3
+                exit 1
+              fi
               STREAM_JSON=$NJS_OUT
               REPLICAS=$(echo "$STREAM_JSON" | jq -r '.config.num_replicas // 0')
               if [ "$REPLICAS" != "{{ .replicas }}" ]; then
@@ -166,7 +170,11 @@ spec:
                 echo "$NJS_OUT" | head -3
                 exit 1
               fi
-              njs consumer info {{ $streamName }} {{ $durableName }} --json || true
+              if ! njs consumer info {{ $streamName }} {{ $durableName }} --json; then
+                echo "ERROR: could not fetch consumer {{ $durableName }} config on {{ $streamName }}:"
+                echo "$NJS_OUT" | head -3
+                exit 1
+              fi
               CONSUMER_JSON=$NJS_OUT
               {{ if .filterSubject }}
               FILTER_SUBJECT=$(echo "$CONSUMER_JSON" | jq -r '.config.filter_subject // ""')

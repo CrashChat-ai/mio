@@ -80,10 +80,22 @@ func normalizeDelete(e *Envelope) (*miov1.Message, error) {
 	if ev.DeletedTS == "" {
 		return nil, fmt.Errorf("%w: slack: message_deleted without deleted_ts", channels.ErrNormalizeSoft)
 	}
+	// message_deleted has no top-level user; previous_message IS the deleted message,
+	// so attribute to its author — the convention normalizeEdit uses for ev.Message.
+	// Slack never says who performed the deletion; do not pretend otherwise.
+	sender := &miov1.Sender{}
+	if prev := ev.PreviousMessage; prev != nil {
+		if prev.BotID != "" || prev.SubType == "bot_message" {
+			// The original bot message was soft-dropped as bot echo; its delete would
+			// orphan-reference a message that was never ingested.
+			return nil, fmt.Errorf("%w: slack: bot echo delete (bot_id=%s)", channels.ErrNormalizeSoft, prev.BotID)
+		}
+		sender.ExternalId = prev.User
+	}
 	target := composite(ev.Channel, ev.DeletedTS)
 	msg := baseMessage(e, ev.Channel, ev.ChannelType)
 	msg.SourceMessageId = target
-	msg.Sender = &miov1.Sender{ExternalId: ev.User, IsBot: true}
+	msg.Sender = sender
 	msg.Attributes[attrSlackTS] = ev.DeletedTS
 	msg.Relation = &miov1.MessageRelation{
 		Kind:             miov1.MessageRelation_KIND_DELETE,

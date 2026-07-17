@@ -1,0 +1,13 @@
+{
+  "type": "event_callback",
+  "team_id": "T01ABCD2EFG",
+  "event_id": "Ev01MSGDELNOPREV",
+  "event": {
+    "type": "message",
+    "subtype": "message_deleted",
+    "channel": "C01PUBLIC001",
+    "channel_type": "channel",
+    "ts": "1700000301.000900",
+    "deleted_ts": "1700000001.000100"
+  }
+}

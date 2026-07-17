@@ -154,6 +154,36 @@ func TestNormalizeDelete(t *testing.T) {
 	if msg.GetRelation().GetTargetExternalId() != target {
 		t.Errorf("delete target = %q, want %q", msg.GetRelation().GetTargetExternalId(), target)
 	}
+	// The event has no top-level user — attribution must come from previous_message
+	// (the deleted message), matching normalizeEdit's nested-message convention.
+	if got := msg.GetSender().GetExternalId(); got != "U01SENDER001" {
+		t.Errorf("delete sender = %q, want author U01SENDER001 from previous_message", got)
+	}
+	if msg.GetSender().GetIsBot() {
+		t.Error("delete sender is_bot = true, want false for a human author")
+	}
+}
+
+func TestNormalizeDeleteNoPreviousMessage(t *testing.T) {
+	msg := mustNormalize(t, "message_deleted_no_previous.json")
+	if got := msg.GetSender().GetExternalId(); got != "" {
+		t.Errorf("sender = %q, want empty — never invent an id", got)
+	}
+	if msg.GetSender().GetIsBot() {
+		t.Error("is_bot = true, want false when authorship is unknown")
+	}
+	if msg.GetRelation().GetKind() != miov1.MessageRelation_KIND_DELETE {
+		t.Errorf("relation kind = %v, want KIND_DELETE", msg.GetRelation().GetKind())
+	}
+}
+
+func TestNormalizeDeleteBotAuthoredSoftDrop(t *testing.T) {
+	// The original bot message was soft-dropped at normalizePlain (bot echo), so its
+	// delete would be an orphan for a message that was never ingested.
+	_, err := normalizeFixture(t, "message_deleted_bot_authored.json")
+	if !errors.Is(err, channels.ErrNormalizeSoft) {
+		t.Errorf("bot-authored delete must soft-drop, got err=%v", err)
+	}
 }
 
 func TestNormalizeReactionAdded(t *testing.T) {

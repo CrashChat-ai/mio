@@ -22,10 +22,18 @@ spec:
       serviceAccountName: {{ include "mio-jetstream-bootstrap.fullname" . }}
       automountServiceAccountToken: false
       restartPolicy: Never
+      # Explicit writable /tmp: jreq stages stderr there, and a future
+      # readOnlyRootFilesystem policy must not silently break the gate.
+      volumes:
+        - name: tmp
+          emptyDir: {}
       containers:
         - name: verify
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           env:
             - name: NATS_URL
               value: {{ .Values.natsUrl | quote }}

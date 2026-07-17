@@ -44,8 +44,8 @@ type EventBody struct {
 	Item     *ReactionItem `json:"item,omitempty"`
 }
 
-// NestedMessage is the edited/previous message carried inside message_changed
-// (and the parent inside message_deleted on some shapes).
+// NestedMessage is the edited/previous message carried inside message_changed,
+// and the deleted message itself inside message_deleted's previous_message.
 type NestedMessage struct {
 	Type     string `json:"type"`
 	SubType  string `json:"subtype"`

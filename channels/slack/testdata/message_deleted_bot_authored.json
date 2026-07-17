@@ -1,0 +1,20 @@
+{
+  "type": "event_callback",
+  "team_id": "T01ABCD2EFG",
+  "event_id": "Ev01MSGDELBOT",
+  "event": {
+    "type": "message",
+    "subtype": "message_deleted",
+    "channel": "C01PUBLIC001",
+    "channel_type": "channel",
+    "ts": "1700000302.000900",
+    "deleted_ts": "1700000002.000100",
+    "previous_message": {
+      "type": "message",
+      "subtype": "bot_message",
+      "bot_id": "B01BOTAUTH01",
+      "text": "automated status update",
+      "ts": "1700000002.000100"
+    }
+  }
+}

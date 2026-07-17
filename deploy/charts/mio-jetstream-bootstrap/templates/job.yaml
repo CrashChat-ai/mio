@@ -10,7 +10,9 @@ metadata:
     helm.sh/hook-weight: "5"
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
-  backoffLimit: 0
+  # 3 pod attempts: assertion failures are deterministic and fail fast anyway;
+  # transient per-connection NATS errors deserve a fresh pod, not a failed release.
+  backoffLimit: 2
   ttlSecondsAfterFinished: 600
   template:
     metadata:
@@ -42,6 +44,24 @@ spec:
               # nats consumer add. Each stream or consumer is created by its
               # owning service. This script is a post-install assertion gate.
               # ---------------------------------------------------------------
+
+              # Every check opens a fresh NATS connection; observed transient per-call
+              # failures (~1 in 10-20 on prod GKE) compound across the ~12 calls into a
+              # coin-flip job with backoffLimit 0. njs retries each call before treating
+              # the result as an assertion failure; output goes to NJS_OUT either way.
+              njs() {
+                _try=0
+                while :; do
+                  _try=$((_try + 1))
+                  if NJS_OUT=$(nats --server="$NATS_URL" "$@" 2>&1); then
+                    return 0
+                  fi
+                  if [ "$_try" -ge 3 ]; then
+                    return 1
+                  fi
+                  sleep 2
+                done
+              }
 
               # Preflight: prove NATS is reachable with the error VISIBLE, retrying —
               # a fresh hook pod can race DNS/conntrack readiness, and the assertion
@@ -103,14 +123,15 @@ spec:
               {{ range .Values.expectedStreams }}
               {{ $streamName := .name }}
               echo -n "    Checking stream {{ $streamName }}... "
-              if ! INFO_OUT=$(nats --server="$NATS_URL" stream info {{ $streamName }} 2>&1); then
+              if ! njs stream info {{ $streamName }}; then
                 echo "MISSING"
                 echo "ERROR: stream {{ $streamName }} check failed — owning service did not provision it, or:"
-                echo "$INFO_OUT" | head -3
+                echo "$NJS_OUT" | head -3
                 exit 1
               fi
               # Verify replica count.
-              STREAM_JSON=$(nats --server="$NATS_URL" stream info {{ $streamName }} --json 2>/dev/null)
+              njs stream info {{ $streamName }} --json || true
+              STREAM_JSON=$NJS_OUT
               REPLICAS=$(echo "$STREAM_JSON" | jq -r '.config.num_replicas // 0')
               if [ "$REPLICAS" != "{{ .replicas }}" ]; then
                 echo "REPLICA MISMATCH"
@@ -139,12 +160,14 @@ spec:
               {{ $streamName := .stream }}
               {{ $durableName := .durable }}
               echo -n "    Checking consumer {{ $durableName }} on {{ $streamName }}... "
-              if ! nats --server="$NATS_URL" consumer info {{ $streamName }} {{ $durableName }} > /dev/null 2>&1; then
+              if ! njs consumer info {{ $streamName }} {{ $durableName }}; then
                 echo "MISSING"
-                echo "ERROR: MISSING consumer {{ $durableName }} on stream {{ $streamName }} — owning service did not create it on startup"
+                echo "ERROR: consumer {{ $durableName }} on stream {{ $streamName }} check failed — owning service did not create it on startup, or:"
+                echo "$NJS_OUT" | head -3
                 exit 1
               fi
-              CONSUMER_JSON=$(nats --server="$NATS_URL" consumer info {{ $streamName }} {{ $durableName }} --json 2>/dev/null)
+              njs consumer info {{ $streamName }} {{ $durableName }} --json || true
+              CONSUMER_JSON=$NJS_OUT
               {{ if .filterSubject }}
               FILTER_SUBJECT=$(echo "$CONSUMER_JSON" | jq -r '.config.filter_subject // ""')
               if [ "$FILTER_SUBJECT" != "{{ .filterSubject }}" ]; then

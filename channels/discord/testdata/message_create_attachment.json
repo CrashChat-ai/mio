@@ -1,0 +1,12 @@
+{
+  "t": "MESSAGE_CREATE",
+  "d": {
+    "id": "1210000000000000005",
+    "channel_id": "1200000000000000001",
+    "guild_id": "1190000000000000001",
+    "author": {"id": "980000000000000001", "username": "alice", "bot": false},
+    "content": "see attached",
+    "timestamp": "2026-07-01T12:04:00.000000+00:00",
+    "attachments": [{"id": "1220000000000000001", "filename": "screenshot.png", "content_type": "image/png", "size": 20480, "url": "https://cdn.discordapp.com/attachments/1200000000000000001/1220000000000000001/screenshot.png"}]
+  }
+}

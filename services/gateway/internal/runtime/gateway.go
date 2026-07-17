@@ -32,6 +32,7 @@ import (
 	"github.com/crashchat-ai/mio/services/gateway/internal/ratelimit"
 	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
 	"github.com/crashchat-ai/mio/services/gateway/internal/server"
+	"github.com/crashchat-ai/mio/services/gateway/internal/discordrunner"
 	"github.com/crashchat-ai/mio/services/gateway/internal/socketrunner"
 	"github.com/crashchat-ai/mio/services/gateway/store"
 )
@@ -159,6 +160,16 @@ func RunGateway(logger *slog.Logger, version string) error {
 			if err := socketrunner.StartFromEnv(poolCtx, pg, sdkClient,
 				accountResolver, cfg.TenantID, cfg.AccountID, runnerReg, logger); err != nil {
 				logger.Error("socket runner exited", "err", err)
+			}
+		}()
+	}
+
+	if os.Getenv("DISCORD_BOT_TOKEN") != "" {
+		discordReg := prometheus.NewRegistry()
+		go func() {
+			if err := discordrunner.StartFromEnv(poolCtx, pg, sdkClient,
+				accountResolver, cfg.TenantID, cfg.AccountID, discordReg, logger); err != nil {
+				logger.Error("discord runner exited", "err", err)
 			}
 		}()
 	}

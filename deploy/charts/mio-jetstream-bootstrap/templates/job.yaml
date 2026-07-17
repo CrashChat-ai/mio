@@ -43,7 +43,13 @@ spec:
               # owning service. This script is a post-install assertion gate.
               # ---------------------------------------------------------------
 
-              echo "==> Waiting for JetStream quorum (3 replicas)..."
+              QUORUM={{ .Values.quorumReplicas | int }}
+              if [ "$QUORUM" -le 1 ]; then
+                # Single-node JetStream has no raft group — `stream cluster info`
+                # reports zero "current" peers, so there is no quorum to wait for.
+                echo "==> quorumReplicas=$QUORUM — single-node, skipping quorum wait."
+              else
+              echo "==> Waiting for JetStream quorum ($QUORUM replicas)..."
               ATTEMPT=0
               while [ "$ATTEMPT" -lt "$RETRY_COUNT" ]; do
                 ATTEMPT=$((ATTEMPT + 1))
@@ -56,21 +62,22 @@ spec:
                 INBOUND_PEERS=$(echo "$INBOUND_INFO" | grep -c "current: true" || true)
                 OUTBOUND_PEERS=$(echo "$OUTBOUND_INFO" | grep -c "current: true" || true)
 
-                if [ "$INBOUND_PEERS" -ge 3 ] && [ "$OUTBOUND_PEERS" -ge 3 ]; then
-                  echo "    Quorum confirmed: INBOUND=$INBOUND_PEERS/3, OUTBOUND=$OUTBOUND_PEERS/3"
+                if [ "$INBOUND_PEERS" -ge "$QUORUM" ] && [ "$OUTBOUND_PEERS" -ge "$QUORUM" ]; then
+                  echo "    Quorum confirmed: INBOUND=$INBOUND_PEERS/$QUORUM, OUTBOUND=$OUTBOUND_PEERS/$QUORUM"
                   break
                 fi
 
                 if [ "$ATTEMPT" -ge "$RETRY_COUNT" ]; then
                   echo "ERROR: JetStream quorum not reached after $RETRY_COUNT attempts"
-                  echo "  MESSAGES_INBOUND peers current: $INBOUND_PEERS (need 3)"
-                  echo "  MESSAGES_OUTBOUND peers current: $OUTBOUND_PEERS (need 3)"
+                  echo "  MESSAGES_INBOUND peers current: $INBOUND_PEERS (need $QUORUM)"
+                  echo "  MESSAGES_OUTBOUND peers current: $OUTBOUND_PEERS (need $QUORUM)"
                   exit 1
                 fi
 
                 echo "    Quorum not ready (INBOUND=$INBOUND_PEERS, OUTBOUND=$OUTBOUND_PEERS) — sleeping ${RETRY_SLEEP}s..."
                 sleep "$RETRY_SLEEP"
               done
+              fi
 
               # ---------------------------------------------------------------
               # Verify streams exist (no mutation).

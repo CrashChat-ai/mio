@@ -105,21 +105,29 @@ func Start(ctx context.Context, deps Deps) error {
 		discordgo.IntentsDirectMessageReactions |
 		discordgo.IntentMessageContent
 
+	// The queue is NEVER closed: discordgo dispatches handlers in its own
+	// goroutines and Close() does not wait for them, so a handler mid-select
+	// could non-deterministically pick the send case after a close and panic.
+	// Lifecycle is cancel-driven instead — runCtx ends the ingest loop and
+	// makes in-flight enqueues return promptly.
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	r := &runner{ing: ing, inbound: deps.Inbound, logger: logger}
 	queue := make(chan []byte, ingestQueueDepth)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		r.ingestLoop(ctx, queue)
+		r.ingestLoop(runCtx, queue)
 	}()
 
 	s.AddHandler(func(_ *discordgo.Session, evt *discordgo.Event) {
-		r.enqueue(ctx, evt, queue)
+		r.enqueue(runCtx, evt, queue)
 	})
 
 	if err := s.Open(); err != nil {
-		close(queue)
+		cancel()
 		wg.Wait()
 		return err
 	}
@@ -129,7 +137,7 @@ func Start(ctx context.Context, deps Deps) error {
 	if cerr := s.Close(); cerr != nil {
 		logger.Warn("discordrunner: close", "err", cerr)
 	}
-	close(queue)
+	cancel()
 	wg.Wait()
 	return ctx.Err()
 }
@@ -162,19 +170,16 @@ func (r *runner) enqueue(ctx context.Context, evt *discordgo.Event, queue chan<-
 	}
 }
 
-// ingestLoop normalizes and ingests queued payloads serially.
-// EnsureUniqueMessage dedups any reconnect redelivery on
-// (account_id, source_message_id).
+// ingestLoop normalizes and ingests queued payloads serially until ctx is
+// cancelled (the queue is never closed — see Start). EnsureUniqueMessage
+// dedups any reconnect redelivery on (account_id, source_message_id).
 func (r *runner) ingestLoop(ctx context.Context, queue <-chan []byte) {
 	for {
 		select {
 		case <-ctx.Done():
 			// Drain nothing further; pending events redeliver via resume.
 			return
-		case payload, ok := <-queue:
-			if !ok {
-				return
-			}
+		case payload := <-queue:
 			r.ingestOne(ctx, payload)
 		}
 	}

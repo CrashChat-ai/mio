@@ -57,11 +57,17 @@ func drive(t *testing.T, events []*discordgo.Event) *fakeIngester {
 	for _, evt := range events {
 		r.enqueue(ctx, evt, queue)
 	}
-	close(queue)
+	// Cancel-driven shutdown (the queue is never closed — see Start); poll
+	// until the serial loop has drained what we enqueued.
+	deadline := time.Now().Add(5 * time.Second)
+	for len(queue) > 0 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	cancel()
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		t.Fatal("ingest loop did not drain")
+		t.Fatal("ingest loop did not stop")
 	}
 	return ing
 }

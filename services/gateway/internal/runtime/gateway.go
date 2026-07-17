@@ -29,10 +29,10 @@ import (
 	"github.com/crashchat-ai/mio/pkg/channels"
 	sdk "github.com/crashchat-ai/mio/sdk-go"
 	"github.com/crashchat-ai/mio/services/gateway/internal/config"
+	"github.com/crashchat-ai/mio/services/gateway/internal/discordrunner"
 	"github.com/crashchat-ai/mio/services/gateway/internal/ratelimit"
 	"github.com/crashchat-ai/mio/services/gateway/internal/sender"
 	"github.com/crashchat-ai/mio/services/gateway/internal/server"
-	"github.com/crashchat-ai/mio/services/gateway/internal/discordrunner"
 	"github.com/crashchat-ai/mio/services/gateway/internal/socketrunner"
 	"github.com/crashchat-ai/mio/services/gateway/store"
 )

@@ -23,6 +23,11 @@ nats:
     merge:
       # Expose Prometheus metrics on port 7777.
       http_port: 8222
+      # server_name intentionally NOT overridden: the upstream chart derives it
+      # per-pod (SERVER_NAME=$(POD_NAME) env + unquoted config default), which
+      # raft REQUIRES to be unique per member in clustered mode. Overriding via
+      # merge renders a quoted literal. Renaming members of an EXISTING cluster
+      # changes raft identities — for clustered deploys, roll members carefully.
 
   podTemplate:
     topologySpreadConstraints:

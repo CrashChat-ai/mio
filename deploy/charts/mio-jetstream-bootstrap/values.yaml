@@ -14,6 +14,11 @@ image:
 retryCount: 5
 retrySleepSeconds: 10
 
+# Raft peers required per stream before verification proceeds. Set to the NATS
+# replica count: single-node deployments (replicas 1) have no raft group at all —
+# `stream cluster info` reports zero "current" peers — so the wait is skipped.
+quorumReplicas: 3
+
 # Expected streams (verify-only; owning services provision these on startup).
 expectedStreams:
   - name: MESSAGES_INBOUND

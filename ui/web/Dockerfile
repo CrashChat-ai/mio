@@ -2,7 +2,7 @@
 
 FROM bufbuild/buf:1.71.0 AS proto
 WORKDIR /src
-COPY buf.yaml buf.gen.yaml ./
+COPY buf.yaml buf.gen.yaml buf.lock ./
 COPY proto/ ./proto/
 RUN buf generate proto
 

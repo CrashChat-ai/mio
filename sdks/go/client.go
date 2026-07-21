@@ -87,16 +87,7 @@ func New(url string, opts ...Option) (*Client, error) {
 		o(cfg)
 	}
 
-	// Build nats.Options slice.
-	natsOpts := []nats.Option{}
-	if cfg.name != "" {
-		natsOpts = append(natsOpts, nats.Name(cfg.name))
-	}
-	if cfg.credFile != "" {
-		natsOpts = append(natsOpts, nats.UserCredentials(cfg.credFile))
-	}
-
-	nc, err := nats.Connect(url, natsOpts...)
+	nc, err := nats.Connect(url, natsOptions(cfg)...)
 	if err != nil {
 		return nil, fmt.Errorf("sdk: nats connect: %w", err)
 	}
@@ -133,6 +124,20 @@ func New(url string, opts ...Option) (*Client, error) {
 		maxAckPending: cfg.maxAckPending,
 		ackWait:       cfg.ackWait,
 	}, nil
+}
+
+func natsOptions(cfg *clientConfig) []nats.Option {
+	opts := []nats.Option{
+		nats.MaxReconnects(-1),
+		nats.ReconnectWait(2 * time.Second),
+	}
+	if cfg.name != "" {
+		opts = append(opts, nats.Name(cfg.name))
+	}
+	if cfg.credFile != "" {
+		opts = append(opts, nats.UserCredentials(cfg.credFile))
+	}
+	return opts
 }
 
 // Close drains and closes the underlying NATS connection.

@@ -3,12 +3,30 @@ package sdk
 import (
 	"strings"
 	"testing"
+	"time"
 
 	miov1 "github.com/crashchat-ai/mio/proto/gen/go/mio/v1"
+	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"google.golang.org/protobuf/proto"
 )
+
+func TestClientNATSOptions_RetryForever(t *testing.T) {
+	opts := nats.GetDefaultOptions()
+	for _, apply := range natsOptions(defaultConfig()) {
+		if err := apply(&opts); err != nil {
+			t.Fatalf("apply NATS option: %v", err)
+		}
+	}
+
+	if opts.MaxReconnect != -1 {
+		t.Fatalf("MaxReconnect = %d, want -1", opts.MaxReconnect)
+	}
+	if opts.ReconnectWait != 2*time.Second {
+		t.Fatalf("ReconnectWait = %s, want 2s", opts.ReconnectWait)
+	}
+}
 
 // --- Subject builder tests ---
 
